@@ -78,12 +78,21 @@ jobs:
         run: |
           if [ -f .env.example ]; then
             cp .env.example .env
-          elif [ -f env.example ]; then
-            cp env.example .env
           else
             touch .env
           fi
-          echo "Dummy .env created"
+          # Подставляем значения для всех обязательных переменных,
+          # которые требует docker-compose.yml (caddy и др.)
+          cat >> .env << 'ENVEOF'
+
+          # --- Значения для CI (не для production) ---
+          ADMIN_DOMAIN=localhost
+          API_DOMAIN=localhost
+          MINIAPP_DOMAIN=localhost
+          CADDY_EMAIL=admin@example.com
+          ENVEOF
+          echo "Dummy .env ready:"
+          cat .env
 
       - name: Validate compose
         run: docker compose config -q
