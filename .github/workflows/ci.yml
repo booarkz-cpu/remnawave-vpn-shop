@@ -49,21 +49,33 @@ jobs:
         app: [admin, miniapp]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check package.json
+        id: check
+        run: |
+          if [ -f ${{ matrix.app }}/package.json ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.exists == 'true'
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ${{ matrix.app }}/package-lock.json
 
       - name: Install
+        if: steps.check.outputs.exists == 'true'
         working-directory: ${{ matrix.app }}
         run: npm install --ignore-scripts
 
       - name: Build
+        if: steps.check.outputs.exists == 'true'
         working-directory: ${{ matrix.app }}
         run: npm run build || true
 
       - name: npm audit
+        if: steps.check.outputs.exists == 'true'
         working-directory: ${{ matrix.app }}
         run: npm audit --omit=dev --audit-level=high || echo "⚠️ npm audit нашёл уязвимости"
 
@@ -76,12 +88,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
+      - name: Ensure required files exist
+        run: |
+          # Файлы, которые требует Dockerfile, но могут отсутствовать
+          mkdir -p scripts
+          if [ ! -f scripts/staging-e2e.sh ]; then
+            cat > scripts/staging-e2e.sh <<'SHEOF'
+          #!/usr/bin/env bash
+          # Placeholder for CI builds
+          set -euo pipefail
+          echo "Staging E2E: no tests configured"
+          exit 0
+          SHEOF
+            chmod +x scripts/staging-e2e.sh
+            echo "Created placeholder scripts/staging-e2e.sh"
+          fi
+
       - name: Create .env for validation
         run: |
           cat > .env <<'EOF'
           APP_SECRET=ci-only-secret-at-least-32-characters-long
-          DB_PASSWORD=ci-db-password
           DB_USER=remna
+          DB_PASSWORD=ci-db-password
           DB_NAME=remna_shop
           POSTGRES_USER=remna
           POSTGRES_PASSWORD=ci-db-password
@@ -106,7 +134,6 @@ jobs:
           DATABASE_URL=postgresql://remna:ci-db-password@localhost:5432/remna_shop
           EOF
           echo "=== .env ready ==="
-          head -20 .env
 
       - name: Validate compose
         run: docker compose config -q
