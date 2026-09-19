@@ -88,22 +88,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
-      - name: Ensure required files exist
-        run: |
-          # Файлы, которые требует Dockerfile, но могут отсутствовать
-          mkdir -p scripts
-          if [ ! -f scripts/staging-e2e.sh ]; then
-            cat > scripts/staging-e2e.sh <<'SHEOF'
-          #!/usr/bin/env bash
-          # Placeholder for CI builds
-          set -euo pipefail
-          echo "Staging E2E: no tests configured"
-          exit 0
-          SHEOF
-            chmod +x scripts/staging-e2e.sh
-            echo "Created placeholder scripts/staging-e2e.sh"
-          fi
-
       - name: Create .env for validation
         run: |
           cat > .env <<'EOF'
