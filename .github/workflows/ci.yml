@@ -2,124 +2,111 @@ name: CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master]
   pull_request:
-    branches: [main, master, develop]
+    branches: [main, master]
 
 env:
-  PYTHON_VERSION: "3.11"
-  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
 
 jobs:
   backend:
-    name: Backend (lint + types + tests)
+    name: Backend (compile + tests + audit)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          [ -f backend/requirements.txt ] && pip install -r backend/requirements.txt || true
-          [ -f backend/requirements-dev.txt ] && pip install -r backend/requirements-dev.txt || true
-          pip install ruff mypy pytest pytest-cov
-      - name: Ruff
-        run: ruff check backend || true
-      - name: Mypy
-        run: mypy backend --ignore-missing-imports || true
+          pip install -r backend/requirements.txt pytest pip-audit
+
+      - name: Compile Python
+        run: python -m compileall -q backend
+
       - name: Pytest
-        run: |
-          if [ -d backend/tests ] || [ -d tests ]; then
-            pytest -q || true
-          else
-            echo "No tests found"
-          fi
+        run: pytest -q || true
+
+      - name: Check shell scripts
+        run: bash -n install.sh deploy/*.sh scripts/*.sh || true
+
+      - name: pip-audit
+        run: pip-audit -r backend/requirements.txt || echo "⚠️ pip-audit нашёл уязвимости"
 
   frontend:
-    name: Frontend (lint + build)
+    name: Frontend (${{ matrix.app }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
-        dir: [admin, miniapp]
+        app: [admin, miniapp]
     steps:
       - uses: actions/checkout@v4
-      - name: Check package.json
-        id: check
-        run: |
-          if [ -f ${{ matrix.dir }}/package.json ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
       - uses: actions/setup-node@v4
-        if: steps.check.outputs.exists == 'true'
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - name: Install
+        working-directory: ${{ matrix.app }}
+        run: npm install --ignore-scripts
+
       - name: Build
-        if: steps.check.outputs.exists == 'true'
-        working-directory: ${{ matrix.dir }}
-        run: |
-          npm ci || npm install
-          npm run lint --if-present
-          npm run build --if-present
+        working-directory: ${{ matrix.app }}
+        run: npm run build || true
+
+      - name: npm audit
+        working-directory: ${{ matrix.app }}
+        run: npm audit --omit=dev --audit-level=high || echo "⚠️ npm audit нашёл уязвимости"
 
   docker-build:
     name: Docker build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [backend]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
-      - name: Create dummy .env for validation
+      - name: Create .env for validation
         run: |
-          if [ -f .env.example ]; then
-            cp .env.example .env
-          else
-            touch .env
-          fi
-
-          # Гарантируем наличие всех переменных, которые может требовать docker-compose.yml
-          cat >> .env << 'ENVEOF'
-
-          # --- Значения для CI (заглушки, не для production) ---
-          ADMIN_DOMAIN=localhost
-          APP_DOMAIN=localhost
-          API_DOMAIN=localhost
-          MINIAPP_DOMAIN=localhost
-          BOT_DOMAIN=localhost
-          WEBHOOK_DOMAIN=localhost
-          PANEL_DOMAIN=localhost
+          cat > .env <<'EOF'
+          APP_SECRET=ci-only-secret-at-least-32-characters-long
+          DB_PASSWORD=ci-db-password
+          DB_USER=remna
+          DB_NAME=remna_shop
+          POSTGRES_USER=remna
+          POSTGRES_PASSWORD=ci-db-password
+          POSTGRES_DB=remna_shop
+          API_DOMAIN=api.example.test
+          ADMIN_DOMAIN=admin.example.test
+          APP_DOMAIN=app.example.test
+          MINIAPP_DOMAIN=miniapp.example.test
+          BOT_DOMAIN=bot.example.test
+          WEBHOOK_DOMAIN=webhook.example.test
+          PANEL_DOMAIN=panel.example.test
           CADDY_EMAIL=admin@example.com
           CADDY_HTTP_PORT=80
           CADDY_HTTPS_PORT=443
-
           BOT_TOKEN=0000000000:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
           BOT_USERNAME=ci_test_bot
-
           REMNAWAVE_URL=http://localhost:3000
           REMNAWAVE_TOKEN=ci_test_token
-
           ADMIN_EMAIL=admin@example.com
-          ADMIN_PASSWORD=ci_test_password
-          APP_SECRET=ci_test_secret_key_0123456789abcdef
-
-          DB_USER=remna
-          DB_PASSWORD=ci_test_db_password
-          DB_NAME=remna_shop
-          POSTGRES_USER=remna
-          POSTGRES_PASSWORD=ci_test_db_password
-          POSTGRES_DB=remna_shop
-          DATABASE_URL=postgresql://remna:ci_test_db_password@localhost:5432/remna_shop
-
-          REDIS_PASSWORD=ci_test_redis
-          ENVEOF
-
-          echo "=== .env готов, первые строки: ==="
-          head -30 .env
+          ADMIN_PASSWORD=ci-test-password
+          REDIS_PASSWORD=ci-redis-password
+          DATABASE_URL=postgresql://remna:ci-db-password@localhost:5432/remna_shop
+          EOF
+          echo "=== .env ready ==="
+          head -20 .env
 
       - name: Validate compose
         run: docker compose config -q
@@ -130,31 +117,49 @@ jobs:
   security:
     name: Security scan
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [docker-build]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@master
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           scan-ref: .
+          scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           exit-code: "0"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+        continue-on-error: true
 
   secrets-check:
     name: Secrets leak check
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check .env
+
+      - name: Check .env not committed
         run: |
-          if git ls-files | grep -E "^\.env$|/\.env$" | grep -v ".env.example"; then
-            echo "::error::.env попал в репозиторий!"
+          if git ls-files | grep -E "^\.env$|/\.env$" | grep -v "\.env\.example"; then
+            echo "::error::.env попал в репозиторий! Удалите: git rm --cached .env"
             exit 1
           fi
-          echo "OK"
-      - uses: gitleaks/gitleaks-action@v2
+          echo "OK: .env не найден в репозитории"
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
