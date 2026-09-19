@@ -1,0 +1,25 @@
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: test_password
+  backend:
+    ports:
+      - "18000:8000"
+    environment:
+      APP_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      DATABASE_URL: postgresql+asyncpg://vpnshop:test_password@db:5432/vpnshop
+      REDIS_URL: redis://redis:6379/0
+      METRICS_TOKEN: integration-test-token
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: lax
+      API_DOMAIN: localhost
+      ADMIN_DOMAIN: localhost
+      APP_DOMAIN: localhost
+  worker:
+    environment:
+      APP_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      DATABASE_URL: postgresql+asyncpg://vpnshop:test_password@db:5432/vpnshop
+      REDIS_URL: redis://redis:6379/0
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: lax
+      WORKER_ROLE: integration

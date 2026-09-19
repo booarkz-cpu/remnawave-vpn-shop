@@ -1,0 +1,1 @@
+Initialize revisions with `alembic revision --autogenerate -m initial` in a controlled deployment.

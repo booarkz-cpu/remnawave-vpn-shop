@@ -1,0 +1,42 @@
+{
+  "version": "2.2.1",
+  "legacy_v2_1_0_version_marker": "2.1.0",
+  "legacy_v2_1_0_contract": {
+    "version": "2.1.0"
+  },
+  "legacy_v2_0_2_audited_version_marker": "2.0.2-audited",
+  "legacy_v2_0_2_contract": {
+    "version": "2.0.2-audited"
+  },
+  "artifact": "remnawave_vpn_shop_v2_2_1_full_release.zip",
+  "sha256": null,
+  "migration_head": "0034_v2_2_0_platform_features",
+  "previous_migration_head_legacy_marker": "0021_v43_hardening_docs",
+  "tests": null,
+  "signed": false,
+  "detached_manifest": "remnawave_vpn_shop_v2_2_1_full_release_manifest.json",
+  "note": "Template only. The exact release manifest is shipped as a detached file next to the ZIP because embedding the ZIP SHA inside the ZIP is self-referential.",
+  "previous_release": "2.0.0-realise",
+  "legacy_version_marker": "version: 2.0.0-realise",
+  "previous_release_legacy_marker": "1.0.0-realise",
+  "previous_release_manifest_legacy_marker": "remnawave_vpn_shop_v1_0_2_realise_deep_audited_fixed_manifest.json",
+  "previous_migration_head": "0021_v43_hardening_docs",
+  "legacy_previous_release": "39.0.0-production",
+  "legacy_previous_migration_head": "0017_v39_staging_isolation",
+  "previous_release_v43_legacy_marker": "43.1.0-production",
+  "previous_release_artifact_legacy_marker": "remnawave_vpn_shop_v1_0_2_realise_deep_audited_fixed.zip",
+  "legacy_v1_0_0_marker": "1.0.0-realise",
+  "legacy_v1_0_0_manifest_marker": "remnawave_vpn_shop_v1_0_0_realise_deep_audited_fixed_manifest.json",
+  "legacy_v1_0_0_version_marker": "version: 1.0.0-realise",
+  "legacy_v1_0_0_contract": {
+    "version": "1.0.0-realise"
+  },
+  "legacy_v1_0_0_artifact_marker": "remnawave_vpn_shop_v1_0_0_realise_deep_audited_fixed.zip",
+  "legacy_compatibility": {
+    "version": "1.0.1-realise"
+  },
+  "previous_release_migration_head": "0032_v2_0_0_product_features",
+  "legacy_previous_release_contract": {
+    "version": "2.0.0-realise"
+  }
+}

@@ -1,0 +1,18 @@
+{$ADMIN_DOMAIN} {
+    encode zstd gzip
+    handle /api/* { reverse_proxy backend:8000 }
+    handle /media/* { reverse_proxy backend:8000 }
+    handle { reverse_proxy admin:80 }
+}
+
+{$APP_DOMAIN} {
+    encode zstd gzip
+    handle /api/* { reverse_proxy backend:8000 }
+    handle /media/* { reverse_proxy backend:8000 }
+    handle { reverse_proxy miniapp:80 }
+}
+
+{$API_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy backend:8000
+}
