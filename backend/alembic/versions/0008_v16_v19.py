@@ -15,7 +15,7 @@ def upgrade():
     op.alter_column("users", "referral_code", nullable=False)
     op.create_unique_constraint("uq_users_referral_code", "users", ["referral_code"])
     op.create_index("ix_users_referral_code", "users", ["referral_code"])
-   for name, col in [
+    for name, col in [
         ("fulfillment_status", sa.String(32)),
         ("fulfillment_attempts",sa.Integer()),
         ("fulfillment_error",sa.Text()),

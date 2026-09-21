@@ -219,6 +219,22 @@ class Settings(BaseSettings):
     admin_port: int = Field(default=3000, alias="ADMIN_PORT")
     miniapp_port: int = Field(default=8080, alias="MINIAPP_PORT")
 
+    # ---------- Файлы и каталоги ----------
+    # Docker Compose монтирует эти пути в backend/worker. Не меняйте их,
+    # если не меняете volumes в docker-compose.yml.
+    media_dir: str = Field(default="/data/media", alias="MEDIA_DIR")
+    backups_dir: str = Field(default="/data/backups", alias="BACKUPS_DIR")
+    project_dir: str = Field(default="/project", alias="PROJECT_DIR")
+    backup_s3_prefix: str = Field(default="vpn-shop", alias="BACKUP_S3_PREFIX")
+
+    # ---------- Yandex ID ----------
+    yandex_client_id: str = Field(default="", alias="YANDEX_CLIENT_ID")
+    yandex_client_secret: str = Field(default="", alias="YANDEX_CLIENT_SECRET")
+    yandex_redirect_uri: str = Field(default="", alias="YANDEX_REDIRECT_URI")
+
+    # Жёсткий env-флаг. Операционный режим также хранится в настройке БД maintenance_mode.
+    maintenance_mode: bool = Field(default=False, alias="MAINTENANCE_MODE")
+
     # ---------- Валидаторы ----------
     @field_validator("admin_cors_origins", mode="before")
     @classmethod

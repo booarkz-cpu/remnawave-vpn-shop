@@ -1,51 +1,68 @@
 # Remnawave VPN Shop 2.2.1
 
-> **Status: 🚧 In active development — not a final production release.**
+Платформа магазина VPN: Telegram Mini App, админ-панель, API, платежи YooKassa / Platega / RollyPay, выдача доступа в Remnawave, очереди, резервные копии и мониторинг.
 
-Полноценная платформа VPN-магазина с Telegram Mini App, административной панелью, backend API, платежами, провижинингом Remnawave, очередями задач, мониторингом и инструментами эксплуатации.
+The same product in English: a VPN shop with a Telegram Mini App, an admin console, a FastAPI backend, three payment providers, Remnawave provisioning, backups and monitoring.
 
-## Состав проекта
+Состояние: **2.2.1, активная разработка**. Перед production пройдите `INSTRUCTION.md` и `PRODUCTION_CHECKLIST.md`.
 
-- **Backend:** Python / FastAPI, PostgreSQL, Redis
-- **Admin:** React + Vite
-- **Mini App:** React + Vite / Telegram WebApp
-- **Infrastructure:** Docker Compose, Caddy, VPS deployment scripts
-- **Operations:** backup/restore, health checks, preflight/security checks, rollback и release tooling
-- **Tests:** regression, production и release-quality тесты
+## Состав
+
+| Часть | Технология |
+| --- | --- |
+| API и бот | Python, FastAPI, aiogram, PostgreSQL, Redis |
+| Админка | React, Vite |
+| Mini App | React, Vite, Telegram WebApp |
+| Периметр | Docker Compose, Caddy |
+| Проверки | `tests/` |
 
 ## Возможности
 
-Проект включает подписки, мультиустройства, автопродление, промокоды и подарки, реферальную программу, поддержку, уведомления, антифрод, финансовый журнал, мониторинг, управление узлами Remnawave, резервное копирование и восстановление, аудит действий и production security hardening.
+Подписки и пробный период, несколько устройств, автопродление YooKassa, промокоды, подарки, реферальная программа, поддержка, уведомления, антифрод, финансовый журнал, мониторинг, резервное копирование, аудит действий, RBAC и необязательная 2FA.
 
-## Текущий статус
-
-Версия в архиве: **2.2.1**.
-
-Проект продолжает развиваться. Возможны незавершённые функции, изменения API/конфигурации и изменения deployment-процесса. Перед использованием в production необходимо самостоятельно пройти процедуры из `INSTALL.md`, `PRODUCTION_CHECKLIST.md` и актуальных audit/release документов.
+Интерфейсы админки, Mini App и ответы бота доступны на **русском и английском**. Переключатель в интерфейсе пишет выбор в `localStorage` (`rw_lang`). Пока выбора нет, используется `DEFAULT_LANGUAGE` и язык браузера или Telegram.
 
 ## Быстрый старт
 
-1. Скопировать `.env.example` в `.env` только для локальной настройки.
-2. Задать реальные секреты и параметры окружения.
-3. Ознакомиться с `INSTALL.md`.
-4. Для production использовать deployment-инструкции и preflight-проверки из `deploy/` и `scripts/`.
+```bash
+cp .env.example .env
+# Заполните APP_SECRET (не короче 32 символов), пароль БД, BOT_TOKEN,
+# REMNAWAVE_URL, REMNAWAVE_TOKEN, ADMIN_EMAIL, ADMIN_PASSWORD
+# и allowlist IP вебхуков YooKassa.
+docker compose up -d --build
+```
 
-**Никогда не коммитьте `.env`, реальные токены, пароли или приватные ключи.**
+Одношаговая установка на Debian/Ubuntu:
+
+```bash
+sudo bash install.sh
+```
+
+Подробности, первый вход, платежи, бэкапы и разбор экранов — в `INSTRUCTION.md`.
+
+Не коммитьте `.env`, токены, пароли и приватные ключи.
 
 ## Документация
 
-- `INSTALL.md` — установка
-- `PRODUCTION_CHECKLIST.md` — production checklist
-- `OPERATIONS_RUNBOOK_RU.md` — эксплуатация
-- `API_REFERENCE_RU.md` — API
-- `SECURITY_MODEL_RU.md` — модель безопасности
-- `AUDIT_REPORT_V2_2_1_RU.md` — актуальный аудит
-- `RELEASE_DOCUMENTATION_INDEX_RU.md` — индекс release-документации
+| Файл | Содержание |
+| --- | --- |
+| `INSTRUCTION.md` | Полная инструкция на русском и английском |
+| `FUNCTIONS.md` | Разбор функций backend и интерфейсов |
+| `SECURITY.md` | Модель безопасности, RU/EN |
+| `SECURITY_MODEL_RU.md` | Краткая модель на русском |
+| `INSTALL.md` | Установщик |
+| `PRODUCTION_CHECKLIST.md` | Чеклист production |
+| `.env.example` | Все переменные окружения |
 
-## Contributing
+## Локальная проверка
 
-Проект находится в разработке. Issues и pull requests приветствуются. Перед внесением изменений рекомендуется ознакомиться с документацией, тестами и release/audit материалами.
+```bash
+python3 -m compileall -q backend
+python3 -m pytest -q
+cd admin && npm ci && npx vite build
+cd miniapp && npm install && npx vite build
+```
 
-## License
+## Лицензия
 
-License не указан в исходном архиве. Использование и распространение следует согласовать с владельцем проекта до публичного релиза.
+В архиве лицензия не указана. Использование и распространение согласуйте с владельцем репозитория до публичного релиза.

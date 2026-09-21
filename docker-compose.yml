@@ -42,6 +42,10 @@ services:
         PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}
     restart: unless-stopped
     env_file: .env
+    environment:
+      MEDIA_DIR: /data/media
+      BACKUPS_DIR: /data/backups
+      PROJECT_DIR: /project
     depends_on:
       db:
         condition: service_healthy
@@ -80,6 +84,9 @@ services:
     env_file: .env
     environment:
       WORKER_ROLE: worker
+      MEDIA_DIR: /data/media
+      BACKUPS_DIR: /data/backups
+      PROJECT_DIR: /project
     depends_on:
       db:
         condition: service_healthy

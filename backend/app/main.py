@@ -128,6 +128,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             _REQUEST_ID.reset(token)
 
     async def _dispatch(self, request, call_next):
+        from fastapi.responses import JSONResponse
         limit = RATE_LIMITS.get(request.url.path)
         if limit is None and request.url.path.startswith("/api/admin/"):
             limit = 120 if request.method == "GET" else 40
@@ -684,7 +685,7 @@ async def public_config(db:AsyncSession=Depends(get_db)):
         payment_providers=await _payment_provider_order(db,None)
     except HTTPException:
         payment_providers=[]
-    return {"app_name":values.get("app_name","VPN Store"),"bot_name":values.get("bot_name","VPN Shop"),"bot_start_image":values.get("bot_start_image",""),"menu":[{"title":m.title,"action":m.action,"type":m.item_type} for m in menus],"fields":[{"key":f.key,"label":f.label,"type":f.field_type,"value":f.value} for f in fields],"images":[{"title":i.title,"url":"/media/"+i.filename} for i in images],"yandex_enabled":bool(settings.yandex_client_id and settings.yandex_redirect_uri),"advertisements":[{"title":a.title,"text":a.text,"image_url":a.image_url,"button_text":a.button_text,"button_url":a.button_url} for a in ads],"promotions":[{"id":p.id,"name":p.name,"kind":p.kind,"value":float(p.value),"description":p.description,"plan_ids":p.plan_ids} for p in promos],"miniapp":{"title":values.get("miniapp_title",values.get("app_name","VPN Store")),"subtitle":values.get("miniapp_subtitle",""),"background_color":values.get("miniapp_background_color","#f5f7fb"),"background_image":values.get("miniapp_background_image",""),"image":values.get("miniapp_image",""),"instructions":values.get("miniapp_instructions",""),"buttons":mini_buttons},"payment_providers":payment_providers}
+    return {"default_language": settings.default_language if settings.default_language in {"ru","en"} else "ru","app_name":values.get("app_name","VPN Store"),"bot_name":values.get("bot_name","VPN Shop"),"bot_start_image":values.get("bot_start_image",""),"menu":[{"title":m.title,"action":m.action,"type":m.item_type} for m in menus],"fields":[{"key":f.key,"label":f.label,"type":f.field_type,"value":f.value} for f in fields],"images":[{"title":i.title,"url":"/media/"+i.filename} for i in images],"yandex_enabled":bool(settings.yandex_client_id and settings.yandex_redirect_uri),"advertisements":[{"title":a.title,"text":a.text,"image_url":a.image_url,"button_text":a.button_text,"button_url":a.button_url} for a in ads],"promotions":[{"id":p.id,"name":p.name,"kind":p.kind,"value":float(p.value),"description":p.description,"plan_ids":p.plan_ids} for p in promos],"miniapp":{"title":values.get("miniapp_title",values.get("app_name","VPN Store")),"subtitle":values.get("miniapp_subtitle",""),"background_color":values.get("miniapp_background_color","#f5f7fb"),"background_image":values.get("miniapp_background_image",""),"image":values.get("miniapp_image",""),"instructions":values.get("miniapp_instructions",""),"buttons":mini_buttons},"payment_providers":payment_providers}
 
 @app.get("/api/me")
 async def api_me(request:Request,db:AsyncSession=Depends(get_db)):
@@ -1356,7 +1357,8 @@ async def finish_provider_event(db:AsyncSession, provider:str, event_id:str, *, 
 @app.post("/api/webhooks/yookassa")
 async def yookassa_webhook(request:Request, db:AsyncSession=Depends(get_db)):
     client_ip=_client_ip(request)
-    if settings.yookassa_webhook_ip_allowlist and not _ip_allowed(client_ip,settings.yookassa_webhook_ip_allowlist): raise HTTPException(403,"Webhook IP not allowed")
+    # Fail closed: an empty allowlist must not accept unsigned YooKassa notifications.
+    if not settings.yookassa_webhook_ip_allowlist or not _ip_allowed(client_ip,settings.yookassa_webhook_ip_allowlist): raise HTTPException(403,"Webhook IP not allowed")
     raw=await request.body()
     try: d=json.loads(raw)
     except Exception: raise HTTPException(400,"Invalid JSON")
@@ -3549,7 +3551,7 @@ async def admin_bot_start_image(file:UploadFile=File(...),db:AsyncSession=Depend
     if row: old=row.value; row.value=new_url
     else: db.add(AppSetting(key="bot_start_image",value=new_url)); old=""
     if old.startswith("/media/"):
-        try: pathlib.Path(settings.media_dir,old.removeprefix("/media/")).unlink(missing_ok=True)
+        try: pathlib.Path(settings.media_dir, pathlib.Path(old.removeprefix("/media/")).name).unlink(missing_ok=True)
         except Exception as exc: logger.warning("Unable to remove old bot image: %s",exc)
     await audit(db,"content.bot.start_image.updated",admin.email)
     await db.commit()
@@ -3559,7 +3561,7 @@ async def admin_bot_start_image(file:UploadFile=File(...),db:AsyncSession=Depend
 async def admin_bot_start_image_delete(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_content"))):
     row=await db.get(AppSetting,"bot_start_image")
     if row and row.value.startswith("/media/"):
-        try: pathlib.Path(settings.media_dir,row.value.removeprefix("/media/")).unlink(missing_ok=True)
+        try: pathlib.Path(settings.media_dir, pathlib.Path(row.value.removeprefix("/media/")).name).unlink(missing_ok=True)
         except Exception as exc: logger.warning("Unable to remove bot image: %s",exc)
     if row: row.value=""
     await audit(db,"content.bot.start_image.deleted",admin.email)
@@ -3611,7 +3613,7 @@ async def admin_miniapp_image(file:UploadFile=File(...),db:AsyncSession=Depends(
     if row: old=row.value; row.value=new_url
     else: db.add(AppSetting(key="miniapp_image",value=new_url)); old=""
     if old.startswith("/media/"):
-        try: pathlib.Path(settings.media_dir,old.removeprefix("/media/")).unlink(missing_ok=True)
+        try: pathlib.Path(settings.media_dir, pathlib.Path(old.removeprefix("/media/")).name).unlink(missing_ok=True)
         except Exception as exc: logger.warning("Unable to remove old miniapp image: %s",exc)
     await audit(db,"content.miniapp.image.updated",admin.email); await db.commit(); return {"ok":True,"url":new_url}
 
@@ -3619,7 +3621,7 @@ async def admin_miniapp_image(file:UploadFile=File(...),db:AsyncSession=Depends(
 async def admin_miniapp_image_delete(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_content"))):
     row=await db.get(AppSetting,"miniapp_image")
     if row and row.value.startswith("/media/"):
-        try: pathlib.Path(settings.media_dir,row.value.removeprefix("/media/")).unlink(missing_ok=True)
+        try: pathlib.Path(settings.media_dir, pathlib.Path(row.value.removeprefix("/media/")).name).unlink(missing_ok=True)
         except Exception as exc: logger.warning("Unable to remove miniapp image: %s",exc)
     if row: row.value=""
     await audit(db,"content.miniapp.image.deleted",admin.email); await db.commit(); return {"ok":True}
@@ -3631,6 +3633,7 @@ async def admin_miniapp_background(file:UploadFile=File(...),db:AsyncSession=Dep
     if not _valid_image_signature(data,file.content_type): raise HTTPException(400,"Invalid image signature")
     ext={"image/jpeg":".jpg","image/png":".png","image/webp":".webp"}[file.content_type]
     name="miniapp-bg-"+secrets.token_hex(16)+ext
+    pathlib.Path(settings.media_dir).mkdir(parents=True,exist_ok=True)
     pathlib.Path(settings.media_dir,name).write_bytes(data)
     row=await db.get(AppSetting,"miniapp_background_image")
     if not row: db.add(AppSetting(key="miniapp_background_image",value="/media/"+name))
@@ -3638,7 +3641,7 @@ async def admin_miniapp_background(file:UploadFile=File(...),db:AsyncSession=Dep
         old=row.value
         row.value="/media/"+name
         if old.startswith("/media/"):
-            try: pathlib.Path(settings.media_dir,old.removeprefix("/media/")).unlink(missing_ok=True)
+            try: pathlib.Path(settings.media_dir, pathlib.Path(old.removeprefix("/media/")).name).unlink(missing_ok=True)
             except Exception as exc:
                 logger.warning("Non-critical operation failed: %s", exc)
     await audit(db,"content.miniapp.background.updated",admin.email)
@@ -3649,7 +3652,7 @@ async def admin_miniapp_background(file:UploadFile=File(...),db:AsyncSession=Dep
 async def admin_miniapp_background_delete(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_content"))):
     row=await db.get(AppSetting,"miniapp_background_image")
     if row and row.value.startswith("/media/"):
-        try: pathlib.Path(settings.media_dir,row.value.removeprefix("/media/")).unlink(missing_ok=True)
+        try: pathlib.Path(settings.media_dir, pathlib.Path(row.value.removeprefix("/media/")).name).unlink(missing_ok=True)
         except Exception as exc:
             logger.warning("Non-critical operation failed: %s", exc)
     if row: row.value=""

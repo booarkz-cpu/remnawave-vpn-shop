@@ -12,6 +12,39 @@ from .models import AppSetting,BotMenuItem,CustomField,Promotion,Advertisement,P
 
 router=Router()
 
+_BOT_TEXT = {
+    "ru": {
+        "welcome": "Добро пожаловать в {name}!",
+        "prices": "Актуальные цены",
+        "scope": " для выбранных тарифов",
+        "open": "🛒 Открыть магазин",
+        "promo_usage": "Использование: /promo КОД",
+        "promo_ready": "Промокод <b>{code}</b>. Откройте магазин и примените его к тарифу.",
+    },
+    "en": {
+        "welcome": "Welcome to {name}!",
+        "prices": "Current prices",
+        "scope": " for selected plans",
+        "open": "🛒 Open shop",
+        "promo_usage": "Usage: /promo CODE",
+        "promo_ready": "Promo code <b>{code}</b>. Open the shop and apply it to a plan.",
+    },
+}
+
+def _lang(message: Message | None = None) -> str:
+    code = ""
+    if message is not None and message.from_user and message.from_user.language_code:
+        code = message.from_user.language_code
+    code = (code or settings.default_language or "ru").lower()
+    return "en" if code.startswith("en") else "ru"
+
+def _tr(lang: str, key: str, **kwargs) -> str:
+    table = _BOT_TEXT.get(lang) or _BOT_TEXT["ru"]
+    text = table[key]
+    for name, value in kwargs.items():
+        text = text.replace("{" + name + "}", str(value))
+    return text
+
 async def get_bot_config():
     async with AsyncSession(engine,expire_on_commit=False) as db:
         vals={x.key:x.value for x in (await db.execute(select(AppSetting))).scalars().all()}
@@ -25,11 +58,12 @@ async def get_bot_config():
         plans=(await db.execute(select(Plan).where(Plan.enabled.is_(True)).order_by(Plan.id))).scalars().all()
         return vals,menu,fields,ads,promos,plans
 
-def promo_text(promos,plans):
+def promo_text(promos,plans,lang="ru"):
     chunks=[]
+    discount_word = "скидка" if lang != "en" else "off"
     for p in promos:
-        scope="" if not p.plan_ids else " для выбранных тарифов"
-        chunks.append(f"🎁 <b>{escape(p.name)}</b> — скидка {p.value:g}{'%' if p.kind=='percent' else ' ₽'}{scope}.\n{escape(p.description)}".strip())
+        scope="" if not p.plan_ids else _tr(lang, "scope")
+        chunks.append(f"🎁 <b>{escape(p.name)}</b> — {discount_word} {p.value:g}{'%' if p.kind=='percent' else ' ₽'}{scope}.\n{escape(p.description)}".strip())
     return "\n\n".join(chunks)
 
 
@@ -74,6 +108,7 @@ async def broadcast_worker(bot:Bot):
 @router.message(CommandStart())
 async def start(message:Message):
     vals,menu,fields,ads,promos,plans=await get_bot_config()
+    lang=_lang(message)
     buttons=[]; field_text=[]
     for m in menu:
         if m.item_type=="webapp":
@@ -86,9 +121,9 @@ async def start(message:Message):
         elif m.item_type=="field":
             f=next((x for x in fields if x.key==m.action),None)
             if f: field_text.append(f"<b>{escape(f.label)}</b>\n{escape(f.value)}")
-    if not buttons: buttons=[[InlineKeyboardButton(text="🛒 Открыть магазин",web_app=WebAppInfo(url=settings.mini_app_url))]]
-    name=escape(vals.get("bot_name") or "VPN Shop"); text=f"Добро пожаловать в {name}!"
-    pt=promo_text(promos,plans)
+    if not buttons: buttons=[[InlineKeyboardButton(text=_tr(lang,"open"),web_app=WebAppInfo(url=settings.mini_app_url))]]
+    name=escape(vals.get("bot_name") or "VPN Shop"); text=_tr(lang,"welcome",name=name)
+    pt=promo_text(promos,plans,lang)
     if pt: text += "\n\n"+pt
     price_lines=[]
     for plan in plans:
@@ -98,7 +133,7 @@ async def start(message:Message):
             discount=price*float(promo_obj.value)/100 if promo_obj.kind=="percent" else min(price,float(promo_obj.value))
             price_lines.append(f"• {escape(plan.name)}: <s>{price:.2f} ₽</s> <b>{price-discount:.2f} ₽</b>")
         else: price_lines.append(f"• {escape(plan.name)}: <b>{price:.2f} ₽</b>")
-    if price_lines: text += "\n\n💳 <b>Актуальные цены</b>\n"+"\n".join(price_lines)
+    if price_lines: text += "\n\n💳 <b>"+_tr(lang,"prices")+"</b>\n"+"\n".join(price_lines)
     for a in ads:
         text += f"\n\n📣 <b>{escape(a.title)}</b>\n{escape(a.text)}"
         if a.button_text and a.button_url: buttons.append([InlineKeyboardButton(text=a.button_text,url=a.button_url)])
@@ -117,13 +152,15 @@ async def start(message:Message):
 
 @router.message(Command("promo"))
 async def promo(message:Message):
+    lang=_lang(message)
     code=(message.text or "").split(maxsplit=1)
     if len(code)<2:
-        await message.answer("Использование: /promo КОД")
+        await message.answer(_tr(lang,"promo_usage"))
         return
     # Deep-link into Mini App with the code; server validates it again before payment.
     from urllib.parse import quote
-    await message.answer(f"Промокод <b>{code[1].strip().upper()}</b>. Откройте магазин и примените его к тарифу.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🛒 Открыть магазин",web_app=WebAppInfo(url=settings.mini_app_url+"?promo="+quote(code[1].strip().upper())))] ]),parse_mode="HTML")
+    promo_code=code[1].strip().upper()
+    await message.answer(_tr(lang,"promo_ready",code=escape(promo_code)),reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=_tr(lang,"open"),web_app=WebAppInfo(url=settings.mini_app_url+"?promo="+quote(promo_code)))] ]),parse_mode="HTML")
 
 async def main():
     if not settings.bot_token: raise RuntimeError("BOT_TOKEN is empty")
