@@ -15,14 +15,14 @@ def upgrade():
     op.alter_column("users", "referral_code", nullable=False)
     op.create_unique_constraint("uq_users_referral_code", "users", ["referral_code"])
     op.create_index("ix_users_referral_code", "users", ["referral_code"])
-    for name, col in [
-    ("fulfillment_status", sa.String(32)),
-    ("fulfillment_attempts", sa.Integer()),
-    ("fulfillment_error", sa.Text()),
-    ("next_retry_at", sa.DateTime()),
-    ("idempotency_key", sa.String(128)),
+   for name, col in [
+        ("fulfillment_status", sa.String(32)),
+        ("fulfillment_attempts",sa.Integer()),
+        ("fulfillment_error",sa.Text()),
+        ("next_retry_at",sa.DateTime()),
+        ("idempotency_key",sa.String(128))
     ]:
-    op.add_column("payments", sa.Column(name, col, nullable=True))
+        op.add_column("payments", sa.Column(name, col, nullable=True))
     op.execute("UPDATE payments SET fulfillment_status=CASE WHEN status='paid' THEN 'completed' ELSE 'pending' END WHERE fulfillment_status IS NULL")
     op.execute("UPDATE payments SET fulfillment_attempts=0 WHERE fulfillment_attempts IS NULL")
     op.alter_column("payments","fulfillment_status",nullable=False,server_default="pending")
