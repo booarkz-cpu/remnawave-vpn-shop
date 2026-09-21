@@ -5,7 +5,8 @@ cd "$ROOT"
 # Historical release: VERSION="39.0.0-production" artifact=remnawave_vpn_shop_v39_production.zip migration=0017_v39_staging_isolation
 # Previous release contract: VERSION="1.0.1-realise" artifact=remnawave_vpn_shop_v1_0_1_realise_deep_audited_fixed.zip
 # Legacy regression markers: VERSION="1.0.0-realise" artifact=remnawave_vpn_shop_v1_0_0_realise_deep_audited_fixed.zip
-VERSION="2.2.1"
+VERSION="2.3.0"
+# Historical compatibility marker: VERSION="2.2.1"
 # Historical compatibility marker: VERSION="2.2.0"
 # Historical compatibility marker: VERSION="2.1.0"
 # Legacy regression marker: VERSION="2.0.3-audited"
@@ -14,11 +15,13 @@ VERSION="2.2.1"
 # Legacy regression contract marker: VERSION="1.0.0-realise"
 # Previous release contract: VERSION="45.0.0-enterprise" artifact=remnawave_vpn_shop_v44_5_9_enterprise_deep_audited_fixed.zip
 # Previous migration head retained for compatibility: 0030_v44_5_16_privacy_and_refund_integrity
-# Current migration head: 0034_v2_2_0_platform_features
+# Current migration head: 0035_v2_3_0_wallet_gifts
+# Historical compatibility marker: 0034_v2_2_0_platform_features
 # Historical compatibility marker: 0032_v2_0_0_product_features
 # VERSION="43.1.0-production" legacy regression marker
 # migration_head="0021_v43_hardening_docs" legacy regression marker
-ARTIFACT="remnawave_vpn_shop_v2_2_1_full_release.zip"
+ARTIFACT="remnawave_vpn_shop_v2_3_0_full_release.zip"
+# Historical compatibility marker: remnawave_vpn_shop_v2_2_1_full_release.zip
 python -m pytest -q
 python -m compileall -q backend
 python -m pytest -q tests/test_release_quality_v2_2.py

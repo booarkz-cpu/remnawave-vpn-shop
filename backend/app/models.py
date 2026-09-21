@@ -15,6 +15,7 @@ class User(Base):
     referred_by_id: Mapped[int|None] = mapped_column(Integer, index=True)
     auto_renew_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     referral_balance: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
+    wallet_balance: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     deleted_at: Mapped[datetime|None] = mapped_column(DateTime)
 
@@ -58,6 +59,8 @@ class Payment(Base):
     fulfillment_max_attempts: Mapped[int] = mapped_column(Integer, default=8, nullable=False)
     fulfillment_terminal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     idempotency_key: Mapped[str|None] = mapped_column(String(128), index=True)
+    purpose: Mapped[str] = mapped_column(String(24), default="subscription", nullable=False)
+    bonus_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     checkout_url: Mapped[str|None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     paid_at: Mapped[datetime|None] = mapped_column(DateTime)
@@ -197,6 +200,8 @@ class GiftCode(Base):
     used_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     expires_at: Mapped[datetime|None] = mapped_column(DateTime)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    purchaser_user_id: Mapped[int|None] = mapped_column(Integer, index=True)
+    idempotency_key: Mapped[str|None] = mapped_column(String(128), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 class GiftRedemption(Base):

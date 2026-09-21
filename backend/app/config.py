@@ -164,6 +164,12 @@ class Settings(BaseSettings):
     auto_renew_enabled: bool = Field(
         default=False, alias="AUTO_RENEW_ENABLED"
     )
+    auto_renew_lead_days: int = Field(
+        default=3, alias="AUTO_RENEW_LEAD_DAYS", ge=1, le=14
+    )
+    required_telegram_channel: str = Field(
+        default="", alias="REQUIRED_TELEGRAM_CHANNEL"
+    )
     fulfillment_max_attempts: int = Field(
         default=8, alias="FULFILLMENT_MAX_ATTEMPTS"
     )

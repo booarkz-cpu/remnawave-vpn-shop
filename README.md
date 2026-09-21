@@ -1,10 +1,10 @@
-# Remnawave VPN Shop 2.2.1
+# Remnawave VPN Shop 2.3.0
 
 Платформа магазина VPN: Telegram Mini App, админ-панель, API, платежи YooKassa / Platega / RollyPay, выдача доступа в Remnawave, очереди, резервные копии и мониторинг.
 
 The same product in English: a VPN shop with a Telegram Mini App, an admin console, a FastAPI backend, three payment providers, Remnawave provisioning, backups and monitoring.
 
-Состояние: **2.2.1, активная разработка**. Перед production пройдите `INSTRUCTION.md` и `PRODUCTION_CHECKLIST.md`.
+Состояние: **2.3.0**. Перед production пройдите `INSTRUCTION.md` и `PRODUCTION_CHECKLIST.md`. Предыдущая линейка 2.2.1 остаётся в истории релизов.
 
 ## Состав
 
@@ -18,7 +18,7 @@ The same product in English: a VPN shop with a Telegram Mini App, an admin conso
 
 ## Возможности
 
-Подписки и пробный период, несколько устройств, автопродление YooKassa, промокоды, подарки, реферальная программа, поддержка, уведомления, антифрод, финансовый журнал, мониторинг, резервное копирование, аудит действий, RBAC и необязательная 2FA.
+Подписки и пробный период, несколько устройств, автопродление YooKassa за несколько дней до окончания, промокоды (включая дни без скидки деньгами), внутренний кошелёк, подарки с deep-link и запретом самоактивации, необязательная подписка на канал, реферальная программа, поддержка, уведомления, антифрод, финансовый журнал, мониторинг, резервное копирование, аудит действий, RBAC и необязательная 2FA.
 
 Интерфейсы админки, Mini App и ответы бота доступны на **русском и английском**. Переключатель в интерфейсе пишет выбор в `localStorage` (`rw_lang`). Пока выбора нет, используется `DEFAULT_LANGUAGE` и язык браузера или Telegram.
 
@@ -37,6 +37,8 @@ docker compose up -d --build
 ```bash
 sudo bash install.sh
 ```
+
+`install.sh` ставит Docker, забирает исходники и запускает `deploy/install-vps.sh`. Все домены, бот, Remnawave, кассы, язык, цены и канал вводятся в этом скрипте. Для автоматизации без вопросов задайте переменные и `INSTALL_NONINTERACTIVE=1`. Снаружи остаются SSH, TCP 80/443 и UDP 443.
 
 Подробности, первый вход, платежи, бэкапы и разбор экранов — в `INSTRUCTION.md`.
 

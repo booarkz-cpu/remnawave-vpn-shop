@@ -22,6 +22,15 @@ export const EN: Record<string, string> = {
   "Тарифы": "Plans",
   "Промокод": "Promo code",
   "Оплатить": "Pay",
+  "С баланса": "Pay from balance",
+  "В подарок": "Buy as a gift",
+  "Кошелёк": "Wallet",
+  "Баланс кошелька": "Wallet balance",
+  "Пополнить": "Top up",
+  "Сумма пополнения": "Top-up amount",
+  "Платёж создан": "Payment created",
+  "Оплачено с баланса": "Paid from balance",
+  "Подарок создан": "Gift created",
   "Управление подпиской": "Subscription management",
   "Статус": "Status",
   "Отмена": "Cancellation",
@@ -71,6 +80,8 @@ export function translate(lang: Lang, value: string): string {
   if (code) return `Code: ${code[1]}`;
   const balance = value.match(/^Баланс: (.+)$/);
   if (balance) return `Balance: ${balance[1]}`;
+  const wallet = value.match(/^Баланс кошелька: (.+)$/);
+  if (wallet) return `Wallet balance: ${wallet[1]}`;
   return value;
 }
 

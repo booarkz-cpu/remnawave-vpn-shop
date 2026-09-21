@@ -15,6 +15,15 @@ command -v apt-get >/dev/null 2>&1 || die "Поддерживаются Debian/U
 
 prompt() {
   local var="$1" label="$2" default="${3:-}" secret="${4:-0}" value
+  if [[ "${INSTALL_NONINTERACTIVE:-0}" == "1" ]]; then
+    if [[ -z "${!var:-}" ]]; then
+      printf -v "$var" '%s' "$default"
+    fi
+    return
+  fi
+  if [[ -z "$default" && -n "${!var:-}" && "$secret" != "1" ]]; then
+    default="${!var}"
+  fi
   if [[ "$secret" == "1" ]]; then
     if [[ -n "$default" ]]; then
       read -r -s -p "$label [$default]: " value; echo
@@ -29,6 +38,11 @@ prompt() {
 
 prompt_required() {
   local var="$1" label="$2" secret="${3:-0}"
+  if [[ "${INSTALL_NONINTERACTIVE:-0}" == "1" ]]; then
+    prompt "$var" "$label" "" "$secret"
+    [[ -n "${!var}" ]] || die "Не задано обязательное поле $var"
+    return
+  fi
   while :; do
     prompt "$var" "$label" "" "$secret"
     [[ -n "${!var}" ]] && return
@@ -44,7 +58,8 @@ env_line() {
 }
 
 # Previous release contract: INSTALLER_VERSION="1.0.0-realise"
-INSTALLER_VERSION="2.2.1"
+INSTALLER_VERSION="2.3.0"
+# Historical compatibility marker: INSTALLER_VERSION="2.2.1"
 # Historical compatibility marker: INSTALLER_VERSION="2.2.0"
 # Historical compatibility marker: INSTALLER_VERSION="2.1.0"
 # Historical banner compatibility marker: Remnawave VPN Shop — 2.1.0
@@ -53,7 +68,7 @@ INSTALLER_VERSION="2.2.1"
 # Previous release contract: INSTALLER_VERSION="45.0.0-enterprise"
 # V44.5 Enterprise legacy contract marker
 # INSTALLER_VERSION="43.1.0-production" legacy regression marker
-log "Remnawave VPN Shop — 2.2.1 русскоязычный production installer"
+log "Remnawave VPN Shop — 2.3.0 русскоязычный production installer"
 echo
 echo "Все основные настройки будут введены сейчас. После установки редактировать .env вручную не требуется."
 echo "Для HTTPS DNS-записи доменов должны уже указывать на этот VDS."
@@ -97,6 +112,50 @@ case "$PAYMENT_PROVIDER" in
   none) ;;
   *) die "Неизвестный PAYMENT_PROVIDER: $PAYMENT_PROVIDER" ;;
 esac
+
+echo
+echo "Дополнительные кассы. Enter оставляет поле пустым."
+if [[ "$PAYMENT_PROVIDER" != "yookassa" ]]; then
+  prompt YOOKASSA_SHOP_ID "YooKassa Shop ID"
+  if [[ -n "${YOOKASSA_SHOP_ID}" ]]; then prompt_required YOOKASSA_SECRET_KEY "YooKassa Secret Key" 1; fi
+fi
+if [[ "$PAYMENT_PROVIDER" != "platega" ]]; then
+  prompt PLATEGA_MERCHANT_ID "Platega Merchant ID"
+  if [[ -n "${PLATEGA_MERCHANT_ID}" ]]; then prompt_required PLATEGA_SECRET "Platega Secret" 1; fi
+fi
+if [[ "$PAYMENT_PROVIDER" != "rollypay" ]]; then
+  prompt ROLLYPAY_API_KEY "RollyPay API Key" "" 1
+  if [[ -n "${ROLLYPAY_API_KEY}" ]]; then prompt_required ROLLYPAY_SIGNING_SECRET "RollyPay Signing Secret" 1; fi
+fi
+prompt PLATEGA_REFUND_URL "Platega refund URL"
+prompt ROLLYPAY_REFUND_URL "RollyPay refund URL"
+if [[ -n "${YOOKASSA_SHOP_ID}${PLATEGA_MERCHANT_ID}${ROLLYPAY_API_KEY}" ]]; then
+  PAYMENT_PROVIDER="configured"
+fi
+
+echo
+prompt_required BOT_USERNAME "Имя бота без @"
+prompt ADMIN_TELEGRAM_ID "Telegram ID администратора (@userinfobot)"
+prompt DEFAULT_LANGUAGE "Язык по умолчанию (ru/en)" "ru"
+DEFAULT_LANGUAGE="$(printf '%s' "$DEFAULT_LANGUAGE" | tr '[:upper:]' '[:lower:]')"
+[[ "$DEFAULT_LANGUAGE" == "ru" || "$DEFAULT_LANGUAGE" == "en" ]] || die "DEFAULT_LANGUAGE должен быть ru или en"
+prompt DEFAULT_CURRENCY "Валюта" "RUB"
+prompt TZ_VALUE "Часовой пояс" "Europe/Moscow"
+prompt CADDY_EMAIL "Email для TLS-сертификата" "$ADMIN_EMAIL"
+prompt WEBHOOK_DOMAIN "Домен вебхуков" "pay.${BASE_DOMAIN}"
+prompt MINIAPP_DOMAIN "Домен Mini App, если отличается" "$APP_DOMAIN"
+prompt BOT_DOMAIN "Домен бота" "bot.${BASE_DOMAIN}"
+prompt PANEL_DOMAIN "Домен панели Remnawave в Caddy, если нужен" "$BASE_DOMAIN"
+prompt PRICE_1 "Цена 1 месяц" "199"
+prompt PRICE_3 "Цена 3 месяца" "499"
+prompt PRICE_6 "Цена 6 месяцев" "899"
+prompt PRICE_12 "Цена 12 месяцев" "1499"
+prompt AUTO_RENEW_ENABLED "Автопродление (true/false)" "false"
+prompt AUTO_RENEW_LEAD_DAYS "За сколько дней до конца списывать автопродление" "3"
+prompt REQUIRED_TELEGRAM_CHANNEL "Обязательный канал (@name или -100..., Enter = выкл)"
+prompt ALERT_TELEGRAM_CHAT_ID "Telegram-чат алертов"
+prompt REFERRAL_REWARD_PERCENT "Процент реферального вознаграждения" "5.0"
+prompt NOTIFICATION_EXPIRY_DAYS "За сколько дней предупреждать об окончании" "3"
 
 echo
 prompt YANDEX_CLIENT_ID "Yandex OAuth Client ID (Enter = пропустить)"
@@ -147,11 +206,13 @@ umask 077
   env_line COOKIE_SECURE "true"
   env_line COOKIE_SAMESITE "none"
   env_line PUBLIC_BASE_URL "https://${API_DOMAIN}"
-  env_line MINI_APP_URL "https://${APP_DOMAIN}"
+  env_line MINI_APP_URL "https://${MINIAPP_DOMAIN:-$APP_DOMAIN}"
   env_line ADMIN_CORS_ORIGINS "https://${ADMIN_DOMAIN}"
   env_line ADMIN_EMAIL "$ADMIN_EMAIL"
   env_line ADMIN_PASSWORD "$ADMIN_PASSWORD"
   env_line BOT_TOKEN "$BOT_TOKEN"
+  env_line BOT_USERNAME "$BOT_USERNAME"
+  env_line ADMIN_TELEGRAM_ID "$ADMIN_TELEGRAM_ID"
   env_line REMNAWAVE_URL "$REMNAWAVE_URL"
   env_line REMNAWAVE_TOKEN "$REMNAWAVE_TOKEN"
   env_line YOOKASSA_SHOP_ID "$YOOKASSA_SHOP_ID"
@@ -159,9 +220,32 @@ umask 077
   env_line YOOKASSA_WEBHOOK_IP_ALLOWLIST "185.71.76.0/27,185.71.77.0/27,77.75.153.0/25,77.75.156.11,77.75.156.35,77.75.154.128/25,2a02:5180::/32"
   env_line PLATEGA_MERCHANT_ID "$PLATEGA_MERCHANT_ID"
   env_line PLATEGA_SECRET "$PLATEGA_SECRET"
+  env_line PLATEGA_REFUND_URL "$PLATEGA_REFUND_URL"
   env_line ROLLYPAY_API_KEY "$ROLLYPAY_API_KEY"
   env_line ROLLYPAY_SIGNING_SECRET "$ROLLYPAY_SIGNING_SECRET"
-  env_line DEFAULT_CURRENCY "RUB"
+  env_line ROLLYPAY_REFUND_URL "$ROLLYPAY_REFUND_URL"
+  env_line DEFAULT_CURRENCY "$DEFAULT_CURRENCY"
+  env_line DEFAULT_LANGUAGE "$DEFAULT_LANGUAGE"
+  env_line TZ "$TZ_VALUE"
+  env_line PRICE_1 "$PRICE_1"
+  env_line PRICE_3 "$PRICE_3"
+  env_line PRICE_6 "$PRICE_6"
+  env_line PRICE_12 "$PRICE_12"
+  env_line AUTO_RENEW_ENABLED "$AUTO_RENEW_ENABLED"
+  env_line AUTO_RENEW_LEAD_DAYS "$AUTO_RENEW_LEAD_DAYS"
+  env_line REQUIRED_TELEGRAM_CHANNEL "$REQUIRED_TELEGRAM_CHANNEL"
+  env_line ALERT_TELEGRAM_CHAT_ID "$ALERT_TELEGRAM_CHAT_ID"
+  env_line REFERRAL_REWARD_PERCENT "$REFERRAL_REWARD_PERCENT"
+  env_line NOTIFICATION_EXPIRY_DAYS "$NOTIFICATION_EXPIRY_DAYS"
+  env_line CADDY_EMAIL "$CADDY_EMAIL"
+  env_line WEBHOOK_DOMAIN "$WEBHOOK_DOMAIN"
+  env_line WEBHOOK_BASE_URL "https://${WEBHOOK_DOMAIN}"
+  env_line MINIAPP_DOMAIN "$MINIAPP_DOMAIN"
+  env_line BOT_DOMAIN "$BOT_DOMAIN"
+  env_line PANEL_DOMAIN "$PANEL_DOMAIN"
+  env_line MAINTENANCE_MODE "false"
+  env_line BACKUPS_DIR "/data/backups"
+  env_line PROJECT_DIR "/project"
   env_line DB_PASSWORD "$DB_PASSWORD"
   env_line YANDEX_CLIENT_ID "$YANDEX_CLIENT_ID"
   env_line YANDEX_CLIENT_SECRET "$YANDEX_CLIENT_SECRET"

@@ -20,6 +20,7 @@ _BOT_TEXT = {
         "open": "🛒 Открыть магазин",
         "promo_usage": "Использование: /promo КОД",
         "promo_ready": "Промокод <b>{code}</b>. Откройте магазин и примените его к тарифу.",
+        "gift_ready": "Подарок <b>{code}</b>. Откройте магазин, чтобы активировать его.",
     },
     "en": {
         "welcome": "Welcome to {name}!",
@@ -28,6 +29,7 @@ _BOT_TEXT = {
         "open": "🛒 Open shop",
         "promo_usage": "Usage: /promo CODE",
         "promo_ready": "Promo code <b>{code}</b>. Open the shop and apply it to a plan.",
+        "gift_ready": "Gift <b>{code}</b>. Open the shop to activate it.",
     },
 }
 
@@ -109,6 +111,11 @@ async def broadcast_worker(bot:Bot):
 async def start(message:Message):
     vals,menu,fields,ads,promos,plans=await get_bot_config()
     lang=_lang(message)
+    start_arg=""
+    parts=(message.text or "").split(maxsplit=1)
+    if len(parts)>1:
+        start_arg=parts[1].strip().split()[0]
+    gift_code=start_arg.upper() if start_arg.upper().startswith("GIFT_") else ""
     buttons=[]; field_text=[]
     for m in menu:
         if m.item_type=="webapp":
@@ -121,9 +128,16 @@ async def start(message:Message):
         elif m.item_type=="field":
             f=next((x for x in fields if x.key==m.action),None)
             if f: field_text.append(f"<b>{escape(f.label)}</b>\n{escape(f.value)}")
-    if not buttons: buttons=[[InlineKeyboardButton(text=_tr(lang,"open"),web_app=WebAppInfo(url=settings.mini_app_url))]]
+    shop_url=settings.mini_app_url
+    if gift_code:
+        join="&" if "?" in shop_url else "?"
+        shop_url=f"{shop_url}{join}gift={gift_code}"
+    if not buttons: buttons=[[InlineKeyboardButton(text=_tr(lang,"open"),web_app=WebAppInfo(url=shop_url))]]
+    elif gift_code:
+        buttons.append([InlineKeyboardButton(text=_tr(lang,"open"),web_app=WebAppInfo(url=shop_url))])
     name=escape(vals.get("bot_name") or "VPN Shop"); text=_tr(lang,"welcome",name=name)
     pt=promo_text(promos,plans,lang)
+    if gift_code: text += "\n\n"+_tr(lang,"gift_ready",code=escape(gift_code))
     if pt: text += "\n\n"+pt
     price_lines=[]
     for plan in plans:

@@ -1,4 +1,4 @@
-# Полная инструкция — Remnawave VPN Shop 2.2.1
+# Полная инструкция — Remnawave VPN Shop 2.3.0
 
 Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Разбор каждой функции кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
@@ -32,7 +32,11 @@ sudo bash install.sh
 
 Скрипт сам ставит Docker, спрашивает данные, которые нельзя угадать, генерирует `APP_SECRET` и пароль базы, пишет `.env` с правами `0600`, собирает образы, поднимает PostgreSQL и Redis, применяет миграции Alembic и печатает адреса панели, Mini App и API. Он настраивает UFW (SSH, TCP 80/443, UDP 443) и Fail2Ban для SSH.
 
-`install.sh` — самостоятельный установщик. Каталог `deploy/` содержит Caddyfile и вспомогательные скрипты, отдельный `deploy/install-vps.sh` этим установщиком не вызывается.
+`install.sh` ставит Docker, клонирует репозиторий при запуске через `curl` и выполняет `deploy/install-vps.sh`. Все операторские поля вводятся в этом скрипте: домены, почта TLS, бот и его username, Telegram ID, Remnawave, язык `ru`/`en`, валюта, цены 1/3/6/12, автопродление и срок списания, обязательный канал, реферальный процент, YooKassa, Platega, RollyPay, Yandex ID и S3. Секреты приложения и базы скрипт генерирует сам. Повторный вопрос не задаётся, если экспортнуты переменные и указан `INSTALL_NONINTERACTIVE=1`.
+
+Firewall после установки: SSH, TCP 80/443 и UDP 443. Порты API, админки, Mini App, PostgreSQL и Redis наружу не открываются.
+
+Каталог `deploy/` содержит Caddyfile. Установщик копирует проект в `/opt/vpn-shop`. Если каталог уже занят, скрипт останавливается, чтобы не затереть рабочую установку. Обновление: `./scripts/update.sh`.
 
 После установки каталог проекта обычно `/opt/vpn-shop`. Проверки:
 
@@ -194,6 +198,14 @@ python3 -m pytest -q
 
 Тема панели: кнопка в шапке. Выбор человека хранится в браузере (`rw_theme`). Серверная тема по умолчанию применяется, пока локального выбора нет.
 
+## 9.1. Кошелёк, подарки и канал (2.3.0)
+
+- **Кошелёк.** В Mini App кнопка «Пополнить» создаёт платёж `purpose=topup` от 50 до 100000. После подтверждения провайдером сумма попадает в `wallet_balance`, а не в VPN. «С баланса» списывает кошелёк и сразу запускает выдачу подписки. Реферальный баланс при этом не тратится.
+- **Подарки.** «В подарок» покупает одноразовый код `GIFT_` за цену тарифа с кошелька. Ссылка `https://t.me/<bot>?start=GIFT_...` открывает магазин и активирует код. Покупатель не может активировать свой подарок. Повтор того же получателя не продлевает подписку второй раз. Код администратора без `purchaser_user_id` может активировать любой пользователь.
+- **Дни в промокоде.** Вид `days` добавляет дни к сроку тарифа и не уменьшает цену. Числовой вид по-прежнему даёт скидку в валюте, `percent` — в процентах.
+- **Канал.** `REQUIRED_TELEGRAM_CHANNEL` пустой — проверка выключена. Иначе оплата, пополнение и списание требуют статуса member, administrator или creator. Сбой Telegram отвечает 503.
+- **Автопродление.** При `AUTO_RENEW_ENABLED=true` списание начинается за `AUTO_RENEW_LEAD_DAYS` дней до конца (по умолчанию 3, допустимо 1–14).
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -303,7 +315,7 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 2.2.1
+# Full instruction — Remnawave VPN Shop 2.3.0
 
 This is the operator guide for installing the shop, turning payments on, and running the admin panel. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
@@ -335,7 +347,11 @@ sudo bash install.sh
 
 The script installs Docker, asks for values it cannot invent, generates `APP_SECRET` and the database password, writes `.env` as mode `0600`, builds images, starts PostgreSQL and Redis, runs Alembic migrations, and prints the admin, Mini App, and API URLs. It configures UFW (SSH, TCP 80/443, UDP 443) and Fail2Ban for SSH.
 
-`install.sh` is a standalone installer. It does not call a separate `deploy/install-vps.sh`. The `deploy/` directory holds the Caddyfile and helper files.
+`install.sh` installs Docker, clones the repository when started from `curl`, and execs `deploy/install-vps.sh`. That script asks for every operator field: domains, the TLS email, the bot token and username, the admin Telegram id, Remnawave, language `ru` or `en`, currency, the 1/3/6/12 prices, auto-renew and its lead time, the required channel, the referral percent, YooKassa, Platega, RollyPay, Yandex ID and S3. Application and database secrets are generated. Export the variables and set `INSTALL_NONINTERACTIVE=1` to skip questions.
+
+The firewall keeps SSH, TCP 80/443 and UDP 443. The API, admin UI, Mini App, PostgreSQL and Redis are not published.
+
+`deploy/` holds the Caddyfile. The installer copies the project to `/opt/vpn-shop` and stops if that directory already contains an installation. Update with `./scripts/update.sh`.
 
 The project directory is usually `/opt/vpn-shop`. Checks:
 
@@ -484,6 +500,14 @@ Roles are `viewer`, `operator`, and `admin`. A missing permission returns HTTP 4
 | Notifications | Templates and the expiry notice queue. The default window is `NOTIFICATION_EXPIRY_DAYS`. |
 
 The header theme button stores `rw_theme` in the browser. The server default applies until a local choice exists.
+
+## 9.1. Wallet, gifts and channel (2.3.0)
+
+- **Wallet.** Top up creates a payment with `purpose=topup` between 50 and 100000. After the provider confirms it, the amount is added to `wallet_balance` and does not provision VPN. Pay from balance debits the wallet and starts fulfillment. The referral balance is separate.
+- **Gifts.** Buy as a gift spends the plan price from the wallet and creates a one-time `GIFT_` code. `https://t.me/<bot>?start=GIFT_...` opens the shop and redeems it. The buyer cannot redeem their own gift. The same recipient does not extend the subscription twice. An admin code without `purchaser_user_id` can be redeemed by any account.
+- **Day promos.** Kind `days` adds days to the plan and does not reduce the price. A numeric kind is still a currency discount, and `percent` is a percentage.
+- **Channel.** An empty `REQUIRED_TELEGRAM_CHANNEL` disables the check. Otherwise checkout, top-up and wallet spend require status member, administrator or creator. A Telegram API failure returns 503.
+- **Auto-renew.** With `AUTO_RENEW_ENABLED=true`, charging starts `AUTO_RENEW_LEAD_DAYS` days before expiry (default 3, allowed 1–14).
 
 ## 10. Mini App
 

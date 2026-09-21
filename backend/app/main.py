@@ -24,7 +24,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.2.1"
+APP_VERSION = "2.3.0"
+# Historical compatibility marker: APP_VERSION = "2.2.1"
 # Historical compatibility marker: APP_VERSION = "2.2.0"
 # Historical compatibility marker: APP_VERSION = "2.1.0"
 # Legacy regression marker: APP_VERSION = "2.0.3-audited"
@@ -242,6 +243,7 @@ class GiftCreateIn(BaseModel):
     duration_days: int | None = Field(default=None, ge=1, le=3650)
     max_uses: int = Field(default=1, ge=1, le=100000)
     expires_at: datetime | None = None
+    purchaser_user_id: int | None = Field(default=None, gt=0)
 
 class AdminTicketReplyIn(BaseModel):
     reply: str = Field(min_length=1, max_length=10000)
@@ -587,6 +589,9 @@ async def active_promotion(db, plan_id:int, now=None):
 
 def discounted_amount(price, kind:str, value):
     price=Decimal(str(price)); value=Decimal(str(value))
+    # kind=days adds subscription time and must not be treated as a cash discount.
+    if kind == "days":
+        return Decimal("0.00")
     discount = price * value / Decimal("100") if kind == "percent" else value
     discount=max(Decimal("0"), min(price, discount))
     return discount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -685,7 +690,7 @@ async def public_config(db:AsyncSession=Depends(get_db)):
         payment_providers=await _payment_provider_order(db,None)
     except HTTPException:
         payment_providers=[]
-    return {"default_language": settings.default_language if settings.default_language in {"ru","en"} else "ru","app_name":values.get("app_name","VPN Store"),"bot_name":values.get("bot_name","VPN Shop"),"bot_start_image":values.get("bot_start_image",""),"menu":[{"title":m.title,"action":m.action,"type":m.item_type} for m in menus],"fields":[{"key":f.key,"label":f.label,"type":f.field_type,"value":f.value} for f in fields],"images":[{"title":i.title,"url":"/media/"+i.filename} for i in images],"yandex_enabled":bool(settings.yandex_client_id and settings.yandex_redirect_uri),"advertisements":[{"title":a.title,"text":a.text,"image_url":a.image_url,"button_text":a.button_text,"button_url":a.button_url} for a in ads],"promotions":[{"id":p.id,"name":p.name,"kind":p.kind,"value":float(p.value),"description":p.description,"plan_ids":p.plan_ids} for p in promos],"miniapp":{"title":values.get("miniapp_title",values.get("app_name","VPN Store")),"subtitle":values.get("miniapp_subtitle",""),"background_color":values.get("miniapp_background_color","#f5f7fb"),"background_image":values.get("miniapp_background_image",""),"image":values.get("miniapp_image",""),"instructions":values.get("miniapp_instructions",""),"buttons":mini_buttons},"payment_providers":payment_providers}
+    return {"default_language": settings.default_language if settings.default_language in {"ru","en"} else "ru","required_channel":settings.required_telegram_channel,"app_name":values.get("app_name","VPN Store"),"bot_name":values.get("bot_name","VPN Shop"),"bot_start_image":values.get("bot_start_image",""),"menu":[{"title":m.title,"action":m.action,"type":m.item_type} for m in menus],"fields":[{"key":f.key,"label":f.label,"type":f.field_type,"value":f.value} for f in fields],"images":[{"title":i.title,"url":"/media/"+i.filename} for i in images],"yandex_enabled":bool(settings.yandex_client_id and settings.yandex_redirect_uri),"advertisements":[{"title":a.title,"text":a.text,"image_url":a.image_url,"button_text":a.button_text,"button_url":a.button_url} for a in ads],"promotions":[{"id":p.id,"name":p.name,"kind":p.kind,"value":float(p.value),"description":p.description,"plan_ids":p.plan_ids} for p in promos],"miniapp":{"title":values.get("miniapp_title",values.get("app_name","VPN Store")),"subtitle":values.get("miniapp_subtitle",""),"background_color":values.get("miniapp_background_color","#f5f7fb"),"background_image":values.get("miniapp_background_image",""),"image":values.get("miniapp_image",""),"instructions":values.get("miniapp_instructions",""),"buttons":mini_buttons},"payment_providers":payment_providers}
 
 @app.get("/api/me")
 async def api_me(request:Request,db:AsyncSession=Depends(get_db)):
@@ -883,6 +888,25 @@ async def release_promo_reservation(db:AsyncSession, reservation_id:int):
     return True
 
 
+async def ensure_required_channel(user:User):
+    channel=(settings.required_telegram_channel or "").strip()
+    if not channel:
+        return
+    if not user.telegram_id or not settings.bot_token:
+        raise HTTPException(403,"Подпишитесь на обязательный канал")
+    try:
+        async with _pinned_public_http_client(10) as client:
+            response=await client.get(
+                f"https://api.telegram.org/bot{settings.bot_token}/getChatMember",
+                params={"chat_id":channel,"user_id":user.telegram_id},
+            )
+        data=response.json()
+    except Exception as exc:
+        raise HTTPException(503,"Не удалось проверить подписку на канал") from exc
+    status=((data.get("result") or {}).get("status") if isinstance(data,dict) and data.get("ok") else None)
+    if status not in {"member","administrator","creator"}:
+        raise HTTPException(403,"Подпишитесь на обязательный канал")
+
 @app.post("/api/payments/create")
 async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(get_db)):
     if await maintenance_enabled(db): raise HTTPException(503,"Service is in maintenance mode")
@@ -936,6 +960,7 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
 
     # No durable intent exists for this idempotency key, so mutable commercial state
     # is now safe to validate for a brand-new checkout.
+    await ensure_required_channel(user)
     plan=await db.get(Plan,plan_id)
     if not plan or not plan.enabled: raise HTTPException(404,"Not found")
     base_amount=Decimal(str(plan.price)); promo, promo_discount_amount=await promo_discount(db,payload.get("promo_code"),plan.id,base_amount,user.id)
@@ -945,6 +970,11 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
     else:
         promotion=None; discount_amount=promo_discount_amount
     final_amount=(base_amount-discount_amount).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP)
+    bonus_days=0
+    if promo is not None and promo.kind=="days":
+        bonus_days=int(Decimal(str(promo.value)))
+    elif promotion is not None and promotion.kind=="days":
+        bonus_days=int(Decimal(str(promotion.value)))
     expected_promo=promo.code if promo else None
     idem_fingerprint=f"{user.id}:{plan.id}:{idem}:{promo.code if promo else promotion.id if promotion else ''}"
     canonical_order_id=f"vpn-{user.id}-{plan.id}-{hashlib.sha256(idem_fingerprint.encode()).hexdigest()[:24]}"
@@ -977,7 +1007,7 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
             reservation=await reserve_promo(db,promo,user.id,canonical_order_id)
         # Durable payment intent BEFORE the external provider call. A process crash after
         # provider acceptance cannot erase the fact that this order already exists.
-        payment_row=Payment(user_id=user.id,plan_id=plan.id,provider=candidate,provider_payment_id=None,order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=plan.duration_days,traffic_limit_gb_snapshot=plan.traffic_limit_gb,device_limit_snapshot=plan.device_limit,remnawave_profile_id_snapshot=plan.remnawave_profile_id,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="creating",fulfillment_status="pending",idempotency_key=idem)
+        payment_row=Payment(user_id=user.id,plan_id=plan.id,provider=candidate,provider_payment_id=None,order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=plan.duration_days,traffic_limit_gb_snapshot=plan.traffic_limit_gb,device_limit_snapshot=plan.device_limit,remnawave_profile_id_snapshot=plan.remnawave_profile_id,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="creating",fulfillment_status="pending",idempotency_key=idem,purpose="subscription",bonus_days=bonus_days)
         db.add(payment_row)
         await db.flush()
         if reservation: reservation.payment_id=payment_row.id
@@ -1134,13 +1164,16 @@ async def fulfill(payment_id:int, db:AsyncSession, existing_user_lock_token: str
         if payment.fulfillment_status=="completed" or payment.fulfillment_terminal: return
         if payment.fulfillment_attempts >= (payment.fulfillment_max_attempts or settings.fulfillment_max_attempts):
             payment.fulfillment_status="failed"; payment.fulfillment_terminal=True; await db.commit(); raise RuntimeError("Fulfillment reached maximum attempts")
-        user=await db.get(User,payment.user_id); plan=await db.get(Plan,payment.plan_id)
-        if not user or user.deleted_at is not None or not plan: raise RuntimeError("Payment references missing or deleted user/plan")
+        user=await db.get(User,payment.user_id)
+        is_topup=(payment.purpose or "subscription")=="topup"
+        plan=None if is_topup else await db.get(Plan,payment.plan_id)
+        if not user or user.deleted_at is not None or (not is_topup and not plan): raise RuntimeError("Payment references missing or deleted user/plan")
         # Purchased payments use their immutable checkout snapshot. Legacy rows without
         # snapshots fall back to the current plan for backward compatibility.
-        duration_days=payment.duration_days_snapshot or plan.duration_days
-        traffic_limit_gb=payment.traffic_limit_gb_snapshot if payment.traffic_limit_gb_snapshot is not None else plan.traffic_limit_gb
-        profile_id=payment.remnawave_profile_id_snapshot if payment.remnawave_profile_id_snapshot is not None else plan.remnawave_profile_id
+        if not is_topup:
+            duration_days=(payment.duration_days_snapshot or plan.duration_days)+int(payment.bonus_days or 0)
+            traffic_limit_gb=payment.traffic_limit_gb_snapshot if payment.traffic_limit_gb_snapshot is not None else plan.traffic_limit_gb
+            profile_id=payment.remnawave_profile_id_snapshot if payment.remnawave_profile_id_snapshot is not None else plan.remnawave_profile_id
         user_token = existing_user_lock_token
         if not existing_user_lock_token:
             user_lock,user_token=await _acquire_user_fulfillment_lock(user.id,ttl=300)
@@ -1153,12 +1186,13 @@ async def fulfill(payment_id:int, db:AsyncSession, existing_user_lock_token: str
         user=(await db.execute(select(User).where(User.id==user.id).with_for_update())).scalar_one_or_none()
         if not user or user.deleted_at is not None:
             raise RuntimeError("User is deleted or no longer available for fulfillment")
-        plan=await db.get(Plan,payment.plan_id)
-        if not plan:
+        plan=None if (payment.purpose or "subscription")=="topup" else await db.get(Plan,payment.plan_id)
+        if (payment.purpose or "subscription")!="topup" and not plan:
             raise RuntimeError("Payment plan no longer exists")
-        duration_days=payment.duration_days_snapshot or plan.duration_days
-        traffic_limit_gb=payment.traffic_limit_gb_snapshot if payment.traffic_limit_gb_snapshot is not None else plan.traffic_limit_gb
-        profile_id=payment.remnawave_profile_id_snapshot if payment.remnawave_profile_id_snapshot is not None else plan.remnawave_profile_id
+        if (payment.purpose or "subscription")!="topup":
+            duration_days=(payment.duration_days_snapshot or plan.duration_days)+int(payment.bonus_days or 0)
+            traffic_limit_gb=payment.traffic_limit_gb_snapshot if payment.traffic_limit_gb_snapshot is not None else plan.traffic_limit_gb
+            profile_id=payment.remnawave_profile_id_snapshot if payment.remnawave_profile_id_snapshot is not None else plan.remnawave_profile_id
         payment_lock, token = await _acquire_payment_side_effect_lock(payment_id)
         # Re-read the payment after acquiring the shared payment lock. A refund/reconcile
         # path can legitimately win the lock after the initial read above. Never start
@@ -1174,6 +1208,12 @@ async def fulfill(payment_id:int, db:AsyncSession, existing_user_lock_token: str
             raise RuntimeError("Payment is not confirmed")
         if payment.fulfillment_status=="completed" or payment.fulfillment_terminal:
             return
+        if (payment.purpose or "subscription")=="topup":
+            amount=Decimal(str(payment.amount)).quantize(Decimal("0.01"))
+            user.wallet_balance=(Decimal(str(user.wallet_balance or 0))+amount).quantize(Decimal("0.01"))
+            await record_financial_event(db,operation_key=f"wallet-topup:{payment.id}",user_id=user.id,payment_id=payment.id,kind="wallet_topup",direction="credit",amount=amount,currency=payment.currency,metadata={"order_id":payment.order_id})
+            payment.fulfillment_status="completed"; payment.fulfillment_terminal=True; payment.fulfillment_attempts=(payment.fulfillment_attempts or 0)+1
+            await audit(db,"wallet.topup",f"user:{user.id}",str(payment.id),{"amount":str(amount)}); await db.commit(); return
         payment.fulfillment_status="processing"; payment.fulfillment_attempts=(payment.fulfillment_attempts or 0)+1; payment.fulfillment_error=None
         job=(await db.execute(select(Job).where(Job.job_key==f"fulfillment:{payment.id}").with_for_update())).scalar_one_or_none()
         if not job:
@@ -1545,7 +1585,7 @@ async def auto_renew_scheduler():
                 if await maintenance_enabled(db): continue
                 if await feature_enabled(db, "payments", True) is False: continue
                 if await setting_value(db, PRODUCTION_PAYMENTS_GATE_KEY, "0") != "1": continue
-                cutoff=datetime.utcnow()+timedelta(hours=24)
+                cutoff=datetime.utcnow()+timedelta(days=max(1,min(int(settings.auto_renew_lead_days or 3),14)))
                 rows=(await db.execute(select(User,Subscription,Plan,AutoRenewMethod).join(Subscription,Subscription.user_id==User.id).join(Plan,Plan.id==Subscription.plan_id).join(AutoRenewMethod,AutoRenewMethod.user_id==User.id).where(User.auto_renew_enabled.is_(True),AutoRenewMethod.enabled.is_(True),AutoRenewMethod.status.in_(["active","past_due"]),Subscription.expires_at.is_not(None),Subscription.expires_at<=cutoff,Subscription.expires_at>datetime.utcnow(),((AutoRenewMethod.next_attempt_at.is_(None))|(AutoRenewMethod.next_attempt_at<=datetime.utcnow()))).limit(25))).all()
                 for user,sub,plan,method in rows:
                     if method.provider != "yookassa": continue
@@ -1813,11 +1853,136 @@ async def subscription_lifecycle(payload:SubscriptionActionIn,request:Request,db
     finally:
         await _release_payment_side_effect_lock(lock,token)
 
+def _money(value) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+@app.post("/api/me/wallet/topup")
+async def wallet_topup(payload:dict, request:Request, db:AsyncSession=Depends(get_db)):
+    if await maintenance_enabled(db): raise HTTPException(503,"Service is in maintenance mode")
+    if not await feature_enabled(db, "payments", True): raise HTTPException(503,"Платежи отключены администратором")
+    if await setting_value(db,PRODUCTION_PAYMENTS_GATE_KEY,"0") != "1":
+        raise HTTPException(503,"Реальные платежи временно заблокированы: требуется успешный staging E2E")
+    user=await user_from_token(request,db)
+    idem=request.headers.get("Idempotency-Key")
+    if not idem or len(idem)>128: raise HTTPException(400,"Idempotency-Key is required")
+    try:
+        amount=_money(payload.get("amount"))
+    except Exception:
+        raise HTTPException(400,"Invalid amount")
+    if amount < Decimal("50") or amount > Decimal("100000"):
+        raise HTTPException(400,"Amount is outside the allowed top-up range")
+    existing=(await db.execute(select(Payment).where(Payment.user_id==user.id,Payment.idempotency_key==idem).order_by(Payment.id.desc()))).scalar_one_or_none()
+    if existing:
+        if (existing.purpose or "subscription") != "topup":
+            raise HTTPException(409,"Idempotency-Key уже использован для другого платежа")
+        return {"id":existing.provider_payment_id,"url":existing.checkout_url,"provider":existing.provider,"status":existing.status,"purpose":"topup"}
+    await ensure_required_channel(user)
+    provider_order=await _payment_provider_order(db,payload.get("provider"))
+    if not provider_order: raise HTTPException(503,"Нет доступных платёжных провайдеров")
+    candidate=provider_order[0]
+    provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider()}[candidate]
+    order_id=f"topup-{user.id}-{hashlib.sha256(idem.encode()).hexdigest()[:24]}"
+    row=Payment(user_id=user.id,plan_id=0,provider=candidate,order_id=order_id,amount=amount,original_amount=amount,discount_amount=Decimal("0.00"),currency=settings.default_currency,status="creating",fulfillment_status="pending",idempotency_key=idem,purpose="topup",bonus_days=0)
+    db.add(row); await db.commit(); await db.refresh(row)
+    try:
+        result=await provider.create(amount,order_id,"Wallet top-up",settings.mini_app_url)
+        if not result.get("id"): raise RuntimeError("Payment provider returned no payment ID")
+        row=(await db.execute(select(Payment).where(Payment.id==row.id).with_for_update())).scalar_one()
+        row.provider_payment_id=result["id"]; row.status="pending"; row.checkout_url=result.get("url")
+        await db.commit()
+        return {"id":result.get("id"),"url":result.get("url"),"provider":candidate,"status":"pending","purpose":"topup"}
+    except Exception as exc:
+        row=(await db.execute(select(Payment).where(Payment.id==row.id).with_for_update())).scalar_one()
+        row.status="creation_unknown"; row.fulfillment_terminal=True; row.fulfillment_error=str(exc)[:1000]
+        await db.commit()
+        raise HTTPException(503,"Результат создания платежа не определён. Повторное списание заблокировано; операция будет сверена.")
+
+@app.post("/api/me/wallet/spend")
+async def wallet_spend(payload:dict, request:Request, db:AsyncSession=Depends(get_db)):
+    if await maintenance_enabled(db): raise HTTPException(503,"Service is in maintenance mode")
+    user=await user_from_token(request,db)
+    try:
+        plan_id=int(payload.get("plan_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400,"Invalid plan_id")
+    idem=request.headers.get("Idempotency-Key") or f"wallet-spend-{user.id}-{plan_id}-{uuid.uuid4().hex}"
+    if len(idem)>128: raise HTTPException(400,"Idempotency-Key is required")
+    existing=(await db.execute(select(Payment).where(Payment.user_id==user.id,Payment.idempotency_key==idem))).scalar_one_or_none()
+    if existing:
+        if existing.provider != "wallet":
+            raise HTTPException(409,"Idempotency-Key уже использован для другого платежа")
+        return {"ok":True,"payment_id":existing.id,"status":existing.status,"fulfillment_status":existing.fulfillment_status}
+    await ensure_required_channel(user)
+    plan=await db.get(Plan,plan_id)
+    if not plan or not plan.enabled: raise HTTPException(404,"Not found")
+    base_amount=Decimal(str(plan.price)); promo, promo_discount_amount=await promo_discount(db,payload.get("promo_code"),plan.id,base_amount,user.id)
+    if promo is None:
+        promotion=await active_promotion(db,plan.id)
+        discount_amount=discounted_amount(base_amount,promotion.kind,promotion.value) if promotion else Decimal("0.00")
+    else:
+        promotion=None; discount_amount=promo_discount_amount
+    final_amount=_money(base_amount-discount_amount)
+    bonus_days=int(Decimal(str(promo.value))) if promo is not None and promo.kind=="days" else (int(Decimal(str(promotion.value))) if promotion is not None and promotion.kind=="days" else 0)
+    if final_amount <= 0: raise HTTPException(400,"Amount must be positive")
+    lock,token=await _acquire_user_fulfillment_lock(user.id,ttl=900)
+    try:
+        user=(await db.execute(select(User).where(User.id==user.id).with_for_update())).scalar_one()
+        balance=_money(user.wallet_balance or 0)
+        if balance < final_amount: raise HTTPException(402,"Недостаточно средств на балансе")
+        order_id=f"wallet-{user.id}-{plan.id}-{hashlib.sha256(idem.encode()).hexdigest()[:24]}"
+        row=Payment(user_id=user.id,plan_id=plan.id,provider="wallet",order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=plan.duration_days,traffic_limit_gb_snapshot=plan.traffic_limit_gb,device_limit_snapshot=plan.device_limit,remnawave_profile_id_snapshot=plan.remnawave_profile_id,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="paid",fulfillment_status="pending",idempotency_key=idem,purpose="subscription",bonus_days=bonus_days,paid_at=datetime.utcnow())
+        user.wallet_balance=_money(balance-final_amount)
+        db.add(row); await db.flush()
+        await record_financial_event(db,operation_key=f"wallet-spend:{row.id}",user_id=user.id,payment_id=row.id,kind="wallet_spend",direction="debit",amount=final_amount,currency=row.currency,metadata={"plan_id":plan.id})
+        await db.commit()
+        try:
+            await fulfill(row.id, db, existing_user_lock_token=token)
+        except Exception:
+            return {"ok":True,"payment_id":row.id,"fulfillment":"queued","wallet_balance":str(user.wallet_balance)}
+        return {"ok":True,"payment_id":row.id,"wallet_balance":str(user.wallet_balance)}
+    finally:
+        await _release_payment_side_effect_lock(lock,token)
+
+@app.post("/api/me/gifts/purchase")
+async def purchase_gift(payload:dict, request:Request, db:AsyncSession=Depends(get_db)):
+    if await maintenance_enabled(db): raise HTTPException(503,"Service is in maintenance mode")
+    user=await user_from_token(request,db)
+    try:
+        plan_id=int(payload.get("plan_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400,"Invalid plan_id")
+    idem=request.headers.get("Idempotency-Key")
+    if not idem or len(idem)>128: raise HTTPException(400,"Idempotency-Key is required")
+    existing=(await db.execute(select(GiftCode).where(GiftCode.idempotency_key==idem,GiftCode.purchaser_user_id==user.id))).scalar_one_or_none()
+    if existing:
+        return {"ok":True,"code":existing.code,"bot_claim_url":(f"https://t.me/{settings.bot_username}?start={existing.code}" if settings.bot_username else None)}
+    await ensure_required_channel(user)
+    plan=await db.get(Plan,plan_id)
+    if not plan or not plan.enabled: raise HTTPException(404,"Not found")
+    price=_money(plan.price)
+    if price <= 0: raise HTTPException(400,"Gift plan must have a positive price")
+    lock,token=await _acquire_user_fulfillment_lock(user.id,ttl=300)
+    try:
+        user=(await db.execute(select(User).where(User.id==user.id).with_for_update())).scalar_one()
+        balance=_money(user.wallet_balance or 0)
+        if balance < price: raise HTTPException(402,"Недостаточно средств на балансе")
+        code="GIFT_"+secrets.token_hex(20)
+        user.wallet_balance=_money(balance-price)
+        gift=GiftCode(code=code,plan_id=plan.id,duration_days=plan.duration_days,max_uses=1,purchaser_user_id=user.id,idempotency_key=idem,enabled=True)
+        db.add(gift); await db.flush()
+        await record_financial_event(db,operation_key=f"gift-purchase:{gift.id}",user_id=user.id,payment_id=None,kind="gift_purchase",direction="debit",amount=price,currency=settings.default_currency,metadata={"plan_id":plan.id})
+        await audit(db,"gift.purchased",f"user:{user.id}",code,{"plan_id":plan.id}); await db.commit()
+        claim=f"https://t.me/{settings.bot_username}?start={code}" if settings.bot_username else None
+        return {"ok":True,"code":code,"bot_claim_url":claim,"wallet_balance":str(user.wallet_balance)}
+    finally:
+        await _release_payment_side_effect_lock(lock,token)
+
 @app.post("/api/me/gifts/redeem")
 async def redeem_gift(payload:GiftRedeemIn,request:Request,db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db)
     code=(await db.execute(select(GiftCode).where(GiftCode.code==payload.code.strip().upper()).with_for_update())).scalar_one_or_none()
     if not code or not code.enabled: raise HTTPException(404,"Gift code not found")
+    if code.purchaser_user_id and code.purchaser_user_id==user.id: raise HTTPException(403,"Gift purchaser cannot redeem their own gift")
     if code.expires_at and code.expires_at<=datetime.utcnow(): raise HTTPException(410,"Gift code expired")
     if code.used_count>=code.max_uses: raise HTTPException(409,"Gift code already exhausted")
     existing_redemption=(await db.execute(select(GiftRedemption).where(GiftRedemption.gift_code_id==code.id,GiftRedemption.user_id==user.id).with_for_update())).scalar_one_or_none()
@@ -1990,7 +2155,7 @@ async def customer_dashboard(request:Request,db:AsyncSession=Depends(get_db)):
     sub=(await db.execute(select(Subscription).where(Subscription.user_id==user.id))).scalar_one_or_none()
     payments=(await db.execute(select(Payment).where(Payment.user_id==user.id).order_by(Payment.id.desc()).limit(10))).scalars().all()
     tickets=(await db.execute(select(SupportTicket).where(SupportTicket.user_id==user.id).order_by(SupportTicket.id.desc()).limit(5))).scalars().all()
-    return {"user":{"id":user.id,"username":user.username,"referral_code":user.referral_code,"referral_balance":str(user.referral_balance)},"subscription":None if not sub else {"plan_id":sub.plan_id,"expires_at":sub.expires_at,"subscription_url":sub.subscription_url},"payments":[{"id":p.id,"amount":str(p.amount),"currency":p.currency,"status":p.status,"fulfillment_status":p.fulfillment_status,"created_at":p.created_at} for p in payments],"tickets":[{"id":t.id,"subject":t.subject,"status":t.status} for t in tickets]}
+    return {"user":{"id":user.id,"username":user.username,"referral_code":user.referral_code,"referral_balance":str(user.referral_balance),"wallet_balance":str(user.wallet_balance or 0)},"subscription":None if not sub else {"plan_id":sub.plan_id,"expires_at":sub.expires_at,"subscription_url":sub.subscription_url},"payments":[{"id":p.id,"amount":str(p.amount),"currency":p.currency,"status":p.status,"fulfillment_status":p.fulfillment_status,"created_at":p.created_at} for p in payments],"tickets":[{"id":t.id,"subject":t.subject,"status":t.status} for t in tickets]}
 
 # ---------- Уведомления, статус и управление развёртываниями ----------
 @app.get("/api/me/notifications")
@@ -2683,7 +2848,7 @@ async def health_summary(db:AsyncSession=Depends(get_db),admin=Depends(require_p
 @app.get("/api/admin/gifts")
 async def admin_gifts(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("marketing.read"))):
     rows=(await db.execute(select(GiftCode).order_by(GiftCode.id.desc()).limit(200))).scalars().all()
-    return [{"id":x.id,"code":x.code,"plan_id":x.plan_id,"duration_days":x.duration_days,"max_uses":x.max_uses,"used_count":x.used_count,"expires_at":x.expires_at,"enabled":x.enabled} for x in rows]
+    return [{"id":x.id,"code":x.code,"plan_id":x.plan_id,"duration_days":x.duration_days,"max_uses":x.max_uses,"used_count":x.used_count,"expires_at":x.expires_at,"enabled":x.enabled,"purchaser_user_id":x.purchaser_user_id} for x in rows]
 
 @app.post("/api/admin/gifts")
 async def admin_gift_create(payload:GiftCreateIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_marketing"))):
@@ -2691,7 +2856,8 @@ async def admin_gift_create(payload:GiftCreateIn,db:AsyncSession=Depends(get_db)
     if not plan or not plan.enabled: raise HTTPException(400,"Plan not found or disabled")
     code=payload.code.strip().upper()
     if await db.scalar(select(GiftCode.id).where(GiftCode.code==code)): raise HTTPException(409,"Gift code already exists")
-    x=GiftCode(code=code,plan_id=plan.id,duration_days=payload.duration_days,max_uses=payload.max_uses,expires_at=payload.expires_at)
+    if payload.purchaser_user_id and not await db.get(User,payload.purchaser_user_id): raise HTTPException(400,"Purchaser not found")
+    x=GiftCode(code=code,plan_id=plan.id,duration_days=payload.duration_days,max_uses=payload.max_uses,expires_at=payload.expires_at,purchaser_user_id=payload.purchaser_user_id)
     db.add(x); await audit(db,"gift.created",admin.email,code,{"plan_id":plan.id,"max_uses":payload.max_uses}); await db.commit(); await db.refresh(x)
     return {"id":x.id,"code":x.code}
 
