@@ -1,4 +1,8 @@
-# Remnawave VPN Shop 2.12.0 — Установка одной командой
+# Remnawave VPN Shop 2.13.0 — Установка одной командой
+
+Файлы приложений, загруженные в панели, лежат в каталоге `app-packages` рядом с `MEDIA_DIR`. Этот каталог не публикуется как `/media`. Ссылки на скачивание описаны в разделе 9.11 `INSTRUCTION.md`.
+
+App files uploaded in the panel live in `app-packages` next to `MEDIA_DIR`. That directory is not published as `/media`. Download links are described in section 9.11 of `INSTRUCTION.md`.
 
 Рассылка Telegram включается тем же `BOT_TOKEN`, что и бот. Отдельной миграции в 2.12.0 нет: таблица `broadcasts` создана миграцией `0003_marketing`. Процесс бота должен быть запущен, иначе очередь не уйдёт в Telegram.
 

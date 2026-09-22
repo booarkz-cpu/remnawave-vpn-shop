@@ -4,9 +4,12 @@ from __future__ import annotations
 import ipaddress
 import json
 import pathlib
+import re
+import secrets
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +33,8 @@ DEFAULTS: dict[str, dict] = {
         "text_ru": "Покупатель управляет подпиской, тарифами и подключением в отдельном приложении.",
         "text_en": "The buyer manages the subscription, plans and connection in a separate app.",
         "url": "",
+        "file": "",
+        "file_label": "",
     },
     "ios-user": {
         "id": "ios-user",
@@ -41,6 +46,8 @@ DEFAULTS: dict[str, dict] = {
         "text_ru": "Покупатель открывает магазин на iPhone и iPad.",
         "text_en": "The buyer opens the shop on iPhone and iPad.",
         "url": "",
+        "file": "",
+        "file_label": "",
     },
     "android-admin": {
         "id": "android-admin",
@@ -52,6 +59,8 @@ DEFAULTS: dict[str, dict] = {
         "text_ru": "Администратор смотрит платежи, мониторинг и нарушения.",
         "text_en": "The administrator reviews payments, monitoring and violations.",
         "url": "",
+        "file": "",
+        "file_label": "",
     },
     "ios-admin": {
         "id": "ios-admin",
@@ -63,8 +72,13 @@ DEFAULTS: dict[str, dict] = {
         "text_ru": "Администратор открывает панель на iPhone и iPad.",
         "text_en": "The administrator opens the console on iPhone and iPad.",
         "url": "",
+        "file": "",
+        "file_label": "",
     },
 }
+
+PACKAGE_NAME = re.compile(r"^[a-f0-9]{32}\.(apk|ipa)$")
+MAX_PACKAGE_BYTES = 80 * 1024 * 1024
 
 router = APIRouter()
 
@@ -107,6 +121,32 @@ def _clip(value: str, limit: int, fallback: str) -> str:
     return text[:limit]
 
 
+def safe_package_name(value: str) -> str:
+    name = str(value or "")
+    if name != pathlib.Path(name).name or not PACKAGE_NAME.fullmatch(name):
+        return ""
+    return name
+
+
+def package_root() -> pathlib.Path:
+    from .config import settings
+
+    root = pathlib.Path(settings.media_dir).resolve().parent / "app-packages"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def package_path(name: str) -> pathlib.Path | None:
+    safe = safe_package_name(name)
+    if not safe:
+        return None
+    root = package_root().resolve()
+    path = (root / safe).resolve()
+    if path.parent != root:
+        return None
+    return path
+
+
 def card_from_input(raw: dict) -> dict:
     app_id = str(raw.get("id") or "")
     if app_id not in DEFAULTS:
@@ -122,7 +162,30 @@ def card_from_input(raw: dict) -> dict:
         "text_ru": _clip(str(raw.get("text_ru") or ""), 500, base["text_ru"]),
         "text_en": _clip(str(raw.get("text_en") or ""), 500, base["text_en"]),
         "url": normalize_store_url(str(raw.get("url") or "")),
+        "file": "",
+        "file_label": "",
     }
+
+
+def attach_stored_file(card: dict, raw: dict) -> dict:
+    name = safe_package_name(str(raw.get("file") or ""))
+    card["file"] = name
+    card["file_label"] = _clip(str(raw.get("file_label") or ""), 80, "") if name else ""
+    return card
+
+
+def view_card(card: dict, *, public: bool) -> dict:
+    shown = {key: card[key] for key in ("id", "audience", "platform", "enabled", "title_ru", "title_en", "text_ru", "text_en", "url")}
+    visible = bool(card.get("file")) and (not public or (card.get("audience") == "user" and card.get("enabled")))
+    if visible:
+        prefix = "/api/public/apps" if public else "/api/admin/apps"
+        shown["download_url"] = f"{prefix}/{card['id']}/download"
+    else:
+        shown["download_url"] = ""
+    if not public:
+        shown["has_file"] = bool(card.get("file"))
+        shown["file_label"] = card.get("file_label") or ""
+    return shown
 
 
 def parse_catalog(raw: str | None) -> list[dict]:
@@ -136,7 +199,7 @@ def parse_catalog(raw: str | None) -> list[dict]:
         if not isinstance(row, dict):
             continue
         try:
-            card = card_from_input(row)
+            card = attach_stored_file(card_from_input(row), row)
         except ValueError:
             continue
         found[card["id"]] = card
@@ -169,7 +232,8 @@ async def _settings(db: AsyncSession) -> dict[str, str]:
 async def catalog_payload(db: AsyncSession, *, public: bool) -> dict:
     values = await _settings(db)
     cards = parse_catalog(values.get(CATALOG_KEY))
-    body = {"logo_url": safe_media_path(values.get(LOGO_KEY, "")), "apps": public_cards(cards) if public else cards}
+    shown = public_cards(cards) if public else cards
+    body = {"logo_url": safe_media_path(values.get(LOGO_KEY, "")), "apps": [view_card(card, public=public) for card in shown]}
     return body
 
 
@@ -187,6 +251,7 @@ async def admin_apps(db: AsyncSession = Depends(get_db), admin=Depends(require_p
 async def save_apps(payload: AppsIn, db: AsyncSession = Depends(get_db), admin=Depends(require_permission("manage_content"))):
     from .main import audit
 
+    current = {card["id"]: card for card in parse_catalog((await _settings(db)).get(CATALOG_KEY))}
     seen: list[dict] = []
     ids: list[str] = []
     for item in payload.apps:
@@ -196,6 +261,9 @@ async def save_apps(payload: AppsIn, db: AsyncSession = Depends(get_db), admin=D
             if str(exc) == "url":
                 raise HTTPException(400, "Нужна https-ссылка без логина и локального адреса")
             raise HTTPException(400, "Неизвестное приложение")
+        previous = current.get(card["id"], {})
+        card["file"] = safe_package_name(str(previous.get("file") or ""))
+        card["file_label"] = previous.get("file_label") or "" if card["file"] else ""
         if card["id"] in ids:
             raise HTTPException(400, "Приложение указано дважды")
         ids.append(card["id"])
@@ -242,3 +310,128 @@ async def delete_client_logo(db: AsyncSession = Depends(get_db), admin=Depends(r
     await audit(db, "content.apps.logo.deleted", admin.email)
     await db.commit()
     return {"ok": True, "logo_url": ""}
+
+
+def _download_name(app_id: str, stored: str) -> str:
+    suffix = ".ipa" if stored.endswith(".ipa") else ".apk"
+    return f"remnawave-{app_id}{suffix}"
+
+
+def _media_type(stored: str) -> str:
+    if stored.endswith(".apk"):
+        return "application/vnd.android.package-archive"
+    return "application/octet-stream"
+
+
+async def _read_package(file: UploadFile) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(min(1024 * 1024, MAX_PACKAGE_BYTES - total + 1))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > MAX_PACKAGE_BYTES:
+            raise HTTPException(413, "Файл приложения слишком большой")
+    return b"".join(chunks)
+
+
+def _package_response(card: dict) -> FileResponse:
+    path = package_path(str(card.get("file") or ""))
+    if path is None or not path.is_file():
+        raise HTTPException(404, "Файл не найден")
+    stored = path.name
+    return FileResponse(path, media_type=_media_type(stored), filename=_download_name(card["id"], stored))
+
+
+async def _write_catalog(db: AsyncSession, cards: list[dict]) -> None:
+    ordered = {card["id"]: card for card in cards}
+    encoded = json.dumps([ordered[app_id] for app_id in APP_IDS], ensure_ascii=False)
+    row = await db.get(AppSetting, CATALOG_KEY)
+    if row:
+        row.value = encoded
+    else:
+        db.add(AppSetting(key=CATALOG_KEY, value=encoded))
+
+
+@router.post("/api/admin/apps/{app_id}/file")
+async def upload_app_file(app_id: str, file: UploadFile = File(...), db: AsyncSession = Depends(get_db), admin=Depends(require_permission("manage_content"))):
+    from .main import audit
+
+    if app_id not in APP_IDS:
+        raise HTTPException(404, "Неизвестное приложение")
+    ext = ".apk" if app_id.startswith("android-") else ".ipa"
+    original = pathlib.Path(file.filename or "").name.lower()
+    if not original.endswith(ext):
+        raise HTTPException(400, "Для Android нужен APK, для iOS нужен IPA")
+    data = await _read_package(file)
+    if not data.startswith(b"PK\x03\x04"):
+        raise HTTPException(400, "Файл не похож на пакет приложения")
+    name = secrets.token_hex(16) + ext
+    path = package_path(name)
+    if path is None:
+        raise HTTPException(500, "Файл не сохранён")
+    path.write_bytes(data)
+    cards = parse_catalog((await _settings(db)).get(CATALOG_KEY))
+    previous = ""
+    for card in cards:
+        if card["id"] != app_id:
+            continue
+        previous = card.get("file") or ""
+        card["file"] = name
+        card["file_label"] = ext.removeprefix(".")
+    try:
+        await _write_catalog(db, cards)
+        await audit(db, "content.apps.file.updated", admin.email, app_id)
+        await db.commit()
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+    old = package_path(previous)
+    if old and old != path:
+        old.unlink(missing_ok=True)
+    return await catalog_payload(db, public=False)
+
+
+@router.delete("/api/admin/apps/{app_id}/file")
+async def delete_app_file(app_id: str, db: AsyncSession = Depends(get_db), admin=Depends(require_permission("manage_content"))):
+    from .main import audit
+
+    if app_id not in APP_IDS:
+        raise HTTPException(404, "Неизвестное приложение")
+    cards = parse_catalog((await _settings(db)).get(CATALOG_KEY))
+    removed = ""
+    for card in cards:
+        if card["id"] != app_id:
+            continue
+        removed = card.get("file") or ""
+        card["file"] = ""
+        card["file_label"] = ""
+    await _write_catalog(db, cards)
+    await audit(db, "content.apps.file.deleted", admin.email, app_id)
+    await db.commit()
+    old = package_path(removed)
+    if old:
+        old.unlink(missing_ok=True)
+    return await catalog_payload(db, public=False)
+
+
+@router.get("/api/public/apps/{app_id}/download")
+async def public_app_download(app_id: str, db: AsyncSession = Depends(get_db)):
+    if app_id not in APP_IDS:
+        raise HTTPException(404, "Файл не найден")
+    card = next((item for item in parse_catalog((await _settings(db)).get(CATALOG_KEY)) if item["id"] == app_id), None)
+    if not card or card.get("audience") != "user" or not card.get("enabled") or not card.get("file"):
+        raise HTTPException(404, "Файл не найден")
+    return _package_response(card)
+
+
+@router.get("/api/admin/apps/{app_id}/download")
+async def admin_app_download(app_id: str, db: AsyncSession = Depends(get_db), admin=Depends(require_permission("read"))):
+    if app_id not in APP_IDS:
+        raise HTTPException(404, "Файл не найден")
+    card = next((item for item in parse_catalog((await _settings(db)).get(CATALOG_KEY)) if item["id"] == app_id), None)
+    if not card or not card.get("file"):
+        raise HTTPException(404, "Файл не найден")
+    return _package_response(card)

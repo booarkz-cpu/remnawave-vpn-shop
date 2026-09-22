@@ -27,6 +27,13 @@
 - [ ] Confirm `/api/public/servers` has no address, token or password fields.
 - [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
 
+## App downloads 2.13.0
+- [ ] Upload an APK on the buyer Android card and an administrator APK on the administrator Android card. Confirm each file is at most 80 MB and starts with a ZIP header.
+- [ ] Open the user cabinet and use **Скачать**. The response is the buyer package. `GET /api/public/apps/android-admin/download` returns 404.
+- [ ] Open Admin → Приложения and use **Скачать** on the administrator card. A viewer session can download. A session without `manage_content` cannot upload.
+- [ ] Save the card texts and confirm the uploaded file is still present.
+- [ ] Confirm the stored file is not listed under `/media/`.
+
 ## Telegram broadcast 2.12.0
 - [ ] `BOT_TOKEN` is set and the bot process is running. The API only queues the row.
 - [ ] An operator queues a short HTML message to `inactive` or a test audience from Admin → Маркетинг and from the administrator app tab Рассылка.

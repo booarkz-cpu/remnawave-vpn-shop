@@ -1,4 +1,16 @@
-# Security / Безопасность — Remnawave VPN Shop 2.12.0
+# Security / Безопасность — Remnawave VPN Shop 2.13.0
+
+## Файлы приложений / App packages (2.13.0)
+
+- Загрузка APK и IPA требует `manage_content`. Скачивание в панели требует `read`. Публичная ссылка есть только у включённой карточки покупателя.
+- Пакет проверяется по расширению и подписи ZIP `PK`. Размер не больше 80 МБ. Имя на диске — 32 шестнадцатеричных символа, его нет в JSON.
+- Каталог `app-packages` не смонтирован как `/media`. Подмена пути `..` отклоняется и при чтении, и при восстановлении из копии.
+- Сохранение текстов карточки не принимает имя файла от браузера и не затирает уже загруженный пакет.
+
+- Uploading an APK or IPA requires `manage_content`. A panel download requires `read`. A public link exists only for an enabled buyer card.
+- The package is checked by extension and the ZIP `PK` signature. The size limit is 80 MB. The on-disk name is 32 hexadecimal characters and is absent from JSON.
+- The `app-packages` directory is not mounted as `/media`. A `..` path is rejected when reading and when restoring a backup.
+- Saving card text does not accept a file name from the browser and does not erase an uploaded package.
 
 ## Рассылка / Broadcast (2.12.0)
 

@@ -1,4 +1,8 @@
-# Мобильные приложения 2.12.0 / Mobile apps 2.12.0
+# Мобильные приложения 2.13.0 / Mobile apps 2.13.0
+
+С версии **2.13.0** ссылка на скачивание приложения администратора стоит в веб-панели, а ссылка на приложение покупателя — в личном кабинете. Сами пакеты Android остаются **2.12.0** для администратора и **2.10.0** для покупателя, пока администратор не загрузит новый файл.
+
+From **2.13.0** the administrator app download link is in the web panel, and the buyer app download link is in the user cabinet. The Android packages stay **2.12.0** for the administrator and **2.10.0** for the buyer until an administrator uploads a new file.
 
 Администратор Android и iOS в этом релизе — **2.12.0**. Покупатель остаётся **2.10.0**. The administrator Android and iOS apps in this release are **2.12.0**. The buyer app stays **2.10.0**.
 

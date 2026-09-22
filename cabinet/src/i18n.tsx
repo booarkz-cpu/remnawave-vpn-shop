@@ -93,6 +93,8 @@ export const EN: Record<string, string> = {
   "Приложения": "Apps",
   "Для Android и iOS есть отдельные приложения магазина.": "Separate shop apps are available for Android and iOS.",
   "Открыть": "Open",
+  "Скачать": "Download",
+  "Скачать по ссылке": "Download from link",
 };
 
 let activeLang: Lang = "ru";

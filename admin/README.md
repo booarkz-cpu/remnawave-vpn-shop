@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## Скачивание / Downloads
+
+Вкладка **Приложения** загружает APK и IPA, меняет тексты карточек и показывает ссылку на приложение администратора. Кабинет покупателя получает ссылку только на включённые карточки покупателя.
+
+The **Приложения** tab uploads an APK or IPA, edits the card texts and shows the administrator app link. The buyer cabinet receives a link only for enabled buyer cards.
+
 ## Рассылка / Broadcast
 
 Раздел **Маркетинг** ставит HTML-рассылку в очередь бота. Аудитория: все с Telegram, активная подписка или без активной подписки. Кнопка и картинка — HTTPS. Повтор продолжает счётчик. Подробности — `INSTRUCTION.md`, раздел 9.10.

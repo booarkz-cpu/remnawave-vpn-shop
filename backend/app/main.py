@@ -26,7 +26,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.12.0"
+APP_VERSION = "2.13.0"
+# Historical compatibility marker: APP_VERSION = "2.12.0"
 # Historical compatibility marker: APP_VERSION = "2.11.0"
 # Historical compatibility marker: APP_VERSION = "2.10.0"
 # Historical compatibility marker: APP_VERSION = "2.9.0"
@@ -3462,6 +3463,8 @@ async def create_project_backup(db, actor="system"):
                 tar.add(dump,arcname="database.sql")
                 media=pathlib.Path(settings.media_dir)
                 if media.exists(): tar.add(media,arcname="media")
+                packages=media.resolve().parent/"app-packages"
+                if packages.exists(): tar.add(packages,arcname="app-packages")
             encrypt=await setting_value(db,"backup_encrypt","1")=="1"
             final=backups/archive.name
             if encrypt:
@@ -3681,6 +3684,22 @@ async def restore_backup(backup_id:int,confirm:str,otp:str|None=None,db:AsyncSes
                     for src in extracted.rglob("*"):
                         if src.is_file():
                             dst=media_root/src.relative_to(extracted); dst.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(src,dst)
+            package_members=[m.name for m in tar.getmembers() if m.name=="app-packages" or m.name.startswith("app-packages/")]
+            if package_members:
+                media_root=pathlib.Path(settings.media_dir)
+                package_root=(media_root.resolve().parent/"app-packages")
+                package_root.mkdir(parents=True,exist_ok=True)
+                for name in package_members:
+                    target=(package_root/pathlib.Path(name).relative_to("app-packages")).resolve() if name!="app-packages" else package_root.resolve()
+                    if target!=package_root.resolve() and package_root.resolve() not in target.parents: raise HTTPException(400,"Unsafe media archive path")
+                    _safe_extract_members(tar,{name},work)
+                extracted_packages=work/"app-packages"
+                if extracted_packages.exists():
+                    for src in extracted_packages.rglob("*"):
+                        if src.is_file() and src.suffix in {".apk",".ipa"} and len(src.name)==36:
+                            dst=package_root/src.name
+                            if dst.parent.resolve()!=package_root.resolve(): continue
+                            shutil.copy2(src,dst)
         sql_file=work/"database.sql"
         # Use the configured SQLAlchemy database URL rather than hard-coded deployment
         # credentials. This keeps restore correct for non-default DB hosts/users/passwords.
