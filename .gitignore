@@ -24,6 +24,7 @@ yarn-error.log*
 # Build artifacts
 admin/dist/
 miniapp/dist/
+cabinet/dist/
 coverage/
 
 # Local/runtime data
