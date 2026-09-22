@@ -5,12 +5,14 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -29,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -68,6 +72,27 @@ fun normalizeBase(raw: String): String {
     throw IllegalArgumentException("https")
 }
 
+fun safeMediaPath(path: String): String? {
+    if (!path.startsWith("/media/") || ".." in path || "\\" in path || "://" in path || "?" in path || "#" in path) return null
+    val name = path.removePrefix("/media/")
+    if (name.isBlank() || "/" in name) return null
+    return path
+}
+
+fun loadLogoBitmap(base: String, path: String): android.graphics.Bitmap? {
+    val safe = safeMediaPath(path) ?: return null
+    val connection = (URL(base + safe).openConnection() as HttpURLConnection).apply {
+        instanceFollowRedirects = false
+        connectTimeout = 15000
+        readTimeout = 15000
+        setRequestProperty("Accept", "image/png,image/jpeg,image/webp")
+    }
+    if (connection.responseCode !in 200..299) return null
+    val bytes = connection.inputStream.use { it.readBytes() }
+    if (bytes.size > 2 * 1024 * 1024) return null
+    return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+}
+
 fun publicNode(row: JSONObject): JSONObject {
     val status = row.optString("status", "unknown")
     val safeStatus = if (status in setOf("online", "offline", "disabled", "unknown")) status else "unknown"
@@ -88,7 +113,7 @@ class ShopApi(private val base: String, private val token: String, private val l
             readTimeout = 15000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Language", lang)
-            setRequestProperty("User-Agent", "RemnawaveShop-Android-User/2.7.0")
+            setRequestProperty("User-Agent", "RemnawaveShop-Android-User/2.8.0")
             setRequestProperty("X-Shop-Client", "android-user")
             if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
             if (idempotency != null) setRequestProperty("Idempotency-Key", idempotency)
@@ -138,6 +163,7 @@ private fun UserApp() {
     var servers by remember { mutableStateOf(JSONObject()) }
     var connection by remember { mutableStateOf(JSONObject()) }
     var config by remember { mutableStateOf(JSONObject()) }
+    var logo by remember { mutableStateOf<ImageBitmap?>(null) }
     var promo by remember { mutableStateOf("") }
     var subject by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
@@ -168,6 +194,10 @@ private fun UserApp() {
             val nextServers = api.get("/api/me/servers") as JSONObject
             val nextConnection = api.get("/api/me/connection-info") as JSONObject
             val nextConfig = api.get("/api/public/config") as JSONObject
+            val nextLogo = try {
+                val catalog = api.get("/api/public/apps") as JSONObject
+                loadLogoBitmap(base, catalog.optString("logo_url"))?.asImageBitmap()
+            } catch (_: Exception) { null }
             activity.runOnUiThread {
                 dashboard = nextDashboard
                 plans = nextPlans
@@ -175,15 +205,29 @@ private fun UserApp() {
                 servers = nextServers
                 connection = nextConnection
                 config = nextConfig
+                logo = nextLogo
             }
         }
     }
     LaunchedEffect(token, lang) {
         if (token.isNotBlank()) refresh()
     }
+    LaunchedEffect(base) {
+        val normalized = try { normalizeBase(base) } catch (_: Exception) { return@LaunchedEffect }
+        if (token.isNotBlank()) return@LaunchedEffect
+        thread {
+            try {
+                val catalog = ShopApi(normalized, "", lang).get("/api/public/apps") as JSONObject
+                val nextLogo = loadLogoBitmap(normalized, catalog.optString("logo_url"))?.asImageBitmap()
+                activity.runOnUiThread { logo = nextLogo }
+            } catch (_: Exception) {
+            }
+        }
+    }
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                if (logo != null) Image(logo!!, contentDescription = t("app_name"), modifier = Modifier.size(48.dp))
                 Text(t("app_name"), style = MaterialTheme.typography.headlineSmall, color = Color(0xFF00E5C0))
                 TextButton(onClick = {
                     lang = if (lang == "ru") "en" else "ru"

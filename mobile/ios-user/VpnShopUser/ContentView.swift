@@ -19,6 +19,7 @@ struct UserRootView: View {
     @State private var promo = ""
     @State private var subject = ""
     @State private var message = ""
+    @State private var logo: UIImage?
 
     private var strings: [String: String] { loadStrings(lang) }
     private func t(_ key: String) -> String { strings[key] ?? key }
@@ -27,6 +28,7 @@ struct UserRootView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
+                    if let logo { Image(uiImage: logo).resizable().frame(width: 48, height: 48) }
                     Text(t("app_name")).font(.title2).foregroundStyle(Color(red: 0, green: 0.90, blue: 0.75))
                     Spacer()
                     Button(lang == "ru" ? "EN" : "RU") { lang = lang == "ru" ? "en" : "ru" }
@@ -39,7 +41,10 @@ struct UserRootView: View {
         }
         .background(Color(red: 0.04, green: 0.06, blue: 0.08))
         .preferredColorScheme(.dark)
-        .onAppear { if !token.isEmpty { refresh() } }
+        .onAppear {
+            if !token.isEmpty { refresh() }
+            else { loadPublicLogo() }
+        }
         .onChange(of: token) { value in if !value.isEmpty { refresh() } }
         .onChange(of: lang) { _ in if !token.isEmpty { refresh() } }
     }
@@ -138,6 +143,21 @@ struct UserRootView: View {
         }
     }
 
+    private func logoImage(_ api: ShopClient, _ path: String) -> UIImage? {
+        guard let catalog = try? api.call("GET", path) as? [String: Any],
+              let media = catalog["logo_url"] as? String,
+              let data = try? api.bytes(media) else { return nil }
+        return UIImage(data: data)
+    }
+
+    private func loadPublicLogo() {
+        guard let normalized = try? normalizeBase(base) else { return }
+        work {
+            let image = logoImage(ShopClient(base: normalized, token: "", lang: lang), "/api/public/apps")
+            DispatchQueue.main.async { logo = image }
+        }
+    }
+
     private func refresh() {
         work {
             let api = ShopClient(base: base, token: token, lang: lang)
@@ -147,6 +167,7 @@ struct UserRootView: View {
             let nextServers = try api.call("GET", "/api/me/servers") as? [String: Any] ?? [:]
             let nextConnection = try api.call("GET", "/api/me/connection-info") as? [String: Any] ?? [:]
             let nextConfig = try api.call("GET", "/api/public/config") as? [String: Any] ?? [:]
+            let nextLogo = logoImage(api, "/api/public/apps")
             DispatchQueue.main.async {
                 dashboard = nextDashboard
                 plans = nextPlans
@@ -154,6 +175,7 @@ struct UserRootView: View {
                 servers = nextServers
                 connection = nextConnection
                 config = nextConfig
+                logo = nextLogo
             }
         }
     }

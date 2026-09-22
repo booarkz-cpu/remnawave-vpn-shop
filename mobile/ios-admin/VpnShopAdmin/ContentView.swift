@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AdminRootView: View {
     @AppStorage("shop_admin_lang") private var lang = "ru"
@@ -17,6 +18,7 @@ struct AdminRootView: View {
     @State private var platform: [String: Any] = [:]
     @State private var tickets: [[String: Any]] = []
     @State private var reply = ""
+    @State private var logo: UIImage?
 
     private func t(_ key: String) -> String { loadStrings(lang)[key] ?? key }
 
@@ -24,6 +26,7 @@ struct AdminRootView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
+                    if let logo { Image(uiImage: logo).resizable().frame(width: 48, height: 48) }
                     Text(t("app_name")).font(.title2).foregroundStyle(Color(red: 0, green: 0.90, blue: 0.75))
                     Spacer()
                     Button(lang == "ru" ? "EN" : "RU") { lang = lang == "ru" ? "en" : "ru" }
@@ -35,7 +38,10 @@ struct AdminRootView: View {
         }
         .background(Color(red: 0.04, green: 0.06, blue: 0.08))
         .preferredColorScheme(.dark)
-        .onAppear { if !token.isEmpty { refresh() } }
+        .onAppear {
+            if !token.isEmpty { refresh() }
+            else { loadPublicLogo() }
+        }
         .onChange(of: token) { value in if !value.isEmpty { refresh() } }
         .onChange(of: lang) { _ in if !token.isEmpty { refresh() } }
     }
@@ -137,6 +143,21 @@ struct AdminRootView: View {
         }
     }
 
+    private func logoImage(_ api: ShopClient, _ path: String) -> UIImage? {
+        guard let catalog = try? api.call("GET", path) as? [String: Any],
+              let media = catalog["logo_url"] as? String,
+              let data = try? api.bytes(media) else { return nil }
+        return UIImage(data: data)
+    }
+
+    private func loadPublicLogo() {
+        guard let normalized = try? normalizeBase(base) else { return }
+        work {
+            let image = logoImage(ShopClient(base: normalized, token: "", lang: lang), "/api/public/apps")
+            DispatchQueue.main.async { logo = image }
+        }
+    }
+
     private func refresh() {
         work {
             let api = ShopClient(base: base, token: token, lang: lang)
@@ -146,6 +167,7 @@ struct AdminRootView: View {
             let nextMonitoring = try api.call("GET", "/api/admin/remnawave/monitoring") as? [String: Any] ?? [:]
             let nextPlatform = try api.call("GET", "/api/admin/platform/summary") as? [String: Any] ?? [:]
             let nextTickets = try api.call("GET", "/api/admin/support/tickets") as? [[String: Any]] ?? []
+            let nextLogo = logoImage(api, "/api/admin/apps")
             DispatchQueue.main.async {
                 overview = nextOverview
                 plans = nextPlans
@@ -153,6 +175,7 @@ struct AdminRootView: View {
                 monitoring = nextMonitoring
                 platform = nextPlatform
                 tickets = nextTickets
+                logo = nextLogo
             }
         }
     }

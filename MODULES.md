@@ -1,8 +1,8 @@
 # Модули проекта / Project modules
 
-Версия **2.7.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Предыдущее описание конструктора относится к **2.5.0**.
+Версия **2.8.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Предыдущее описание конструктора относится к **2.5.0**.
 
-Version **2.7.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. The constructor description belongs to **2.5.0**.
+Version **2.8.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. The constructor description belongs to **2.5.0**.
 
 ---
 
@@ -11,6 +11,10 @@ Version **2.7.0**. This document explains why each module exists. The function-b
 ### Как устроен запрос
 
 Покупатель открывает Mini App, личный кабинет или бота. Администратор открывает панель. Caddy принимает HTTPS и отдаёт статику `admin`, `miniapp` или `cabinet`, а `/api` отправляет в FastAPI. API читает и пишет PostgreSQL, ставит блокировки и лимиты в Redis, ходит в Remnawave за пользователями и узлами и в платёжного провайдера за созданием и сверкой платежа. Фоновый `worker` дожимает очередь задач. Планировщики внутри API-процесса повторяют выдачу, возвраты, автопродление, сверку и уведомления об окончании подписки.
+
+### `backend/app/mobile_catalog.py`
+
+Хранит четыре карточки приложений и логотип кабинета. Публичный маршрут отдаёт только включённые карточки покупателя и безопасный путь `/media/`. Запись и загрузка логотипа требуют `manage_content`.
 
 ### `backend/app/mobile_auth.py`
 
@@ -154,6 +158,10 @@ Compose поднимает `db`, `redis`, `backend`, `worker`, `bot`, `admin`, `
 ### Request path
 
 A buyer opens the Mini App, the cabinet or the bot. An administrator opens the panel. Caddy terminates HTTPS, serves the `admin`, `miniapp` or `cabinet` files, and forwards `/api` to FastAPI. The API uses PostgreSQL for state, Redis for locks and rate limits, Remnawave for users and nodes, and a payment provider to create and re-read payments. `worker` drains the job queue. Schedulers inside the API process retry fulfillment, refunds, auto-renew, reconciliation and expiry notices.
+
+### `backend/app/mobile_catalog.py`
+
+Stores the four app cards and the cabinet logo. The public route returns only enabled buyer cards and a safe `/media/` path. Saving the catalog and uploading the logo require `manage_content`.
 
 ### `backend/app/mobile_auth.py`
 

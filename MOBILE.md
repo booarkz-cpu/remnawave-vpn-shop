@@ -1,10 +1,20 @@
-# Мобильные приложения 2.7.0 / Mobile apps 2.7.0
+# Мобильные приложения 2.8.0 / Mobile apps 2.8.0
+
+Текущая версия приложений **2.8.0**. Исходники появились в **2.7.0**. В **2.8.0** администратор задаёт тексты карточек и общий логотип.
+
+The current app version is **2.8.0**. The sources arrived in **2.7.0**. In **2.8.0** an administrator edits the cards and the shared logo.
 
 Четыре отдельных клиента магазина: Android и iOS для покупателя, Android и iOS для администратора. Общий вид — тёмная схема Material Design и акцент Web 3.0 `#00E5C0`. В каждом приложении есть переключатель **RU / EN**.
 
 Four separate shop clients: Android and iOS for the buyer, Android and iOS for the administrator. The shared look is a dark Material Design scheme with the Web 3.0 accent `#00E5C0`. Each app has a **RU / EN** language switch.
 
 Русский и English живут в одном каталоге на роль: `mobile/l10n/user.json` и `mobile/l10n/admin.json`. Копии лежат в assets Android и в бандле iOS и должны совпадать побайтно.
+
+## Логотип и карточки
+
+Админка, вкладка **Приложения**, сохраняет четыре карточки и файл `client_logo`. Покупательский кабинет читает `GET /api/public/apps` и показывает логотип и включённые карточки покупателя. Приложения на экране входа запрашивают тот же публичный маршрут. После входа администраторское приложение читает `GET /api/admin/apps`. Картинка загружается только с пути `/media/<имя>`, без редиректа.
+
+The admin **Приложения** tab stores four cards and the `client_logo` file. The buyer cabinet reads `GET /api/public/apps` and shows the logo plus enabled buyer cards. The apps request the same public route on the sign-in screen. After sign-in the administrator app reads `GET /api/admin/apps`. The image download accepts only a `/media/<name>` path and does not follow redirects.
 
 ## Лицензия
 
@@ -16,10 +26,10 @@ The apps are part of Remnawave VPN Shop and are covered by the Remnawave VPN Sho
 
 | Приложение | Каталог | Идентификатор | `X-Shop-Client` | User-Agent |
 | --- | --- | --- | --- | --- |
-| Android, покупатель | `mobile/android-user` | `shop.remnawave.user` | `android-user` | `RemnawaveShop-Android-User/2.7.0` |
-| Android, администратор | `mobile/android-admin` | `shop.remnawave.admin` | `android-admin` | `RemnawaveShop-Android-Admin/2.7.0` |
-| iOS, покупатель | `mobile/ios-user` | `shop.remnawave.user` | `ios-user` | `RemnawaveShop-iOS-User/2.7.0` |
-| iOS, администратор | `mobile/ios-admin` | `shop.remnawave.admin` | `ios-admin` | `RemnawaveShop-iOS-Admin/2.7.0` |
+| Android, покупатель | `mobile/android-user` | `shop.remnawave.user` | `android-user` | `RemnawaveShop-Android-User/2.8.0` |
+| Android, администратор | `mobile/android-admin` | `shop.remnawave.admin` | `android-admin` | `RemnawaveShop-Android-Admin/2.8.0` |
+| iOS, покупатель | `mobile/ios-user` | `shop.remnawave.user` | `ios-user` | `RemnawaveShop-iOS-User/2.8.0` |
+| iOS, администратор | `mobile/ios-admin` | `shop.remnawave.admin` | `ios-admin` | `RemnawaveShop-iOS-Admin/2.8.0` |
 
 User-Agent должен оставаться одинаковым между входом и следующими запросами: сессия привязана к нему, смена строки отзывает сессию.
 
