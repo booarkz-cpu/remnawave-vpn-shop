@@ -383,6 +383,20 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 
 Скрипт требует `.env` в `/opt/vpn-shop` (или в каталоге `APP_DIR`). Он скачивает zip `full_release` и `.sha256` только с GitHub, отклоняет чужой хост, symlink, путь с `..` и архив больше 80 МБ, не затирает `.env`, `.env.*`, `.rollback` и `.git`. С версии 2.11.0 `scripts/update.sh` снимает снимок и делает `pg_dump` до копирования новых файлов, затем собирает проект, запускает `doctor.sh` и откатывает снимок при ошибке. Если установлена та же или более новая версия, скрипт печатает «Установлена актуальная версия» и завершается с кодом 0. Расписание cron администратор добавляет сам. По умолчанию оно выключено.
 
+## 9.10. Массовая рассылка в Telegram (2.12.0)
+
+1. Рассылка есть в веб-панели, раздел **Маркетинг**, и в приложениях администратора Android и iOS, вкладка **Рассылка**. Доставку выполняет процесс бота, функция `broadcast_worker` в `backend/app/bot.py`. Контейнер API сообщение в Telegram не отправляет: он только ставит строку в таблицу `broadcasts` со статусом `queued`.
+2. Нужны `BOT_TOKEN` и запущенный процесс бота. Без токена `POST /api/admin/broadcasts` отвечает 503 `BOT_TOKEN is not configured`.
+3. Право — `manage_broadcasts`. Оно есть у ролей `operator` и `admin`. Роль `viewer` список видит через `GET /api/admin/marketing`, а поставить рассылку не может.
+4. Аудитория:
+   - `all` — каждый пользователь с `telegram_id`;
+   - `active` — есть подписка с `expires_at` позже текущего времени;
+   - `inactive` — Telegram есть, активной подписки нет.
+5. Текст — HTML, до 4000 символов. Кнопка задаётся парой: текст до 100 символов и абсолютный `https://` URL. Картинка — отдельный `https://` URL. С картинкой текст не длиннее 1024 символов: это предел подписи Telegram. Пустой адрес не проверяется. Адрес с логином, паролем или частным хостом отклоняется.
+6. Воркер забирает одну запись `queued` запросом `FOR UPDATE SKIP LOCKED`, ставит `sending` и шлёт `sendMessage` или `sendPhoto`. Один и тот же пользователь не попадает в список дважды, даже если активных подписок несколько. После каждого получателя счётчики `sent_count` и `failed_count` сохраняются. Ответ 429 повторяется один раз. Клиент HTTP не берёт прокси из окружения (`trust_env=False`).
+7. Если отправка обрывается, статус становится `failed`. Кнопка **Повторить** вызывает `POST /api/admin/broadcasts/{id}/retry` и возвращает `sending` или `failed` в `queued`. Воркер пропускает уже посчитанных получателей (`sent_count + failed_count`) и продолжает по порядку `id`. Уже доставленные сообщения второй раз не уходят, пока порядок пользователей не изменился. Завершённую рассылку повтор не перезапускает: для новой отправки создаётся новая запись.
+8. Приложение администратора Android в этом релизе имеет `versionName` **2.12.0** и `versionCode` **2120**, User-Agent `RemnawaveShop-Android-Admin/2.12.0`. iOS-администратор: `MARKETING_VERSION` **2.12.0**, `CURRENT_PROJECT_VERSION` **2120**, User-Agent `RemnawaveShop-iOS-Admin/2.12.0`. Приложение покупателя остаётся **2.10.0**. IPA по-прежнему собирается в Xcode.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -849,6 +863,20 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 ```
 
 The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `full_release` zip and the matching `.sha256` from GitHub only, rejects another host, a symlink, any `..` path and an archive larger than 80 MB, and keeps `.env`, `.env.*`, `.rollback` and `.git`. From 2.11.0, `scripts/update.sh` snapshots the install and runs `pg_dump` before copying the new files, then builds, runs `doctor.sh` and restores the snapshot on failure. When the installed version is current, it prints «Установлена актуальная версия» and exits 0. An administrator may add a cron job. It is not enabled by default.
+
+## 9.10. Telegram mass broadcast (2.12.0)
+
+1. The broadcast lives in the web panel, **Маркетинг** (Marketing), and in the Android and iOS administrator apps on the **Рассылка** (Broadcast) tab. Delivery is the bot process, `broadcast_worker` in `backend/app/bot.py`. The API container does not call Telegram. It inserts a `broadcasts` row with status `queued`.
+2. `BOT_TOKEN` must be set and the bot process must be running. Without the token, `POST /api/admin/broadcasts` returns 503 `BOT_TOKEN is not configured`.
+3. The permission is `manage_broadcasts`. Roles `operator` and `admin` have it. A `viewer` can read `GET /api/admin/marketing` and cannot queue a broadcast.
+4. Audience:
+   - `all` — every user with a `telegram_id`;
+   - `active` — a subscription whose `expires_at` is in the future;
+   - `inactive` — a Telegram id and no active subscription.
+5. The text is HTML, up to 4000 characters. A button is a pair: text up to 100 characters and an absolute `https://` URL. An image is a separate `https://` URL. With an image the text stays within 1024 characters, the Telegram caption limit. An empty URL is skipped. A URL with a username, a password or a private host is rejected.
+6. The worker claims one `queued` row with `FOR UPDATE SKIP LOCKED`, sets `sending`, and calls `sendMessage` or `sendPhoto`. A user is listed once even when several subscriptions are active. After each recipient, `sent_count` and `failed_count` are saved. HTTP 429 is retried once. The HTTP client ignores proxy variables (`trust_env=False`).
+7. A broken send becomes `failed`. **Повторить** (Retry) calls `POST /api/admin/broadcasts/{id}/retry` and moves `sending` or `failed` back to `queued`. The worker skips recipients already counted (`sent_count + failed_count`) and continues in `id` order. Messages already delivered are not sent again while that order stays stable. A completed broadcast is not restarted by retry. A new send is a new row.
+8. The Android administrator app in this release uses `versionName` **2.12.0** and `versionCode` **2120**, User-Agent `RemnawaveShop-Android-Admin/2.12.0`. The iOS administrator app uses `MARKETING_VERSION` **2.12.0**, `CURRENT_PROJECT_VERSION` **2120**, User-Agent `RemnawaveShop-iOS-Admin/2.12.0`. The buyer app stays **2.10.0**. The IPA is still built in Xcode.
 
 ## 10. Mini App
 

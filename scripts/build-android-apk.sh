@@ -22,6 +22,7 @@ fi
 OUT="${1:-$ROOT}"
 mkdir -p "$OUT"
 # Historical compatibility marker: remnawave_vpn_shop_android_user_2_9_0.apk
+# Historical compatibility marker: name="remnawave_vpn_shop_${app//-/_}_2_10_0.apk"
 TASK=":app:assembleDebug"
 KIND="debug"
 if [[ -n "${ANDROID_KEYSTORE:-}" ]]; then
@@ -36,7 +37,11 @@ for app in android-user android-admin; do
     (cd "$dir" && "$GRADLE" "$TASK" --no-daemon)
   fi
   src="$dir/app/build/outputs/apk/$KIND/app-$KIND.apk"
-  name="remnawave_vpn_shop_${app//-/_}_2_10_0.apk"
+  if [[ "$app" == "android-admin" ]]; then
+    name="remnawave_vpn_shop_android_admin_2_12_0.apk"
+  else
+    name="remnawave_vpn_shop_android_user_2_10_0.apk"
+  fi
   cp "$src" "$OUT/$name"
   sha256sum "$OUT/$name" > "$OUT/$name.sha256"
   echo "APK: $OUT/$name"

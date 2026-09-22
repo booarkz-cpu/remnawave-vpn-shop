@@ -26,7 +26,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.11.0"
+APP_VERSION = "2.12.0"
+# Historical compatibility marker: APP_VERSION = "2.11.0"
 # Historical compatibility marker: APP_VERSION = "2.10.0"
 # Historical compatibility marker: APP_VERSION = "2.9.0"
 # Historical compatibility marker: APP_VERSION = "2.8.0"
@@ -4146,7 +4147,7 @@ class PromoCodeIn(BaseModel):
 class AdIn(BaseModel):
     title:str=Field(min_length=1,max_length=255); text:str=""; image_url:str|None=None; button_text:str|None=None; button_url:str|None=None; starts_at:datetime|None=None; ends_at:datetime|None=None; enabled:bool=True; sort_order:int=0
 class BroadcastIn(BaseModel):
-    text:str=Field(min_length=1,max_length=4000); image_url:str|None=None; button_text:str|None=None; button_url:str|None=None; target:str="all"
+    text:str=Field(min_length=1,max_length=4000); image_url:str|None=None; button_text:str|None=Field(default=None,max_length=100); button_url:str|None=None; target:str="all"
 
 @app.get("/api/admin/marketing")
 async def admin_marketing(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
@@ -4214,8 +4215,23 @@ async def delete_ad(item_id:int,db:AsyncSession=Depends(get_db),admin=Depends(re
 async def create_broadcast(payload:BroadcastIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_broadcasts"))):
     if not settings.bot_token: raise HTTPException(503,"BOT_TOKEN is not configured")
     if payload.target not in {"all","active","inactive"}: raise HTTPException(400,"Unsupported target")
-    validate_public_url(payload.button_url); validate_public_url(payload.image_url)
-    x=Broadcast(**payload.model_dump()); db.add(x); await db.commit(); await db.refresh(x); return {"id":x.id,"status":"queued"}
+    data=payload.model_dump()
+    for key in ("image_url","button_text","button_url"):
+        if data.get(key)=="": data[key]=None
+    if bool(data.get("button_text")) != bool(data.get("button_url")): raise HTTPException(400,"Button text and URL are set together")
+    if data.get("image_url") and len(payload.text)>1024: raise HTTPException(400,"Caption is longer than 1024 characters")
+    validate_public_url(data.get("button_url")); validate_public_url(data.get("image_url"))
+    x=Broadcast(**data); db.add(x); await audit(db,"marketing.broadcast.queued",admin.email,str(payload.target)); await db.commit(); await db.refresh(x); return {"id":x.id,"status":"queued"}
+
+@app.post("/api/admin/broadcasts/{broadcast_id}/retry")
+async def retry_broadcast(broadcast_id:int,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_broadcasts"))):
+    if not settings.bot_token: raise HTTPException(503,"BOT_TOKEN is not configured")
+    x=await db.get(Broadcast,broadcast_id)
+    if not x: raise HTTPException(404,"Broadcast not found")
+    if x.status not in {"sending","failed"}: raise HTTPException(409,"Broadcast is not waiting for a retry")
+    x.status="queued"; x.finished_at=None
+    await audit(db,"marketing.broadcast.retried",admin.email,str(x.id),{"sent_count":x.sent_count,"failed_count":x.failed_count})
+    await db.commit(); return {"id":x.id,"status":"queued","sent_count":x.sent_count,"failed_count":x.failed_count}
 
 async def monitor_checks_scheduler():
     while True:

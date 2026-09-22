@@ -1,4 +1,8 @@
-# Remnawave VPN Shop 2.11.0 — Установка одной командой
+# Remnawave VPN Shop 2.12.0 — Установка одной командой
+
+Рассылка Telegram включается тем же `BOT_TOKEN`, что и бот. Отдельной миграции в 2.12.0 нет: таблица `broadcasts` создана миграцией `0003_marketing`. Процесс бота должен быть запущен, иначе очередь не уйдёт в Telegram.
+
+The Telegram broadcast uses the same `BOT_TOKEN` as the bot. Version 2.12.0 adds no migration: the `broadcasts` table comes from `0003_marketing`. The bot process must be running, otherwise the queue is not delivered.
 
 Предыдущие установщики: 2.9.0 (debug APK), 2.8.0 (тексты и логотип приложений), 2.7.0 (приложения Android и iOS), 2.6.0 (платформа антиабьюза и агент узла), 2.5.0 (конструктор тарифов и мониторинг узлов) и 2.4.0 (личный кабинет). Серверная схема остаётся на миграции `0038_v2_6_0_platform`. Установщик VPS сервер ставит, а APK на телефон не копирует. Android-пакеты 2.10.0 лежат во вложениях релиза и собираются скриптом `scripts/build-android-apk.sh`. Пакеты 2.9.0 остаются в истории релиза. iOS собирается в Xcode. Тексты и логотип задаются в админке, раздел 9.7 `INSTRUCTION.md`. Установка APK 2.9.0 — раздел 9.8. Подпись клиента, release APK и обновление с GitHub — раздел 9.9. Проверка без касс — раздел 9.4. Агент — раздел 9.5. Лицензия — `LICENSE`.
 
@@ -211,6 +215,6 @@ Update the whole project from the latest GitHub release:
 sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 ```
 
-The 2.11.0 script checks SHA-256, keeps `.env`, and asks `scripts/update.sh` to snapshot the install before replacing files. It does not create a cron job.
+The 2.11.0 script checks SHA-256, keeps `.env`, and asks `scripts/update.sh` to snapshot the install before replacing files. It does not create a cron job. Version 2.12.0 keeps that updater and adds the Telegram broadcast described in section 9.10 of `INSTRUCTION.md`. The buyer APK stays 2.10.0. The administrator APK is 2.12.0.
 
 Run a staging end-to-end check with PostgreSQL, Redis, Remnawave and the sandbox provider before live payments.

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime
 from html import escape
 from aiogram import Bot,Dispatcher,Router
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import settings
 from .db import engine
 from .models import AppSetting,BotMenuItem,CustomField,Promotion,Advertisement,Plan,Broadcast,User,Subscription,AbuseViolation,NodeAgent
+
+logger = logging.getLogger("remnawave.broadcast")
 
 router=Router()
 
@@ -73,42 +76,101 @@ def promo_text(promos,plans,lang="ru"):
     return "\n\n".join(chunks)
 
 
-async def broadcast_worker(bot:Bot):
+def broadcast_recipient_query(target: str, now: datetime):
+    """Users with a Telegram id. Active joins subscriptions, so the query is distinct."""
+    stmt = select(User.id, User.telegram_id).where(User.telegram_id.is_not(None))
+    if target == "active":
+        stmt = stmt.join(Subscription, Subscription.user_id == User.id).where(Subscription.expires_at > now)
+    elif target == "inactive":
+        active_ids = select(Subscription.user_id).where(Subscription.expires_at > now)
+        stmt = stmt.where(~User.id.in_(active_ids))
+    return stmt.distinct().order_by(User.id)
+
+
+async def _telegram_post(client, method: str, payload: dict):
+    url = f"https://api.telegram.org/bot{settings.bot_token}/{method}"
+    response = None
+    for attempt in range(2):
+        response = await client.post(url, json=payload)
+        if response.status_code != 429 or attempt == 1:
+            return response
+        wait = 1.0
+        try:
+            wait = float(response.json().get("parameters", {}).get("retry_after", 1))
+        except Exception:
+            wait = 1.0
+        await asyncio.sleep(min(max(wait, 0.5), 30))
+    return response
+
+
+async def _mark_broadcast_failed(broadcast_id: int) -> None:
+    async with AsyncSession(engine, expire_on_commit=False) as db:
+        row = await db.get(Broadcast, broadcast_id)
+        if row and row.status == "sending":
+            row.status = "failed"
+            row.finished_at = datetime.utcnow()
+            await db.commit()
+
+
+async def broadcast_worker(bot: Bot):
     import httpx
     while True:
+        claimed = None
         try:
-            async with AsyncSession(engine,expire_on_commit=False) as db:
-                row=(await db.execute(sql_text("UPDATE broadcasts SET status='sending' WHERE id=(SELECT id FROM broadcasts WHERE status='queued' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id"))).first()
+            async with AsyncSession(engine, expire_on_commit=False) as db:
+                row = (await db.execute(sql_text("UPDATE broadcasts SET status='sending' WHERE id=(SELECT id FROM broadcasts WHERE status='queued' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id"))).first()
                 await db.commit()
                 if not row:
-                    await asyncio.sleep(2); continue
-                b=await db.get(Broadcast,int(row[0]))
-                if not b: continue
-                if b.target=="active":
-                    users=(await db.execute(select(User).join(Subscription,Subscription.user_id==User.id).where(User.telegram_id.is_not(None),Subscription.expires_at>datetime.utcnow()))).scalars().all()
-                elif b.target=="inactive":
-                    users=(await db.execute(select(User).where(User.telegram_id.is_not(None),~User.id.in_(select(Subscription.user_id).where(Subscription.expires_at>datetime.utcnow()))))).scalars().all()
-                else:
-                    users=(await db.execute(select(User).where(User.telegram_id.is_not(None)))).scalars().all()
-                sent=failed=0
-                async with httpx.AsyncClient(timeout=15) as client:
-                    for u in users:
+                    await asyncio.sleep(2)
+                    continue
+                claimed = int(row[0])
+                item = await db.get(Broadcast, claimed)
+                if not item:
+                    claimed = None
+                    continue
+                now = datetime.utcnow()
+                recipients = (await db.execute(broadcast_recipient_query(item.target, now))).all()
+                sent = int(item.sent_count or 0)
+                failed = int(item.failed_count or 0)
+                start = sent + failed
+                async with httpx.AsyncClient(timeout=15, trust_env=False) as client:
+                    for index, recipient in enumerate(recipients):
+                        if index < start:
+                            continue
                         try:
-                            markup={"inline_keyboard":[[{"text":b.button_text,"url":b.button_url}]]} if b.button_text and b.button_url else None
-                            if b.image_url:
-                                payload={"chat_id":u.telegram_id,"photo":b.image_url,"caption":b.text,"parse_mode":"HTML"}
-                                if markup: payload["reply_markup"]=markup
-                                r=await client.post(f"https://api.telegram.org/bot{settings.bot_token}/sendPhoto",json=payload)
+                            markup = {"inline_keyboard": [[{"text": item.button_text, "url": item.button_url}]]} if item.button_text and item.button_url else None
+                            if item.image_url:
+                                payload = {"chat_id": recipient.telegram_id, "photo": item.image_url, "caption": item.text, "parse_mode": "HTML"}
+                                if markup:
+                                    payload["reply_markup"] = markup
+                                response = await _telegram_post(client, "sendPhoto", payload)
                             else:
-                                payload={"chat_id":u.telegram_id,"text":b.text,"parse_mode":"HTML"}
-                                if markup: payload["reply_markup"]=markup
-                                r=await client.post(f"https://api.telegram.org/bot{settings.bot_token}/sendMessage",json=payload)
-                            if r.is_success: sent+=1
-                            else: failed+=1
-                        except Exception: failed+=1
+                                payload = {"chat_id": recipient.telegram_id, "text": item.text, "parse_mode": "HTML"}
+                                if markup:
+                                    payload["reply_markup"] = markup
+                                response = await _telegram_post(client, "sendMessage", payload)
+                            if response is not None and response.is_success:
+                                sent += 1
+                            else:
+                                failed += 1
+                        except Exception:
+                            logger.exception("broadcast delivery failed for id %s", claimed)
+                            failed += 1
+                        item.sent_count = sent
+                        item.failed_count = failed
+                        await db.commit()
                         await asyncio.sleep(0.04)
-                b.sent_count=sent; b.failed_count=failed; b.status="completed"; b.finished_at=datetime.utcnow(); await db.commit()
+                item.status = "completed"
+                item.finished_at = datetime.utcnow()
+                await db.commit()
+                claimed = None
         except Exception:
+            logger.exception("broadcast worker failed")
+            if claimed is not None:
+                try:
+                    await _mark_broadcast_failed(claimed)
+                except Exception:
+                    logger.exception("broadcast failure status was not saved")
             await asyncio.sleep(5)
 
 @router.message(CommandStart())

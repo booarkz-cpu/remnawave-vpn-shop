@@ -18,6 +18,9 @@ struct AdminRootView: View {
     @State private var monitoring: [String: Any] = [:]
     @State private var platform: [String: Any] = [:]
     @State private var tickets: [[String: Any]] = []
+    @State private var broadcasts: [[String: Any]] = []
+    @State private var broadcastText = ""
+    @State private var broadcastTarget = "all"
     @State private var reply = ""
     @State private var unlocked = false
     @State private var paymentDetail: [String: Any] = [:]
@@ -71,7 +74,7 @@ struct AdminRootView: View {
         VStack(alignment: .leading, spacing: 10) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack {
-                    ForEach(["overview", "plans", "payments", "monitoring", "platform", "support"], id: \.self) { key in
+                    ForEach(["overview", "plans", "payments", "monitoring", "platform", "support", "broadcast"], id: \.self) { key in
                         Button(t(key)) { tab = key }.buttonStyle(.bordered)
                     }
                 }
@@ -130,6 +133,24 @@ struct AdminRootView: View {
             ForEach(Array(countries.enumerated()), id: \.offset) { _, country in
                 Text("\(country["country"] as? String ?? ""): \(country["count"] ?? 0)")
             }
+        case "broadcast":
+            Text(t("broadcast_hint")).foregroundStyle(.secondary)
+            HStack {
+                Button(t("all_telegram")) { broadcastTarget = "all" }.buttonStyle(.bordered)
+                Button(t("active_subs")) { broadcastTarget = "active" }.buttonStyle(.bordered)
+                Button(t("inactive_subs")) { broadcastTarget = "inactive" }.buttonStyle(.bordered)
+            }
+            Text(t(broadcastTarget == "active" ? "active_subs" : broadcastTarget == "inactive" ? "inactive_subs" : "all_telegram"))
+            TextField(t("broadcast_text"), text: $broadcastText).textFieldStyle(.roundedBorder)
+            Button(t("queue_broadcast")) { queueBroadcast() }.disabled(busy)
+            if broadcasts.isEmpty { Text(t("no_data")) }
+            ForEach(Array(broadcasts.enumerated()), id: \.offset) { _, row in
+                let audience = (row["target"] as? String) == "active" ? t("active_subs") : (row["target"] as? String) == "inactive" ? t("inactive_subs") : t("all_telegram")
+                Text("#\(row["id"] ?? "") · \(audience) · \(row["status"] as? String ?? "") · \(t("sent")) \(row["sent_count"] ?? 0) · \(t("failed")) \(row["failed_count"] ?? 0)")
+                if (row["status"] as? String) == "sending" || (row["status"] as? String) == "failed" {
+                    Button(t("retry_broadcast")) { retryBroadcast(row) }.disabled(busy)
+                }
+            }
         default:
             TextField(t("reply"), text: $reply).textFieldStyle(.roundedBorder)
             if tickets.isEmpty { Text(t("no_data")) }
@@ -184,6 +205,8 @@ struct AdminRootView: View {
             let nextMonitoring = try api.call("GET", "/api/admin/remnawave/monitoring") as? [String: Any] ?? [:]
             let nextPlatform = try api.call("GET", "/api/admin/platform/summary") as? [String: Any] ?? [:]
             let nextTickets = try api.call("GET", "/api/admin/support/tickets") as? [[String: Any]] ?? []
+            let nextMarketing = try api.call("GET", "/api/admin/marketing") as? [String: Any] ?? [:]
+            let nextBroadcasts = nextMarketing["broadcasts"] as? [[String: Any]] ?? []
             let nextLogo = logoImage(api, "/api/admin/apps")
             DispatchQueue.main.async {
                 overview = nextOverview
@@ -192,6 +215,7 @@ struct AdminRootView: View {
                 monitoring = nextMonitoring
                 platform = nextPlatform
                 tickets = nextTickets
+                broadcasts = nextBroadcasts
                 logo = nextLogo
             }
         }
@@ -233,6 +257,24 @@ struct AdminRootView: View {
         work {
             _ = try ShopClient(base: base, token: token, lang: lang).call("POST", "/api/admin/platform/violations/\(id)/review", body: ["action": action])
             DispatchQueue.main.async { notice = t(action == "restrict" ? "restricted" : "cleared") }
+        }
+    }
+
+    private func queueBroadcast() {
+        let text = broadcastText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty { return }
+        let target = broadcastTarget
+        work {
+            _ = try ShopClient(base: base, token: token, lang: lang).call("POST", "/api/admin/broadcasts", body: ["text": text, "target": target])
+            DispatchQueue.main.async { notice = t("broadcast_queued"); broadcastText = "" }
+        }
+    }
+
+    private func retryBroadcast(_ row: [String: Any]) {
+        guard let id = jsonInt(row["id"]) else { return }
+        work {
+            _ = try ShopClient(base: base, token: token, lang: lang).call("POST", "/api/admin/broadcasts/\(id)/retry")
+            DispatchQueue.main.async { notice = t("broadcast_retried") }
         }
     }
 

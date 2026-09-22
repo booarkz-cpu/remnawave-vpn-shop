@@ -1,8 +1,8 @@
-# Remnawave VPN Shop 2.11.0
+# Remnawave VPN Shop 2.12.0
 
 Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-Состояние: **2.11.0**. Предыдущие релизы: **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **2.12.0**. Предыдущие релизы: **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Русский
 
@@ -17,6 +17,11 @@
 | Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+### Возможности 2.12.0
+
+- **Массовая рассылка в Telegram.** Веб-панель, раздел «Маркетинг», и приложения администратора Android и iOS ставят сообщение в очередь `POST /api/admin/broadcasts`. Доставляет процесс бота. Аудитория: все с Telegram, активная подписка или без активной подписки. Кнопка и картинка — только `https://`. Повтор `POST /api/admin/broadcasts/{id}/retry` продолжает с сохранённого счётчика. Подробный разбор — `RELEASE_NOTES_V2_12_0.md` и раздел 9.10 в `INSTRUCTION.md`.
+- Приложение администратора Android: `versionName` **2.12.0**, `versionCode` **2120**. iOS-администратор: `MARKETING_VERSION` **2.12.0**. Приложение покупателя остаётся **2.10.0**. Схема базы остаётся `0038_v2_6_0_platform`.
 
 ### Возможности 2.11.0
 
@@ -108,6 +113,7 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 | `DOCUMENTATION.md` | Карта актуальных документов и архивных аудитов |
 | `LICENSE` | Проприетарная лицензия 1.0, RU/EN |
 | `MOBILE.md` | Android и iOS: функции, сессия, логотип, сборка, RU/EN |
+| `RELEASE_NOTES_V2_12_0.md` | Рассылка 2.12.0, разбор функций и проверка |
 | `RELEASE_NOTES_V2_11_0.md` | Документация 2.11.0 и безопасный порядок обновления |
 | `RELEASE_NOTES_V2_10_0.md` | Что вошло в 2.10.0, release APK, подпись клиента |
 | `RELEASE_NOTES_V2_9_0.md` | Что вошло в 2.9.0, APK и сборка iOS |
@@ -140,7 +146,7 @@ cd ../cabinet && npm install && npx vite build
 
 A VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Current release: **2.11.0**. Previous releases: **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
+Current release: **2.12.0**. Previous releases: **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
 
 ### What is in the tree
 
@@ -153,6 +159,11 @@ Current release: **2.11.0**. Previous releases: **2.10.0**, **2.9.0**, **2.8.0**
 | Android and iOS | Kotlin Compose, SwiftUI | Buyer and administrator, Russian and English |
 | Edge | Docker Compose, Caddy | HTTPS and separate domains |
 | Checks | `tests/`, `scripts/sandbox-e2e.sh` | Regression and a run without live gateways |
+
+### What 2.12.0 adds
+
+- **Telegram mass broadcast.** The web Marketing section and the Android and iOS administrator apps queue a message with `POST /api/admin/broadcasts`. The bot process delivers it. The audience is everyone with Telegram, an active subscription, or no active subscription. A button and an image accept only `https://`. `POST /api/admin/broadcasts/{id}/retry` continues from the saved counter. The full walkthrough is `RELEASE_NOTES_V2_12_0.md` and section 9.10 of `INSTRUCTION.md`.
+- Android administrator app: `versionName` **2.12.0**, `versionCode` **2120**. iOS administrator app: `MARKETING_VERSION` **2.12.0**. The buyer app stays **2.10.0**. The database schema stays `0038_v2_6_0_platform`.
 
 ### What 2.11.0 adds
 
@@ -228,6 +239,7 @@ The full procedure is `INSTRUCTION.md`, section 9.9. Do not commit `.env`, token
 | `DOCUMENTATION.md` | Index of current documents and archived audits |
 | `LICENSE` | Proprietary license 1.0, RU/EN |
 | `MOBILE.md` | Android and iOS functions, session, logo and build, RU/EN |
+| `RELEASE_NOTES_V2_12_0.md` | 2.12.0 broadcast, function reference and the check |
 | `RELEASE_NOTES_V2_11_0.md` | 2.11.0 documents and the safe update order |
 | `INSTALL.md` | Installer, RU/EN |
 | `PRODUCTION_CHECKLIST.md` | Production checklist |

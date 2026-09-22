@@ -20,3 +20,9 @@
 Кнопка языка в шапке переключает русский и английский. Выбор хранится в `localStorage` (`rw_lang`). Русские строки остаются в `src/main.tsx`, английские подставляются словарём `src/i18n.tsx` после отрисовки. Пока выбора нет, язык берётся из браузера. Серверный `DEFAULT_LANGUAGE` задаёт запасной язык Mini App и бота.
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
+
+## Рассылка / Broadcast
+
+Раздел **Маркетинг** ставит HTML-рассылку в очередь бота. Аудитория: все с Telegram, активная подписка или без активной подписки. Кнопка и картинка — HTTPS. Повтор продолжает счётчик. Подробности — `INSTRUCTION.md`, раздел 9.10.
+
+The **Marketing** section queues an HTML broadcast for the bot. The audience is everyone with Telegram, an active subscription, or no active subscription. A button and an image use HTTPS. Retry continues the counter. Details are in `INSTRUCTION.md`, section 9.10.

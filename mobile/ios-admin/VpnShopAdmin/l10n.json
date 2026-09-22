@@ -47,7 +47,20 @@
     "payment_detail": "Карточка платежа",
     "order": "Заказ",
     "purpose": "Назначение",
-    "unlock": "Разблокировать"
+    "unlock": "Разблокировать",
+    "broadcast": "Рассылка",
+    "audience": "Аудитория",
+    "all_telegram": "Все с Telegram",
+    "active_subs": "Активная подписка",
+    "inactive_subs": "Без активной подписки",
+    "broadcast_text": "Текст HTML-рассылки",
+    "queue_broadcast": "Отправить в очередь",
+    "broadcast_queued": "Рассылка поставлена в очередь",
+    "broadcast_retried": "Рассылка возвращена в очередь",
+    "sent": "Отправлено",
+    "failed": "Ошибок",
+    "retry_broadcast": "Повторить",
+    "broadcast_hint": "Очередь доставляет Telegram-бот. Повтор продолжает с сохранённого счётчика."
   },
   "en": {
     "app_name": "VPN admin",
@@ -97,6 +110,19 @@
     "payment_detail": "Payment card",
     "order": "Order",
     "purpose": "Purpose",
-    "unlock": "Unlock"
+    "unlock": "Unlock",
+    "broadcast": "Broadcast",
+    "audience": "Audience",
+    "all_telegram": "Everyone with Telegram",
+    "active_subs": "Active subscription",
+    "inactive_subs": "No active subscription",
+    "broadcast_text": "HTML broadcast text",
+    "queue_broadcast": "Queue broadcast",
+    "broadcast_queued": "Broadcast queued",
+    "broadcast_retried": "Broadcast returned to the queue",
+    "sent": "Sent",
+    "failed": "Failed",
+    "retry_broadcast": "Retry",
+    "broadcast_hint": "The Telegram bot delivers the queue. Retry continues from the saved counter."
   }
 }

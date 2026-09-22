@@ -143,7 +143,8 @@ class ShopApi(private val base: String, private val token: String, private val l
             readTimeout = 15000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Language", lang)
-            setRequestProperty("User-Agent", "RemnawaveShop-Android-Admin/2.10.0")
+            setRequestProperty("User-Agent", "RemnawaveShop-Android-Admin/2.12.0")
+            // Historical compatibility marker: RemnawaveShop-Android-Admin/2.10.0
             // Historical compatibility marker: RemnawaveShop-Android-Admin/2.9.0
             setRequestProperty("X-Shop-Client", "android-admin")
             val proof = shopProof("android-admin", method, path, System.currentTimeMillis() / 1000)
@@ -199,6 +200,9 @@ private fun AdminApp() {
     var monitoring by remember { mutableStateOf(JSONObject()) }
     var platform by remember { mutableStateOf(JSONObject()) }
     var tickets by remember { mutableStateOf(JSONArray()) }
+    var broadcasts by remember { mutableStateOf(JSONArray()) }
+    var broadcastText by remember { mutableStateOf("") }
+    var broadcastTarget by remember { mutableStateOf("all") }
     var reply by remember { mutableStateOf("") }
     var logo by remember { mutableStateOf<ImageBitmap?>(null) }
     val strings = remember(lang) { loadStrings(context, lang) }
@@ -223,6 +227,8 @@ private fun AdminApp() {
             val nextMonitoring = api.get("/api/admin/remnawave/monitoring") as JSONObject
             val nextPlatform = api.get("/api/admin/platform/summary") as JSONObject
             val nextTickets = api.get("/api/admin/support/tickets") as JSONArray
+            val nextMarketing = api.get("/api/admin/marketing") as JSONObject
+            val nextBroadcasts = nextMarketing.optJSONArray("broadcasts") ?: JSONArray()
             val nextLogo = try {
                 val catalog = api.get("/api/admin/apps") as JSONObject
                 loadLogoBitmap(base, catalog.optString("logo_url"))?.asImageBitmap()
@@ -234,6 +240,7 @@ private fun AdminApp() {
                 monitoring = nextMonitoring
                 platform = nextPlatform
                 tickets = nextTickets
+                broadcasts = nextBroadcasts
                 logo = nextLogo
             }
         }
@@ -297,7 +304,7 @@ private fun AdminApp() {
                 TextButton(onClick = { prefs.edit().remove("token").apply(); token = ""; unlocked = true }) { Text(t("sign_out")) }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("overview", "plans", "payments", "monitoring", "platform", "support").forEach { key ->
+                    listOf("overview", "plans", "payments", "monitoring", "platform", "support", "broadcast").forEach { key ->
                         FilterChip(selected = tab == key, onClick = { tab = key }, label = { Text(t(key)) })
                     }
                 }
@@ -378,6 +385,41 @@ private fun AdminApp() {
                         for (index in 0 until countries.length()) {
                             val country = countries.getJSONObject(index)
                             Text("${country.optString("country")}: ${country.optInt("count")}")
+                        }
+                    }
+                    "broadcast" -> {
+                        Text(t("broadcast_hint"), color = Color(0xFF9AA6B2))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("all" to "all_telegram", "active" to "active_subs", "inactive" to "inactive_subs").forEach { (value, key) ->
+                                FilterChip(selected = broadcastTarget == value, onClick = { broadcastTarget = value }, label = { Text(t(key)) })
+                            }
+                        }
+                        OutlinedTextField(broadcastText, { broadcastText = it }, label = { Text(t("broadcast_text")) }, modifier = Modifier.fillMaxWidth())
+                        Button(onClick = {
+                            if (broadcastText.isBlank()) return@Button
+                            work {
+                                ShopApi(base, token, lang).post("/api/admin/broadcasts", JSONObject().put("text", broadcastText.trim()).put("target", broadcastTarget))
+                                activity.runOnUiThread { notice = t("broadcast_queued"); broadcastText = "" }
+                            }
+                        }, enabled = !busy) { Text(t("queue_broadcast")) }
+                        if (broadcasts.length() == 0) Text(t("no_data"))
+                        for (index in 0 until broadcasts.length()) {
+                            val row = broadcasts.getJSONObject(index)
+                            val audience = when (row.optString("target")) {
+                                "active" -> t("active_subs")
+                                "inactive" -> t("inactive_subs")
+                                else -> t("all_telegram")
+                            }
+                            Text("#${row.optInt("id")} · $audience · ${row.optString("status")} · ${t("sent")} ${row.optInt("sent_count")} · ${t("failed")} ${row.optInt("failed_count")}")
+                            val status = row.optString("status")
+                            if (status == "sending" || status == "failed") {
+                                TextButton(onClick = {
+                                    work {
+                                        ShopApi(base, token, lang).post("/api/admin/broadcasts/${row.optInt("id")}/retry", JSONObject())
+                                        activity.runOnUiThread { notice = t("broadcast_retried") }
+                                    }
+                                }) { Text(t("retry_broadcast")) }
+                            }
                         }
                     }
                     "support" -> {
