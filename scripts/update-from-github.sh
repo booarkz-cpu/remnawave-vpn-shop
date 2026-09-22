@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Download the newest GitHub release, verify SHA-256, keep .env, then run update.sh.
+# update.sh snapshots the current install before it copies UPDATE_STAGE.
+# Cron is not installed by this script.
 set -Eeuo pipefail
 APP_DIR="${APP_DIR:-/opt/vpn-shop}"
 cd "$APP_DIR"
@@ -19,8 +21,7 @@ if [[ "$LATEST" == Установлена* ]]; then
   echo "$LATEST"
   exit 0
 fi
-# The release zip contains the repository root. Copy it over the install
-# without replacing secrets or the rollback archive.
-tar --exclude='./.env' --exclude='./.env.*' --exclude='./.rollback' --exclude='./.git' -C "$STAGE" -cf - . | tar -C "$APP_DIR" -xf -
-echo "Файлы релиза $LATEST разложены. Запуск update.sh"
+export UPDATE_STAGE="$STAGE"
+trap - EXIT
+echo "Проверен релиз $LATEST. Снимок текущей установки делает update.sh, затем он заменяет файлы."
 exec bash "$APP_DIR/scripts/update.sh"

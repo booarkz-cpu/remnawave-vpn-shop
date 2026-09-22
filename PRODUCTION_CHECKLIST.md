@@ -27,6 +27,12 @@
 - [ ] Confirm `/api/public/servers` has no address, token or password fields.
 - [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
 
+## GitHub update 2.11.0
+- [ ] Read the command in Admin → Релизы. It is `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+- [ ] Confirm `.env` is still present after a dry understanding of the script. The script keeps `.env`, `.env.*`, `.rollback` and `.git`.
+- [ ] Leave cron off unless an administrator chooses a schedule.
+- [ ] The buyer and administrator APKs stay the 2.10.0 release files. This checklist does not replace them.
+
 ## Android APK 2.10.0
 - [ ] Download `remnawave_vpn_shop_android_user_2_10_0.apk` and `remnawave_vpn_shop_android_admin_2_10_0.apk` from the GitHub release and check the `.sha256` files.
 - [ ] Compare the signing certificate SHA-256 with `RELEASE_NOTES_V2_10_0.md`. Uninstall a 2.9.0 debug APK once before installing 2.10.0.
