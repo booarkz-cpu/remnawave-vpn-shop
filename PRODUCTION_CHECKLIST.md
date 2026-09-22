@@ -27,6 +27,14 @@
 - [ ] Confirm `/api/public/servers` has no address, token or password fields.
 - [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
 
+## Telegram broadcast 2.12.0
+- [ ] `BOT_TOKEN` is set and the bot process is running. The API only queues the row.
+- [ ] An operator queues a short HTML message to `inactive` or a test audience from Admin → Маркетинг and from the administrator app tab Рассылка.
+- [ ] `GET /api/admin/marketing` shows `queued`, then `sending`, then `completed` with `sent_count` and `failed_count`.
+- [ ] A viewer receives 403 on `POST /api/admin/broadcasts`.
+- [ ] Retry is used only for `sending` or `failed`. A completed row stays completed.
+- [ ] Install `remnawave_vpn_shop_android_admin_2_12_0.apk` (`versionName` 2.12.0, `versionCode` 2120) after checking its `.sha256`. The buyer APK stays `remnawave_vpn_shop_android_user_2_10_0.apk`.
+
 ## GitHub update 2.11.0
 - [ ] Read the command in Admin → Релизы. It is `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
 - [ ] Confirm `.env` is still present after a dry understanding of the script. The script keeps `.env`, `.env.*`, `.rollback` and `.git`.

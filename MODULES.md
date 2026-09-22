@@ -1,8 +1,8 @@
 # Модули проекта / Project modules
 
-Версия **2.11.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Установка APK 2.9.0 — в разделе 9.8. Подпись клиента, release APK и обновление с GitHub — в разделе 9.9. Предыдущее описание конструктора относится к **2.5.0**. Каталог приложений описан для **2.8.0**.
+Версия **2.12.0**. Этот документ объясняет, зачем существует каждый модуль. Массовая рассылка Telegram описана в разделе 9.10 `INSTRUCTION.md`. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Установка APK 2.9.0 — в разделе 9.8. Подпись клиента, release APK и обновление с GitHub — в разделе 9.9. Предыдущее описание конструктора относится к **2.5.0**. Каталог приложений описан для **2.8.0**.
 
-Version **2.11.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. The 2.9.0 APK install is in section 9.8. Client proof, the release APK and the GitHub update are in section 9.9. The constructor description belongs to **2.5.0**. The app catalog belongs to **2.8.0**.
+Version **2.12.0**. This document explains why each module exists. The Telegram mass broadcast is described in section 9.10 of `INSTRUCTION.md`. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. The 2.9.0 APK install is in section 9.8. Client proof, the release APK and the GitHub update are in section 9.9. The constructor description belongs to **2.5.0**. The app catalog belongs to **2.8.0**.
 
 ---
 
@@ -101,7 +101,7 @@ Version **2.11.0**. This document explains why each module exists. The function-
 
 ### `backend/app/bot.py`
 
-Telegram-бот на aiogram. Приветствие, цены, кнопка магазина, команды промокода и подарка, рассылки и `/ops` для `ADMIN_TELEGRAM_ID`. Тексты есть на русском и английском. Бот не принимает деньги сам: он открывает Mini App.
+Telegram-бот на aiogram. Приветствие, цены, кнопка магазина, команды промокода и подарка, рассылки и `/ops` для `ADMIN_TELEGRAM_ID`. Тексты есть на русском и английском. Бот не принимает деньги сам: он открывает Mini App. С версии 2.12.0 `broadcast_worker` забирает строки `queued`, сохраняет прогресс после каждого получателя, помечает оборванную отправку как `failed` и продолжает повтор с `sent_count + failed_count`. API только ставит строку в очередь.
 
 ### `backend/app/provisioner.py`
 
@@ -227,7 +227,7 @@ The async SQLAlchemy engine and `get_db`. Alembic owns schema changes.
 
 ### `backend/app/bot.py`
 
-The aiogram Telegram bot: welcome, prices, the shop button, promo and gift commands, broadcasts, and `/ops` for `ADMIN_TELEGRAM_ID`. Copy exists in Russian and English. The bot does not charge cards; it opens the Mini App.
+The aiogram Telegram bot: welcome, prices, the shop button, promo and gift commands, broadcasts, and `/ops` for `ADMIN_TELEGRAM_ID`. Copy exists in Russian and English. The bot does not charge cards; it opens the Mini App. From 2.12.0, `broadcast_worker` claims `queued` rows, saves progress after each recipient, marks a crashed send as `failed`, and continues a retry from `sent_count + failed_count`. The API only queues the row.
 
 ### `backend/app/provisioner.py`
 

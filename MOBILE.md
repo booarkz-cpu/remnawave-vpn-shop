@@ -1,6 +1,8 @@
-# Мобильные приложения 2.10.0 / Mobile apps 2.10.0
+# Мобильные приложения 2.12.0 / Mobile apps 2.12.0
 
-Текущая версия приложений **2.10.0**. Исходники появились в **2.7.0**. В **2.8.0** администратор задаёт тексты карточек и общий логотип. В **2.9.0** релиз GitHub содержит debug APK покупателя и администратора. В **2.10.0** APK подписаны release-ключом, добавлены QR, глубокие ссылки, устройства, трафик, подарок, пополнение, подпись HMAC и биометрия.
+Администратор Android и iOS в этом релизе — **2.12.0**. Покупатель остаётся **2.10.0**. The administrator Android and iOS apps in this release are **2.12.0**. The buyer app stays **2.10.0**.
+
+Текущая версия приложений покупателя **2.10.0**. Исходники появились в **2.7.0**. В **2.8.0** администратор задаёт тексты карточек и общий логотип. В **2.9.0** релиз GitHub содержит debug APK покупателя и администратора. В **2.10.0** APK подписаны release-ключом, добавлены QR, глубокие ссылки, устройства, трафик, подарок, пополнение, подпись HMAC и биометрия.
 
 The current app version is **2.10.0**. The sources arrived in **2.7.0**. In **2.8.0** an administrator edits the cards and the shared logo. In **2.9.0** the GitHub release contains debug APKs for the buyer and the administrator. In **2.10.0** the APKs are release-signed and add a QR, deep links, devices, traffic, gifts, top-up, HMAC proof and a biometric lock.
 
@@ -27,11 +29,17 @@ The apps are part of Remnawave VPN Shop and are covered by the Remnawave VPN Sho
 | Приложение | Каталог | Идентификатор | `X-Shop-Client` | User-Agent |
 | --- | --- | --- | --- | --- |
 | Android, покупатель | `mobile/android-user` | `shop.remnawave.user` | `android-user` | `RemnawaveShop-Android-User/2.10.0` |
-| Android, администратор | `mobile/android-admin` | `shop.remnawave.admin` | `android-admin` | `RemnawaveShop-Android-Admin/2.10.0` |
+| Android, администратор | `mobile/android-admin` | `shop.remnawave.admin` | `android-admin` | `RemnawaveShop-Android-Admin/2.12.0` |
 | iOS, покупатель | `mobile/ios-user` | `shop.remnawave.user` | `ios-user` | `RemnawaveShop-iOS-User/2.10.0` |
-| iOS, администратор | `mobile/ios-admin` | `shop.remnawave.admin` | `ios-admin` | `RemnawaveShop-iOS-Admin/2.10.0` |
+| iOS, администратор | `mobile/ios-admin` | `shop.remnawave.admin` | `ios-admin` | `RemnawaveShop-iOS-Admin/2.12.0` |
 
-User-Agent должен оставаться одинаковым между входом и следующими запросами: сессия привязана к нему, смена строки отзывает сессию. Предыдущие строки сессии 2.9.0: `RemnawaveShop-Android-User/2.9.0`, `RemnawaveShop-Android-Admin/2.9.0`, `RemnawaveShop-iOS-User/2.9.0`, `RemnawaveShop-iOS-Admin/2.9.0`. Новая строка 2.10.0 начинает новую сессию.
+User-Agent должен оставаться одинаковым между входом и следующими запросами: сессия привязана к нему, смена строки отзывает сессию. Предыдущие строки сессии 2.9.0: `RemnawaveShop-Android-User/2.9.0`, `RemnawaveShop-Android-Admin/2.9.0`, `RemnawaveShop-iOS-User/2.9.0`, `RemnawaveShop-iOS-Admin/2.9.0`. Строка администратора 2.10.0 была `RemnawaveShop-Android-Admin/2.10.0` и `RemnawaveShop-iOS-Admin/2.10.0`. Строка 2.12.0 начинает новую сессию администратора. Покупатель остаётся на `2.10.0`.
+
+## Рассылка в приложении администратора
+
+Вкладка **Рассылка** читает `GET /api/admin/marketing` и показывает очередь. Кнопка отправки вызывает `POST /api/admin/broadcasts` с полями `text` и `target` (`all`, `active`, `inactive`). Кнопка повтора вызывает `POST /api/admin/broadcasts/{id}/retry` для статусов `sending` и `failed`. Право на запись — `manage_broadcasts`. Доставку выполняет бот, не само приложение.
+
+The **Broadcast** tab reads `GET /api/admin/marketing` and shows the queue. Queue calls `POST /api/admin/broadcasts` with `text` and `target` (`all`, `active`, `inactive`). Retry calls `POST /api/admin/broadcasts/{id}/retry` for `sending` and `failed`. The write permission is `manage_broadcasts`. The bot delivers the message. The app does not.
 
 The previous 2.9.0 session strings were `RemnawaveShop-Android-User/2.9.0`, `RemnawaveShop-Android-Admin/2.9.0`, `RemnawaveShop-iOS-User/2.9.0` and `RemnawaveShop-iOS-Admin/2.9.0`. The 2.10.0 string starts a new session.
 

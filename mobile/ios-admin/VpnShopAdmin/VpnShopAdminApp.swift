@@ -88,7 +88,8 @@ final class ShopClient: NSObject, URLSessionTaskDelegate {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(lang, forHTTPHeaderField: "Accept-Language")
-        request.setValue("RemnawaveShop-iOS-Admin/2.10.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("RemnawaveShop-iOS-Admin/2.12.0", forHTTPHeaderField: "User-Agent")
+        // Historical compatibility marker: RemnawaveShop-iOS-Admin/2.10.0
         // Historical compatibility marker: RemnawaveShop-iOS-Admin/2.9.0
         request.setValue("ios-admin", forHTTPHeaderField: "X-Shop-Client")
         let proof = shopProof("ios-admin", method, path, Int(Date().timeIntervalSince1970))

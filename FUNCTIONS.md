@@ -1,6 +1,32 @@
 # Разбор функций / Function reference
 
-Версия приложения: **2.11.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`.
+Версия приложения: **2.12.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая рассылка — в `INSTRUCTION.md`, раздел 9.10, и в `RELEASE_NOTES_V2_12_0.md`.
+
+Application version: **2.12.0**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The broadcast walkthrough is section 9.10 of `INSTRUCTION.md` and `RELEASE_NOTES_V2_12_0.md`.
+
+## Рассылка Telegram / Telegram broadcast (2.12.0)
+
+| Шаг | Где | Что происходит |
+| --- | --- | --- |
+| 1 | Панель «Маркетинг», Android/iOS администратора | Оператор с правом `manage_broadcasts` отправляет текст, аудиторию `all` / `active` / `inactive`, необязательные кнопку и картинку |
+| 2 | `POST /api/admin/broadcasts` | Проверяет `BOT_TOKEN`, пару кнопки, длину подписи 1024 и публичный HTTPS. Пишет строку `queued` и аудит `marketing.broadcast.queued` |
+| 3 | `broadcast_worker` в процессе бота | `FOR UPDATE SKIP LOCKED` переводит строку в `sending`, выбирает пользователей с `telegram_id` без повторов, шлёт `sendMessage` или `sendPhoto` |
+| 4 | После каждого получателя | Сохраняет `sent_count` и `failed_count`. Ответ 429 повторяется один раз. Прокси окружения не используется |
+| 5 | Сбой | Статус `failed`. `POST /api/admin/broadcasts/{id}/retry` возвращает `queued` и продолжает с `sent_count + failed_count` |
+| 6 | Конец списка | Статус `completed`, заполняется `finished_at` |
+
+| Step | Where | What happens |
+| --- | --- | --- |
+| 1 | Marketing panel, Android/iOS administrator app | An operator with `manage_broadcasts` sends text, audience `all` / `active` / `inactive`, and an optional button and image |
+| 2 | `POST /api/admin/broadcasts` | Checks `BOT_TOKEN`, the button pair, the 1024-character caption and a public HTTPS URL. Inserts `queued` and audits `marketing.broadcast.queued` |
+| 3 | `broadcast_worker` in the bot process | `FOR UPDATE SKIP LOCKED` moves the row to `sending`, selects distinct users with `telegram_id`, and calls `sendMessage` or `sendPhoto` |
+| 4 | After each recipient | Saves `sent_count` and `failed_count`. HTTP 429 is retried once. Environment proxies are ignored |
+| 5 | Failure | Status `failed`. `POST /api/admin/broadcasts/{id}/retry` returns `queued` and continues from `sent_count + failed_count` |
+| 6 | End of the list | Status `completed` and `finished_at` is set |
+
+Добавлено в 2.12.0: аудитория в панели, вкладка рассылки в приложениях администратора, продолжение с счётчика, статус `failed` после сбоя воркера, отказ от повторной отправки одному пользователю с несколькими подписками, лимит подписи и пара кнопки.
+
+Added in 2.12.0: an audience control in the panel, a broadcast tab in the administrator apps, resume from the counter, status `failed` after a worker crash, one delivery per user when several subscriptions exist, the caption limit and the button pair.
 
 Добавлено в 2.11.0: `scripts/update.sh` копирует `UPDATE_STAGE` только после tar-снимка и `pg_dump`. `scripts/github_release_fetch.py` отклоняет symlink, путь с `..` и архив больше 80 МБ. `README.md` содержит полную русскую и полную английскую части.
 

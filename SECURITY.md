@@ -1,4 +1,20 @@
-# Security / Безопасность — Remnawave VPN Shop 2.11.0
+# Security / Безопасность — Remnawave VPN Shop 2.12.0
+
+## Рассылка / Broadcast (2.12.0)
+
+- Поставить или повторить рассылку может только роль с `manage_broadcasts` (`operator`, `admin`).
+- Текст уходит в Telegram как HTML, который ввёл оператор. Это ожидаемый режим панели, не фильтр для покупателя.
+- `button_url` и `image_url` проходят `validate_public_url`: только абсолютный HTTPS, без логина и пароля, без частного адреса. Пустое значение допускается.
+- Кнопка принимается только парой «текст + URL». Подпись к картинке не длиннее 1024 символов.
+- Воркер ходит в `api.telegram.org` с `trust_env=False` и не подставляет прокси из окружения процесса.
+- Повтор не обнуляет счётчики. Уже учтённые получатели пропускаются. Завершённая рассылка повторно не стартует.
+
+- Only a role with `manage_broadcasts` (`operator`, `admin`) can queue or retry a broadcast.
+- The text is sent to Telegram as the HTML the operator typed. That is the panel mode.
+- `button_url` and `image_url` go through `validate_public_url`: absolute HTTPS, no username or password, no private address. An empty value is allowed.
+- A button is accepted only as a text and URL pair. An image caption is at most 1024 characters.
+- The worker calls `api.telegram.org` with `trust_env=False` and does not apply process proxy variables.
+- Retry does not reset the counters. Recipients already counted are skipped. A completed broadcast does not start again.
 
 Граница доверия: браузер или Telegram → Caddy → API → PostgreSQL, Redis, Remnawave и платёжные провайдеры. PostgreSQL и Redis наружу не публикуются.
 
