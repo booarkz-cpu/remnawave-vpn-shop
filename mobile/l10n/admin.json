@@ -38,7 +38,16 @@
     "panel_down": "Remnawave недоступен",
     "online": "Онлайн",
     "version": "Версия",
-    "refresh": "Обновить"
+    "refresh": "Обновить",
+    "stale": "Нет связи",
+    "heartbeat": "Сигнал",
+    "disable_plan": "Выключить тариф",
+    "enable_plan": "Включить тариф",
+    "plan_saved": "Тариф обновлён",
+    "payment_detail": "Карточка платежа",
+    "order": "Заказ",
+    "purpose": "Назначение",
+    "unlock": "Разблокировать"
   },
   "en": {
     "app_name": "VPN admin",
@@ -79,6 +88,15 @@
     "panel_down": "Remnawave is unavailable",
     "online": "Online",
     "version": "Version",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "stale": "No heartbeat",
+    "heartbeat": "Heartbeat",
+    "disable_plan": "Disable plan",
+    "enable_plan": "Enable plan",
+    "plan_saved": "Plan updated",
+    "payment_detail": "Payment card",
+    "order": "Order",
+    "purpose": "Purpose",
+    "unlock": "Unlock"
   }
 }

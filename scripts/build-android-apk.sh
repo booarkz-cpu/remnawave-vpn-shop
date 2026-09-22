@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build sideload debug APKs for the buyer and administrator Android apps.
+# Build sideload APKs for the buyer and administrator Android apps.
+# ANDROID_KEYSTORE selects assembleRelease. An empty keystore selects assembleDebug.
 # iOS IPA packages require Xcode on macOS and are not produced here.
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,15 +21,22 @@ if [[ -z "$GRADLE" ]]; then
 fi
 OUT="${1:-$ROOT}"
 mkdir -p "$OUT"
+# Historical compatibility marker: remnawave_vpn_shop_android_user_2_9_0.apk
+TASK=":app:assembleDebug"
+KIND="debug"
+if [[ -n "${ANDROID_KEYSTORE:-}" ]]; then
+  TASK=":app:assembleRelease"
+  KIND="release"
+fi
 for app in android-user android-admin; do
   dir="$ROOT/mobile/$app"
   if [[ "$GRADLE" == "$ROOT/mobile/android-user/gradlew" ]]; then
-    (cd "$dir" && "$dir/gradlew" :app:assembleDebug --no-daemon)
+    (cd "$dir" && "$dir/gradlew" "$TASK" --no-daemon)
   else
-    (cd "$dir" && "$GRADLE" :app:assembleDebug --no-daemon)
+    (cd "$dir" && "$GRADLE" "$TASK" --no-daemon)
   fi
-  src="$dir/app/build/outputs/apk/debug/app-debug.apk"
-  name="remnawave_vpn_shop_${app//-/_}_2_9_0.apk"
+  src="$dir/app/build/outputs/apk/$KIND/app-$KIND.apk"
+  name="remnawave_vpn_shop_${app//-/_}_2_10_0.apk"
   cp "$src" "$OUT/$name"
   sha256sum "$OUT/$name" > "$OUT/$name.sha256"
   echo "APK: $OUT/$name"

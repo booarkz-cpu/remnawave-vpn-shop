@@ -55,6 +55,8 @@ def _client_ip(request: Request) -> str:
 @router.post("/api/auth/register")
 async def auth_register(payload: EmailAuthIn, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     from .main import create_user_session, _set_auth_cookies, audit
+    from .mobile_auth import require_mobile_proof
+    require_mobile_proof(request)
 
     email = _normalize_email(payload.email)
     if await db.scalar(select(User.id).where(User.email == email)):
@@ -83,6 +85,8 @@ async def auth_register(payload: EmailAuthIn, request: Request, response: Respon
 @router.post("/api/auth/login")
 async def auth_login(payload: EmailAuthIn, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     from .main import create_user_session, _set_auth_cookies, audit
+    from .mobile_auth import require_mobile_proof
+    require_mobile_proof(request)
 
     email = _normalize_email(payload.email)
     user = (await db.execute(select(User).where(User.email == email).with_for_update())).scalar_one_or_none()

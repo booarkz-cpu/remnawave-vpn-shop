@@ -1,8 +1,8 @@
 # Модули проекта / Project modules
 
-Версия **2.9.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Установка APK и сборка iOS — в разделе 9.8. Предыдущее описание конструктора относится к **2.5.0**. Каталог приложений описан для **2.8.0**.
+Версия **2.10.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Установка APK 2.9.0 — в разделе 9.8. Подпись клиента, release APK и обновление с GitHub — в разделе 9.9. Предыдущее описание конструктора относится к **2.5.0**. Каталог приложений описан для **2.8.0**.
 
-Version **2.9.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. APK install and the iOS build are in section 9.8. The constructor description belongs to **2.5.0**. The app catalog belongs to **2.8.0**.
+Version **2.10.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. The 2.9.0 APK install is in section 9.8. Client proof, the release APK and the GitHub update are in section 9.9. The constructor description belongs to **2.5.0**. The app catalog belongs to **2.8.0**.
 
 ---
 
@@ -18,7 +18,11 @@ Version **2.9.0**. This document explains why each module exists. The function-b
 
 ### `backend/app/mobile_auth.py`
 
-Решает, можно ли отдать JWT в теле ответа. Список клиентов: `android-user`, `android-admin`, `ios-user`, `ios-admin`. Для них `session_body` добавляет `access_token`. Для браузера тело остаётся без токена, а cookie ставит вызывающий обработчик.
+Решает, можно ли отдать JWT в теле ответа. Список клиентов: `android-user`, `android-admin`, `ios-user`, `ios-admin`. Для них `session_body` добавляет `access_token`. Для браузера тело остаётся без токена, а cookie ставит вызывающий обработчик. С версии 2.10.0 `require_mobile_proof` проверяет HMAC, если заголовок клиента известен и `MOBILE_REQUIRE_PROOF` включён.
+
+### `backend/app/github_update.py`
+
+Читает последний релиз `booarkz-cpu/remnawave-vpn-shop` у `api.github.com` без редиректов и без доверия к переменным прокси. Отдаёт сравнение версий и allowlist ссылок на файлы релиза. Архив не скачивает и на диск не пишет. Применение остаётся у `scripts/update-from-github.sh` на хосте.
 
 ### `backend/app/main.py`
 
@@ -165,7 +169,11 @@ Stores the four app cards and the cabinet logo. The public route returns only en
 
 ### `backend/app/mobile_auth.py`
 
-Decides whether the JWT may appear in the response body. The client list is `android-user`, `android-admin`, `ios-user` and `ios-admin`. For those names `session_body` adds `access_token`. A browser response stays without the token, and the caller sets the cookie.
+Decides whether the JWT may appear in the response body. The client list is `android-user`, `android-admin`, `ios-user` and `ios-admin`. For those names `session_body` adds `access_token`. A browser response stays without the token, and the caller sets the cookie. From 2.10.0, `require_mobile_proof` checks the HMAC when the client header is known and `MOBILE_REQUIRE_PROOF` is on.
+
+### `backend/app/github_update.py`
+
+Reads the latest `booarkz-cpu/remnawave-vpn-shop` release from `api.github.com` without following redirects and without trusting proxy environment variables. It returns the version comparison and an allowlist of release file URLs. It does not download or extract the archive. Applying the update stays with `scripts/update-from-github.sh` on the host.
 
 ### `backend/app/main.py`
 

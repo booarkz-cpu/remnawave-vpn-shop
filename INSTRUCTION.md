@@ -351,6 +351,38 @@ python3 scripts/node-agent.py
 6. iOS: на macOS откройте `mobile/ios-user/VpnShopUser.xcodeproj` и `mobile/ios-admin/VpnShopAdmin.xcodeproj` в Xcode 15 или новее, выберите команду подписи и нажмите Run. IPA создаёт Product → Archive.
 7. Подпись APK в релизе — debug-ключ машины сборки. Сборка на другой машине может потребовать удалить уже установленное приложение, если отладочный ключ отличается.
 
+## 9.9. Приложения 2.10.0, подпись и обновление с GitHub
+
+1. На странице релиза v2.10.0 скачайте `remnawave_vpn_shop_android_user_2_10_0.apk`, `remnawave_vpn_shop_android_admin_2_10_0.apk` и файлы `.sha256`. Проверьте сумму: `sha256sum -c remnawave_vpn_shop_android_user_2_10_0.apk.sha256`.
+2. Пакеты подписаны release-ключом. Отпечаток SHA-256 сертификата указан в `RELEASE_NOTES_V2_10_0.md`. Закрытый ключ к релизу не приложен. Если на телефоне стоит debug APK 2.9.0, удалите его один раз и установите 2.10.0. Следующая сборка с тем же ключом ставится поверх.
+3. Повторная сборка с подписью:
+
+```bash
+export ANDROID_HOME="$HOME/android-sdk"
+export GRADLE_BIN="$HOME/gradle-8.10.2/bin/gradle"
+export ANDROID_KEYSTORE="$HOME/.android/remnawave-release.keystore"
+export ANDROID_KEYSTORE_PASSWORD="пароль-хранилища"
+export ANDROID_KEY_ALIAS="remnawave"
+export ANDROID_KEY_PASSWORD="пароль-ключа"
+bash scripts/build-android-apk.sh /tmp/apk
+```
+
+Без `ANDROID_KEYSTORE` скрипт собирает debug APK. Готовые файлы кладите вне каталога git.
+
+4. iOS: на macOS откройте проекты в Xcode. `MARKETING_VERSION` равен `2.10.0`, `CURRENT_PROJECT_VERSION` равен `2100`. IPA создаёт Product → Archive. В этом релизе IPA нет.
+5. Сохранённый токен приложения закрыт биометрией или PIN. Если устройство не умеет подтверждать владельца, экран открывается сразу. Кнопка выхода доступна на экране блокировки. Новый вход по паролю экран не запирает.
+6. Приложение шлёт `X-Shop-Time` и `X-Shop-Proof`. Сервер проверяет HMAC, когда `MOBILE_REQUIRE_PROOF=true` и задан `MOBILE_CLIENT_KEY`. Окно подписи — 5 минут. Путь берётся без query. Браузер этот заголовок не шлёт и продолжает работать на cookie.
+7. Ключ по умолчанию совпадает с исходниками. Свой ключ в `.env` требует пересборки приложений. `MOBILE_REQUIRE_PROOF=false` принимает приложения 2.9.0 после обновления сервера. User-Agent 2.10.0 начинает новую сессию: старая сессия 2.9.0 к новой строке не привязана.
+8. Экран подключения показывает QR и кнопки Happ, v2rayNG и Streisand. Ссылка строится только из `https://` адреса подписки. Устройства отзываются без показа `device_key` и `last_ip`. Подарок отправляется на `POST /api/me/gifts/redeem`. Пополнение — на `POST /api/me/wallet/topup` с новым `Idempotency-Key`. Сумма от 50 до 100000. Провайдер `sandbox` доступен при `PAYMENTS_SANDBOX=true` даже без production gate.
+9. Администратор в приложении включает и выключает тариф (`POST /api/admin/plans/{id}/enabled`, право `manage_plans`) и открывает карточку платежа. Карточка не содержит текст ошибки выдачи, URL кассы и id платежа у провайдера. Агент без сигнала дольше 5 минут помечен как устаревший.
+10. Обновление всего проекта с GitHub выполняется на хосте, не внутри контейнера API. В админке вкладка релизов вызывает `GET /api/admin/github-update` и показывает команду:
+
+```bash
+sudo bash /opt/vpn-shop/scripts/update-from-github.sh
+```
+
+Скрипт требует `.env` в `/opt/vpn-shop` (или в каталоге `APP_DIR`). Он скачивает zip `full_release` и `.sha256` только с GitHub, отклоняет чужой хост и пути с `..`, не затирает `.env`, `.env.*`, `.rollback` и `.git`, затем запускает `scripts/update.sh`: снимок, `pg_dump`, сборка, `doctor.sh` и откат при ошибке. Если установлена та же или более новая версия, скрипт печатает «Установлена актуальная версия» и завершается с кодом 0. Расписание cron администратор добавляет сам. По умолчанию оно выключено.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -785,6 +817,38 @@ The four source trees live under `mobile/`: `android-user`, `android-admin`, `io
 5. Rebuild from source with `ANDROID_HOME` and `GRADLE_BIN` set, then `bash scripts/build-android-apk.sh /tmp/apk`. Android Studio opens `mobile/android-user` and `mobile/android-admin` as well.
 6. iOS: on macOS, open `mobile/ios-user/VpnShopUser.xcodeproj` and `mobile/ios-admin/VpnShopAdmin.xcodeproj` in Xcode 15 or newer, select a signing team and press Run. Product → Archive creates the IPA.
 7. The release APKs are signed with the build machine's debug key. A later build on another machine can require uninstalling the previous copy when the debug key differs.
+
+## 9.9. Apps 2.10.0, proof and the GitHub update
+
+1. From the v2.10.0 release, download `remnawave_vpn_shop_android_user_2_10_0.apk`, `remnawave_vpn_shop_android_admin_2_10_0.apk` and the `.sha256` files. Check with `sha256sum -c remnawave_vpn_shop_android_user_2_10_0.apk.sha256`.
+2. The packages are signed with the release key. The certificate SHA-256 is in `RELEASE_NOTES_V2_10_0.md`. The private key is not attached. If a 2.9.0 debug APK is installed, uninstall it once, then install 2.10.0. A later build with the same key updates in place.
+3. Rebuild with a signature:
+
+```bash
+export ANDROID_HOME="$HOME/android-sdk"
+export GRADLE_BIN="$HOME/gradle-8.10.2/bin/gradle"
+export ANDROID_KEYSTORE="$HOME/.android/remnawave-release.keystore"
+export ANDROID_KEYSTORE_PASSWORD="keystore-password"
+export ANDROID_KEY_ALIAS="remnawave"
+export ANDROID_KEY_PASSWORD="key-password"
+bash scripts/build-android-apk.sh /tmp/apk
+```
+
+Without `ANDROID_KEYSTORE` the script builds a debug APK. Keep the output outside the git tree.
+
+4. iOS: on macOS, open the projects in Xcode. `MARKETING_VERSION` is `2.10.0` and `CURRENT_PROJECT_VERSION` is `2100`. Product → Archive creates the IPA. This release has no IPA.
+5. A saved app token is locked with biometrics or the device PIN. A device that cannot authenticate opens immediately. Sign-out stays available on the lock screen. A fresh password login does not lock the screen.
+6. The app sends `X-Shop-Time` and `X-Shop-Proof`. The server checks the HMAC when `MOBILE_REQUIRE_PROOF=true` and `MOBILE_CLIENT_KEY` is set. The window is 5 minutes. The path has no query string. A browser does not send the client header and keeps using cookies.
+7. The default key matches the app source. A custom key in `.env` needs a rebuilt app. `MOBILE_REQUIRE_PROOF=false` accepts 2.9.0 apps after the server upgrade. The 2.10.0 User-Agent starts a new session. A 2.9.0 session is not reused with the new string.
+8. The connection screen shows a QR and buttons for Happ, v2rayNG and Streisand. The link is built only from an `https://` subscription URL. Devices are revoked without showing `device_key` or `last_ip`. A gift posts to `POST /api/me/gifts/redeem`. A top-up posts to `POST /api/me/wallet/topup` with a new `Idempotency-Key`. The amount is 50 to 100000. Provider `sandbox` works when `PAYMENTS_SANDBOX=true`, including when the production payments gate is off.
+9. In the admin app, enable or disable a plan with `POST /api/admin/plans/{id}/enabled` (`manage_plans`) and open a payment card. The card omits the fulfillment error text, the checkout URL and the provider payment id. An agent with no heartbeat for 5 minutes is marked stale.
+10. A full project update from GitHub runs on the host, not inside the API container. The releases tab calls `GET /api/admin/github-update` and shows this command:
+
+```bash
+sudo bash /opt/vpn-shop/scripts/update-from-github.sh
+```
+
+The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `full_release` zip and the matching `.sha256` from GitHub only, rejects another host and any `..` path, keeps `.env`, `.env.*`, `.rollback` and `.git`, then runs `scripts/update.sh`: snapshot, `pg_dump`, build, `doctor.sh` and rollback on failure. When the installed version is current, it prints «Установлена актуальная версия» and exits 0. An administrator may add a cron job. It is not enabled by default.
 
 ## 10. Mini App
 

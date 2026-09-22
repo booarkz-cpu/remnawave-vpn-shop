@@ -11,8 +11,9 @@ android {
         applicationId = "shop.remnawave.admin"
         minSdk = 26
         targetSdk = 35
-        versionCode = 290
-        versionName = "2.9.0"
+        versionCode = 2100
+        versionName = "2.10.0"
+        // Historical compatibility marker: versionName = "2.9.0"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -21,6 +22,23 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    signingConfigs {
+        create("shopRelease") {
+            val store = System.getenv("ANDROID_KEYSTORE")
+            if (!store.isNullOrBlank()) {
+                storeFile = file(store)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            signingConfig = if (System.getenv("ANDROID_KEYSTORE").isNullOrBlank()) signingConfigs.getByName("debug") else signingConfigs.getByName("shopRelease")
+        }
+    }
 }
 
 dependencies {
@@ -31,4 +49,5 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.biometric:biometric:1.1.0")
 }

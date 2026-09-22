@@ -163,10 +163,11 @@ async def platform_summary(db: AsyncSession = Depends(get_db), admin=Depends(req
         .order_by(func.count().desc())
         .limit(20)
     )).all()
+    now = datetime.utcnow()
     return {
         "policy": await _policy(db),
         "plugins": [{"key": p.key, "enabled": p.enabled, "description": p.description} for p in plugins],
-        "agents": [{"id": a.id, "name": a.name, "enabled": a.enabled, "cpu": a.cpu, "mem": a.mem, "disk": a.disk, "xray_ok": a.xray_ok, "last_seen_at": a.last_seen_at, "version": a.version} for a in agents],
+        "agents": [{"id": a.id, "name": a.name, "enabled": a.enabled, "cpu": a.cpu, "mem": a.mem, "disk": a.disk, "xray_ok": a.xray_ok, "last_seen_at": a.last_seen_at, "version": a.version, "stale": a.last_seen_at is None or now - a.last_seen_at > timedelta(minutes=5)} for a in agents],
         "violations": [{"id": v.id, "user_id": v.user_id, "score": v.score, "recommendation": v.recommendation, "summary": v.summary, "status": v.status, "analyzers": v.analyzers, "created_at": v.created_at} for v in violations],
         "api_keys": [{"id": k.id, "name": k.name, "prefix": k.prefix, "scopes": k.scopes, "enabled": k.enabled, "last_used_at": k.last_used_at} for k in keys],
         "webhooks": [{"id": h.id, "url": h.url, "events": h.events, "enabled": h.enabled, "last_status": h.last_status} for h in hooks],

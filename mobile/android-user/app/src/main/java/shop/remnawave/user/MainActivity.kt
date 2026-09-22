@@ -1,10 +1,13 @@
 package shop.remnawave.user
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,9 +45,14 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.util.UUID
+import java.util.concurrent.Executors
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlin.concurrent.thread
 
-class MainActivity : ComponentActivity() {
+private const val mobileClientKey = "b7e1c4a09f6d42e8a1c35b77d0e94f12"
+
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { MaterialTheme(colorScheme = shopColors()) { UserApp() } }
@@ -61,6 +69,38 @@ private fun shopColors() = darkColorScheme(
 )
 
 private val localHttpHosts = setOf("localhost", "127.0.0.1", "10.0.2.2")
+
+fun shopProof(client: String, method: String, path: String, nowSeconds: Long): Pair<String, String> {
+    val stamp = nowSeconds.toString()
+    val message = "$client\n$stamp\n${method.uppercase()}\n$path"
+    val mac = Mac.getInstance("HmacSHA256")
+    mac.init(SecretKeySpec(mobileClientKey.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+    val hex = mac.doFinal(message.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    return stamp to hex
+}
+
+fun subscriptionApps(url: String): List<Pair<String, String>> {
+    if (!url.startsWith("https://") || url.any { it.isWhitespace() }) return emptyList()
+    val encoded = Uri.encode(url)
+    return listOf("Happ" to "happ://add/$encoded", "v2rayNG" to "v2rayng://install-sub?url=$encoded", "Streisand" to "streisand://import/$encoded")
+}
+
+fun promptUnlock(activity: FragmentActivity, title: String, onResult: (Boolean) -> Unit) {
+    val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    try {
+        if (BiometricManager.from(activity).canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
+            onResult(true)
+            return
+        }
+        val prompt = BiometricPrompt(activity, Executors.newSingleThreadExecutor(), object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { activity.runOnUiThread { onResult(true) } }
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) { activity.runOnUiThread { onResult(false) } }
+        })
+        prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle(title).setAllowedAuthenticators(authenticators).build())
+    } catch (_: Exception) {
+        onResult(true)
+    }
+}
 
 fun externalUrlAllowed(raw: String): Boolean {
     if (raw.isBlank() || raw.any { it.isWhitespace() }) return false
@@ -122,8 +162,12 @@ class ShopApi(private val base: String, private val token: String, private val l
             readTimeout = 15000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Language", lang)
-            setRequestProperty("User-Agent", "RemnawaveShop-Android-User/2.9.0")
+            setRequestProperty("User-Agent", "RemnawaveShop-Android-User/2.10.0")
+            // Historical compatibility marker: RemnawaveShop-Android-User/2.9.0
             setRequestProperty("X-Shop-Client", "android-user")
+            val proof = shopProof("android-user", method, path, System.currentTimeMillis() / 1000)
+            setRequestProperty("X-Shop-Time", proof.first)
+            setRequestProperty("X-Shop-Proof", proof.second)
             if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
             if (idempotency != null) setRequestProperty("Idempotency-Key", idempotency)
             if (body != null) {
@@ -156,7 +200,7 @@ private fun detailOf(payload: String, status: Int): String {
 @Composable
 private fun UserApp() {
     val context = LocalContext.current
-    val activity = context as ComponentActivity
+    val activity = context as FragmentActivity
     val prefs = remember { context.getSharedPreferences("shop_user", 0) }
     var lang by remember { mutableStateOf(prefs.getString("lang", "ru") ?: "ru") }
     var base by remember { mutableStateOf(prefs.getString("base", "") ?: "") }
@@ -174,6 +218,12 @@ private fun UserApp() {
     var config by remember { mutableStateOf(JSONObject()) }
     var logo by remember { mutableStateOf<ImageBitmap?>(null) }
     var promo by remember { mutableStateOf("") }
+    var devices by remember { mutableStateOf(JSONArray()) }
+    var traffic by remember { mutableStateOf(JSONObject()) }
+    var giftCode by remember { mutableStateOf("") }
+    var topupAmount by remember { mutableStateOf("100") }
+    var qr by remember { mutableStateOf<ImageBitmap?>(null) }
+    var unlocked by remember { mutableStateOf(token.isBlank()) }
     var subject by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     val strings = remember(lang) { loadStrings(context, lang) }
@@ -181,6 +231,7 @@ private fun UserApp() {
     fun saveSession(nextBase: String, nextToken: String) {
         base = nextBase
         token = nextToken
+        unlocked = true
         prefs.edit().putString("base", nextBase).putString("token", nextToken).putString("lang", lang).apply()
     }
     fun work(block: () -> Unit) {
@@ -203,6 +254,9 @@ private fun UserApp() {
             val nextServers = api.get("/api/me/servers") as JSONObject
             val nextConnection = api.get("/api/me/connection-info") as JSONObject
             val nextConfig = api.get("/api/public/config") as JSONObject
+            val nextTraffic = api.get("/api/me/traffic") as JSONObject
+            val nextDevices = api.get("/api/me/devices") as JSONArray
+            val nextQr = loadAuthedPng(base, "/api/me/connection-qr", token, lang)
             val nextLogo = try {
                 val catalog = api.get("/api/public/apps") as JSONObject
                 loadLogoBitmap(base, catalog.optString("logo_url"))?.asImageBitmap()
@@ -214,12 +268,18 @@ private fun UserApp() {
                 servers = nextServers
                 connection = nextConnection
                 config = nextConfig
+                traffic = nextTraffic
+                devices = nextDevices
+                qr = nextQr
                 logo = nextLogo
             }
         }
     }
-    LaunchedEffect(token, lang) {
-        if (token.isNotBlank()) refresh()
+    LaunchedEffect(token) {
+        if (token.isNotBlank() && !unlocked) promptUnlock(activity, t("unlock")) { unlocked = it }
+    }
+    LaunchedEffect(token, lang, unlocked) {
+        if (token.isNotBlank() && unlocked) refresh()
     }
     LaunchedEffect(base) {
         val normalized = try { normalizeBase(base) } catch (_: Exception) { return@LaunchedEffect }
@@ -275,9 +335,12 @@ private fun UserApp() {
                         activity.runOnUiThread { saveSession(normalized, issued) }
                     }
                 }, enabled = !busy) { Text(t("sign_up")) }
+            } else if (!unlocked) {
+                Button(onClick = { promptUnlock(activity, t("unlock")) { unlocked = it } }) { Text(t("unlock")) }
+                TextButton(onClick = { prefs.edit().remove("token").apply(); token = ""; unlocked = true }) { Text(t("sign_out")) }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("overview", "plans", "builder", "servers", "connection", "support").forEach { key ->
+                    listOf("overview", "plans", "builder", "servers", "connection", "devices", "support").forEach { key ->
                         FilterChip(selected = tab == key, onClick = { tab = key }, label = { Text(t(key)) })
                     }
                 }
@@ -293,6 +356,31 @@ private fun UserApp() {
                         Text("${t("wallet")}: ${user.optString("wallet_balance", "0")}")
                         Text("${t("referral")}: ${user.optString("referral_code")}")
                         Text(if (sub == null) t("no_subscription") else "${t("subscription")}: ${t("active")} · ${t("expires")} ${sub.optString("expires_at")}")
+                        val used = traffic.opt("traffic_used_bytes")
+                        val limit = traffic.opt("traffic_limit_bytes")
+                        Text("${t("traffic_used")}: ${if (traffic.optBoolean("available")) used else t("usage_unavailable")}")
+                        Text("${t("traffic_limit")}: ${if (limit == null || limit == JSONObject.NULL) t("unlimited") else limit}")
+                        OutlinedTextField(topupAmount, { topupAmount = it }, label = { Text(t("topup_amount")) }, modifier = Modifier.fillMaxWidth())
+                        Button(onClick = {
+                            val amount = topupAmount.trim()
+                            work {
+                                val body = JSONObject().put("amount", amount).put("provider", providerOf(config))
+                                val response = ShopApi(base, token, lang).post("/api/me/wallet/topup", body, UUID.randomUUID().toString()) as JSONObject
+                                val url = response.optString("url")
+                                activity.runOnUiThread {
+                                    notice = t("topup_ok")
+                                    if (externalUrlAllowed(url)) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
+                            }
+                        }) { Text(t("topup")) }
+                        OutlinedTextField(giftCode, { giftCode = it }, label = { Text(t("gift_code")) }, modifier = Modifier.fillMaxWidth())
+                        Button(onClick = {
+                            if (giftCode.isBlank()) return@Button
+                            work {
+                                ShopApi(base, token, lang).post("/api/me/gifts/redeem", JSONObject().put("code", giftCode.trim().uppercase()))
+                                activity.runOnUiThread { notice = t("gift_ok"); giftCode = "" }
+                            }
+                        }) { Text(t("redeem")) }
                     }
                     "plans" -> {
                         OutlinedTextField(promo, { promo = it }, label = { Text(t("promo")) }, modifier = Modifier.fillMaxWidth())
@@ -364,10 +452,19 @@ private fun UserApp() {
                     "connection" -> {
                         val url = connection.optString("subscription_url")
                         Text(if (url.isBlank()) t("no_subscription") else url)
-                        if (url.isNotBlank()) TextButton(onClick = {
-                            context.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText("subscription", url))
-                            notice = t("copied")
-                        }) { Text(t("copy")) }
+                        if (url.isNotBlank()) {
+                            if (qr != null) Image(qr!!, contentDescription = t("qr"), modifier = Modifier.size(180.dp))
+                            TextButton(onClick = {
+                                context.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText("subscription", url))
+                                notice = t("copied")
+                            }) { Text(t("copy")) }
+                            subscriptionApps(url).forEach { (label, link) ->
+                                TextButton(onClick = {
+                                    try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))) }
+                                    catch (_: ActivityNotFoundException) { notice = label }
+                                }) { Text(label) }
+                            }
+                        }
                         Text(t("guides"))
                         val platforms = connection.optJSONObject("platforms") ?: JSONObject()
                         for (key in listOf("android", "ios", "tv", "windows", "macos", "linux")) Text("$key: ${platforms.optString(key)}")
@@ -379,6 +476,21 @@ private fun UserApp() {
                                 activity.runOnUiThread { notice = t("trial_started") }
                             }
                         }) { Text(t("trial")) }
+                    }
+                    "devices" -> {
+                        if (devices.length() == 0) Text(t("no_devices"))
+                        for (index in 0 until devices.length()) {
+                            val device = devices.getJSONObject(index)
+                            Text("${device.optString("name")} · ${device.optString("platform")} · ${device.optString("status")}")
+                            if (device.optString("status") == "active") {
+                                TextButton(onClick = {
+                                    work {
+                                        ShopApi(base, token, lang).post("/api/me/devices/${device.optInt("id")}/revoke", JSONObject())
+                                        activity.runOnUiThread { notice = t("device_revoked") }
+                                    }
+                                }) { Text(t("revoke")) }
+                            }
+                        }
                     }
                     "support" -> {
                         OutlinedTextField(subject, { subject = it }, label = { Text(t("subject")) }, modifier = Modifier.fillMaxWidth())
@@ -395,6 +507,26 @@ private fun UserApp() {
             }
         }
     }
+}
+
+private fun loadAuthedPng(base: String, path: String, token: String, lang: String): ImageBitmap? {
+    val proof = shopProof("android-user", "GET", path, System.currentTimeMillis() / 1000)
+    val connection = (URL(base + path).openConnection() as HttpURLConnection).apply {
+        instanceFollowRedirects = false
+        connectTimeout = 15000
+        readTimeout = 15000
+        setRequestProperty("Accept", "image/png")
+        setRequestProperty("Accept-Language", lang)
+        setRequestProperty("User-Agent", "RemnawaveShop-Android-User/2.10.0")
+        setRequestProperty("X-Shop-Client", "android-user")
+        setRequestProperty("X-Shop-Time", proof.first)
+        setRequestProperty("X-Shop-Proof", proof.second)
+        if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
+    }
+    if (connection.responseCode !in 200..299) return null
+    val bytes = connection.inputStream.use { it.readBytes() }
+    if (bytes.size > 2 * 1024 * 1024) return null
+    return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
 }
 
 private fun providerOf(config: JSONObject): String {

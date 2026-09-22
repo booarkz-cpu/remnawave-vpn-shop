@@ -1,10 +1,12 @@
-# Remnawave VPN Shop 2.9.0
+# Remnawave VPN Shop 2.10.0
 
 Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
 The same product in English: a VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Состояние: **2.9.0**. Предыдущие релизы: **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **2.10.0**. Предыдущие релизы: **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+
+Current release: **2.10.0**. Previous releases: **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
 
 ## Состав
 
@@ -17,6 +19,20 @@ The same product in English: a VPN shop with a Telegram bot, a Mini App, a stand
 | Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+## Возможности 2.10.0
+
+- **Release APK.** `remnawave_vpn_shop_android_user_2_10_0.apk` и `remnawave_vpn_shop_android_admin_2_10_0.apk`, `versionCode` 2100. Сертификат и контрольные суммы — в `RELEASE_NOTES_V2_10_0.md`. Пакеты 2.9.0 были debug-подписаны, перед 2.10.0 их удаляют один раз. Закрытый ключ в релиз не входит.
+- **Один шаг подключения.** QR `GET /api/me/connection-qr` и кнопки Happ, v2rayNG, Streisand для `https://` ссылки подписки.
+- **Устройства, трафик, подарок и пополнение.** Список устройств без `device_key` и `last_ip`. Трафик с запасным лимитом из снимка. Подарок и пополнение кошелька, включая sandbox при `PAYMENTS_SANDBOX=true`.
+- **Подпись клиента и биометрия.** HMAC `X-Shop-Proof`. Сохранённый токен закрывается биометрией или PIN. `MOBILE_REQUIRE_PROOF=false` оставляет рабочими приложения 2.9.0.
+- **Telegram.** Срок подписки, пополнение и успешная оплата. Ошибка отправки не откатывает платёж.
+- **Дежурство в приложении администратора.** Включение тарифа, карточка платежа без текста ошибки провайдера, признак устаревшего агента.
+- **Обновление с GitHub на хосте.** `GET /api/admin/github-update` только показывает статус. Применение: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. Скрипт сверяет SHA-256, сохраняет `.env` и вызывает `scripts/update.sh`. API архив не распаковывает. Cron не включён по умолчанию.
+- **iOS.** Исходники с `MARKETING_VERSION` 2.10.0. IPA в этом релизе нет: сборка идёт в Xcode на macOS.
+- Схема базы остаётся `0038_v2_6_0_platform`. Лицензия прежняя, файл `LICENSE`.
+
+English: release-signed sideload APKs, subscription QR and client deep links, devices and traffic, gift redeem and wallet top-up, HMAC client proof, biometric lock of a saved token, Telegram notices, admin plan toggle and payment detail, and a host script that updates from GitHub after a SHA-256 check. The API does not extract the archive. There is no IPA in this release.
 
 ## Возможности 2.9.0
 
@@ -87,6 +103,7 @@ sudo bash install.sh
 | `DOCUMENTATION.md` | Карта актуальных документов и архивных аудитов |
 | `LICENSE` | Проприетарная лицензия 1.0, RU/EN |
 | `MOBILE.md` | Android и iOS: функции, сессия, логотип, сборка, RU/EN |
+| `RELEASE_NOTES_V2_10_0.md` | Что вошло в 2.10.0, release APK, подпись клиента и обновление с GitHub |
 | `RELEASE_NOTES_V2_9_0.md` | Что вошло в 2.9.0, APK и сборка iOS |
 | `RELEASE_NOTES_V2_8_0.md` | Что вошло в 2.8.0 |
 | `RELEASE_NOTES_V2_7_0.md` | Что вошло в 2.7.0 |
