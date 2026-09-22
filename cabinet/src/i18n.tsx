@@ -68,6 +68,8 @@ export const EN: Record<string, string> = {
   "Сохранить": "Save",
   "Отмена": "Cancel",
   "Ошибка": "Error",
+  "Разделы кабинета": "Account sections",
+  "Telegram WebApp initData недоступен": "Telegram WebApp initData is unavailable",
   "Добро пожаловать": "Welcome",
   "Управляйте подпиской, тарифами и подключением": "Manage your subscription, plans and connection",
   "Безопасный доступ к сети": "Secure network access",
@@ -109,6 +111,8 @@ export function translate(lang: Lang, value: string): string {
   if (expires) return `Expires: ${expires[1]}`;
   const trial = value.match(/^Пробный период · (.+) дней$/);
   if (trial) return `Trial · ${trial[1]} days`;
+  const online = value.match(/^Онлайн (\d+) из (\d+)$/);
+  if (online) return `Online ${online[1]} of ${online[2]}`;
   return value;
 }
 
@@ -169,6 +173,14 @@ export function DomLocalizer({children}: {children: React.ReactNode}) {
       const next = translate(lang, source);
       if (node.nodeValue !== next) node.nodeValue = next;
     }
+    root.querySelectorAll<HTMLElement>("[aria-label]").forEach((el) => {
+      const label = el.getAttribute("aria-label") || "";
+      const stored = el.dataset.i18nAria;
+      const source = sourceOf(label, stored, lang);
+      el.dataset.i18nAria = source;
+      const next = translate(lang, source);
+      if (label !== next) el.setAttribute("aria-label", next);
+    });
     root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input,textarea").forEach((el) => {
       const source = sourceOf(el.placeholder || "", el.dataset.i18nPlaceholder, lang);
       el.dataset.i18nPlaceholder = source;

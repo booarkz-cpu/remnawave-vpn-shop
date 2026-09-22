@@ -70,9 +70,14 @@ async def auth_register(payload: EmailAuthIn, request: Request, response: Respon
     token = await create_user_session(db, user, request)
     await audit(db, "auth.user.register", f"user:{user.id}", None, {"method": "email", "ip": _client_ip(request)})
     await db.commit()
+    from .mobile_auth import mobile_client_name, session_body
+
+    body = {"id": user.id, "email": user.email, "username": user.username}
+    if mobile_client_name(request):
+        return session_body(request, token, body)
     response.set_cookie("rw_user", token, httponly=True, secure=settings.cookie_secure, samesite=settings.cookie_samesite, max_age=3600)
     _set_auth_cookies(response, token)
-    return {"id": user.id, "email": user.email, "username": user.username}
+    return body
 
 
 @router.post("/api/auth/login")
@@ -86,9 +91,14 @@ async def auth_login(payload: EmailAuthIn, request: Request, response: Response,
     token = await create_user_session(db, user, request)
     await audit(db, "auth.user.login", f"user:{user.id}", None, {"method": "email", "ip": _client_ip(request)})
     await db.commit()
+    from .mobile_auth import mobile_client_name, session_body
+
+    body = {"id": user.id, "email": user.email, "username": user.username}
+    if mobile_client_name(request):
+        return session_body(request, token, body)
     response.set_cookie("rw_user", token, httponly=True, secure=settings.cookie_secure, samesite=settings.cookie_samesite, max_age=3600)
     _set_auth_cookies(response, token)
-    return {"id": user.id, "email": user.email, "username": user.username}
+    return body
 
 
 @router.get("/api/auth/vk")

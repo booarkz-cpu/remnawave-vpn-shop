@@ -315,7 +315,22 @@ python3 scripts/node-agent.py
 
 ### Лицензия
 
-Файл `LICENSE` — Remnawave VPN Shop Proprietary License 1.0. Чтение репозитория разрешено. Копирование, изменение, распространение и сервис для третьих лиц требуют письменного разрешения владельца.
+Файл `LICENSE` — Remnawave VPN Shop Proprietary License 1.0. Чтение репозитория разрешено. Копирование, изменение, распространение и сервис для третьих лиц требуют письменного разрешения владельца. Та же лицензия покрывает приложения Android и iOS.
+
+## 9.6. Приложения Android и iOS (2.7.0)
+
+Четыре исходника лежат в `mobile/`: `android-user`, `android-admin`, `ios-user`, `ios-admin`. Подробный разбор функций, заголовков и сборки — в `MOBILE.md` на русском и английском.
+
+1. В поле адреса укажите `https://` API магазина. `http://` принимается только для `localhost`, `127.0.0.1` и `10.0.2.2`.
+2. Покупатель входит или регистрируется по email. Пароль не короче 8 символов. Приложение шлёт `X-Shop-Client: android-user` или `ios-user` и сохраняет `access_token` из JSON. Веб-кабинет этот токен в JSON не получает.
+3. Кнопка языка переключает русский и английский. Запросы уходят с тем же `Accept-Language`.
+4. Тариф оплачивается через `POST /api/payments/create` с новым `Idempotency-Key`. Если в публичном конфиге есть провайдер `sandbox`, выбирается он. Ссылка оплаты открывается только для https или перечисленных локальных http-хостов.
+5. Конструктор отправляет `constructor_id` и идентификаторы пунктов устройств, трафика и дней.
+6. Экран серверов показывает имя, страну, статус и число пользователей. Адреса и токены на экран не выводятся. Имя, похожее на хост, заменяется на `node`.
+7. Экран подключения копирует ссылку подписки и показывает инструкции для Android, iOS, TV, Windows, macOS и Linux. Пробный период берёт первый тариф и `trial_days`.
+8. Администратор входит с `X-Shop-Client: android-admin` или `ios-admin`. Код 2FA уходит только если поле заполнено. User-Agent приложения должен оставаться прежним: сессия к нему привязана.
+9. Админские экраны читают обзор, тарифы, платежи, мониторинг Remnawave и сводку платформы. Кнопки «Ограничить» и «Снять» вызывают разбор нарушения. Поддержка отправляет поле `reply`.
+10. Сборка: Android Studio для каталогов `mobile/android-*`, Xcode для `mobile/ios-*/*.xcodeproj`. Готового APK или IPA в архиве релиза нет.
 
 ## 10. Mini App
 
@@ -716,7 +731,22 @@ The cabinet serves `manifest.webmanifest` and can be added to the home screen. T
 
 ### License
 
-`LICENSE` is the Remnawave VPN Shop Proprietary License 1.0. Reading the repository is allowed. Copying, modifying, redistributing and offering the software as a service require the owner's written permission.
+`LICENSE` is the Remnawave VPN Shop Proprietary License 1.0. Reading the repository is allowed. Copying, modifying, redistributing and offering the software as a service require the owner's written permission. The same license covers the Android and iOS apps.
+
+## 9.6. Android and iOS apps (2.7.0)
+
+The four source trees live under `mobile/`: `android-user`, `android-admin`, `ios-user` and `ios-admin`. Function, header and build details are in `MOBILE.md` in Russian and English.
+
+1. Enter the shop API as `https://`. `http://` is accepted only for `localhost`, `127.0.0.1` and `10.0.2.2`.
+2. The buyer signs in or registers with email and a password of at least 8 characters. The app sends `X-Shop-Client: android-user` or `ios-user` and stores `access_token` from the JSON. The web cabinet does not receive that token in JSON.
+3. The language control switches Russian and English. Requests send the same `Accept-Language`.
+4. A plan is paid with `POST /api/payments/create` and a new `Idempotency-Key`. When the public config lists `sandbox`, that provider is selected. The payment URL opens only for https or the local http hosts above.
+5. The builder sends `constructor_id` plus the device, traffic and day option ids.
+6. The servers screen shows name, country, status and the online-user count. Addresses and tokens are not shown. A host-like name is replaced with `node`.
+7. The connection screen copies the subscription link and shows guides for Android, iOS, TV, Windows, macOS and Linux. Trial uses the first plan and `trial_days`.
+8. The administrator signs in with `X-Shop-Client: android-admin` or `ios-admin`. The 2FA code is sent only when the field is filled. The app User-Agent must stay stable because the session is bound to it.
+9. Admin screens read the overview, plans, payments, Remnawave monitoring and the platform summary. Restrict and clear call violation review. Support sends the `reply` field.
+10. Build with Android Studio for `mobile/android-*` and with Xcode for `mobile/ios-*/*.xcodeproj`. The release archive does not contain an APK or an IPA.
 
 ## 10. Mini App
 

@@ -27,6 +27,14 @@
 - [ ] Confirm `/api/public/servers` has no address, token or password fields.
 - [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
 
+## Mobile apps 2.7.0
+- [ ] Build `mobile/android-user` and `mobile/android-admin` in Android Studio, and the two Xcode projects under `mobile/ios-user` and `mobile/ios-admin`.
+- [ ] Point each app at `https://` API. Confirm `http://` is rejected except for localhost, 127.0.0.1 and 10.0.2.2.
+- [ ] Sign in from a buyer app and confirm the JSON contains `access_token` only because `X-Shop-Client` is `android-user` or `ios-user`. Repeat from a browser and confirm the JSON has no `access_token`.
+- [ ] Switch RU/EN and confirm the same screens reload.
+- [ ] Open Servers and confirm the rows have no address, token or password.
+- [ ] From the admin app, load the platform summary and confirm it has no agent token or webhook secret.
+
 ## Platform 2.6.0
 - [ ] Open Admin → Платформа and confirm the summary loads without agent tokens or webhook secrets.
 - [ ] Leave `auto_hard_block` off until the scoring thresholds are reviewed.

@@ -1,0 +1,105 @@
+import SwiftUI
+
+@main
+struct VpnShopAdminApp: App {
+    var body: some Scene {
+        WindowGroup { AdminRootView() }
+    }
+}
+
+private let localHttpHosts: Set<String> = ["localhost", "127.0.0.1", "10.0.2.2"]
+
+func normalizeBase(_ raw: String) throws -> String {
+    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    guard let url = URL(string: value), let host = url.host?.lowercased(), url.user == nil, !value.contains(where: \.isWhitespace) else {
+        throw URLError(.badURL)
+    }
+    if url.scheme == "https" { return value }
+    if url.scheme == "http", localHttpHosts.contains(host) { return value }
+    throw URLError(.badURL)
+}
+
+func jsonInt(_ value: Any?) -> Int? {
+    if value == nil || value is NSNull { return nil }
+    if let number = value as? Int { return number }
+    if let number = value as? NSNumber { return number.intValue }
+    if let text = value as? String { return Int(text) }
+    return nil
+}
+
+func jsonBool(_ value: Any?) -> Bool {
+    if let flag = value as? Bool { return flag }
+    if let number = value as? NSNumber { return number.boolValue }
+    return false
+}
+
+func publicNode(_ row: [String: Any]) -> [String: Any] {
+    let status = (row["status"] as? String) ?? "unknown"
+    let safe = ["online", "offline", "disabled", "unknown"].contains(status) ? status : "unknown"
+    var name = (row["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if name.isEmpty { name = "node" }
+    if name.contains("://") || (name.filter { $0 == "." }.count >= 3 && name.contains(where: \.isNumber)) { name = "node" }
+    return ["name": name, "country": row["country"] as? String ?? "", "status": safe, "users_online": jsonInt(row["users_online"]) ?? 0]
+}
+
+final class ShopClient: NSObject, URLSessionTaskDelegate {
+    let base: String
+    let token: String
+    let lang: String
+    private lazy var session: URLSession = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
+
+    init(base: String, token: String, lang: String) {
+        self.base = base
+        self.token = token
+        self.lang = lang
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
+
+    func call(_ method: String, _ path: String, body: [String: Any]? = nil) throws -> Any {
+        var request = URLRequest(url: URL(string: base + path)!)
+        request.httpMethod = method
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(lang, forHTTPHeaderField: "Accept-Language")
+        request.setValue("RemnawaveShop-iOS-Admin/2.7.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("ios-admin", forHTTPHeaderField: "X-Shop-Client")
+        if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let semaphore = DispatchSemaphore(value: 0)
+        var payload = Data()
+        var status = 0
+        var failure: Error?
+        session.dataTask(with: request) { data, response, error in
+            payload = data ?? Data()
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            failure = error
+            semaphore.signal()
+        }.resume()
+        semaphore.wait()
+        if let failure { throw failure }
+        if !(200...299).contains(status) { throw NSError(domain: "shop", code: status, userInfo: [NSLocalizedDescriptionKey: detailOf(payload, status)]) }
+        if payload.isEmpty { return [String: Any]() }
+        return try JSONSerialization.jsonObject(with: payload)
+    }
+}
+
+private func detailOf(_ payload: Data, _ status: Int) -> String {
+    let json = (try? JSONSerialization.jsonObject(with: payload)) as? [String: Any]
+    if let detail = json?["detail"] as? String, !detail.isEmpty { return String(detail.prefix(300)) }
+    if let list = json?["detail"] as? [[String: Any]], let msg = list.first?["msg"] as? String { return String(msg.prefix(300)) }
+    return "HTTP \(status)"
+}
+
+func loadStrings(_ lang: String) -> [String: String] {
+    guard let url = Bundle.main.url(forResource: "l10n", withExtension: "json"),
+          let data = try? Data(contentsOf: url),
+          let root = try? JSONSerialization.jsonObject(with: data) as? [String: [String: String]],
+          let table = root[lang] else { return [:] }
+    return table
+}
