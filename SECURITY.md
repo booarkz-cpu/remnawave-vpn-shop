@@ -1,10 +1,10 @@
-# Security / Безопасность — Remnawave VPN Shop 2.5.0
+# Security / Безопасность — Remnawave VPN Shop 2.6.0
 
 Граница доверия: браузер или Telegram → Caddy → API → PostgreSQL, Redis, Remnawave и платёжные провайдеры. PostgreSQL и Redis наружу не публикуются.
 
 Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Remnawave and the payment providers. PostgreSQL and Redis are not published to the host network.
 
-Предыдущая версия документа описывала 2.4.0. Ниже — актуальная модель 2.5.0 на двух языках.
+Предыдущая версия документа описывала 2.5.0 и 2.4.0. Ниже — актуальная модель 2.6.0 на двух языках.
 
 ## Аутентификация
 
@@ -59,6 +59,19 @@ Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Rem
 - Покупатель подарка не может активировать собственный код. Повторная активация тем же получателем не продлевает подписку второй раз.
 - Если задан `REQUIRED_TELEGRAM_CHANNEL`, оплата и списание кошелька требуют членства в канале. Ошибка Telegram API отвечает 503 и не создаёт списание.
 
+## Платформа 2.6.0
+
+- Токен агента, ключ API и секрет webhook возвращаются только в ответе на создание. `GET /api/admin/platform/summary` отдаёт имя агента, префикс ключа и URL webhook и не отдаёт `token_hash`, `secret_hash` и расшифрованный секрет.
+- Агент авторизуется заголовком `X-Agent-Token`. Сервер хранит SHA-256 токена. Heartbeat помечает доставленными только действия `throttle` и `clear`. Остальные виды в очереди получают статус `rejected` и на узел не уходят.
+- Наблюдения с некорректным IP не сохраняются. Сырые адреса остаются в таблице наблюдений и видны администратору с правом `read`. Публичные маршруты серверов по-прежнему не отдают адреса.
+- Пользователь с `restricted_at` получает 403 «Доступ ограничен» на пробный период, создание платежа и списание кошелька.
+- HWID со действием `block` получает 403 «Устройство в чёрном списке». Действие `alert` регистрацию не останавливает.
+- `auto_hard_block` по умолчанию выключен.
+- Ключ API имеет вид `rw_` и проверяется по хешу и scope. `GET /api/v3/status` требует scope `read`.
+- Webhook создаётся только для URL, который проходит `validate_public_url`. Подпись — HMAC-SHA256 тела в `X-Shop-Signature`. Ошибка доставки записывается как «delivery failed» без текста исключения.
+- Тест SMTP отправляет письмо только на `admin.email` текущего администратора. Пароль SMTP и закрытый ключ DKIM лежат в `AppSetting` в виде `encrypt_secret`.
+- Дополнительные строки Prometheus появляются, когда модуль `metrics` включён. Сам `/metrics` по-прежнему закрыт `METRICS_TOKEN`.
+
 ## Что это не гарантирует
 
 Gate production не заменяет внешнюю проверку провайдера. Панель не включает WebAuthn автоматически: хранилище ключей есть, криптографическая проверка assertion не притворяется включённой 2FA. Живые кассы YooKassa, Platega, RollyPay и боевой Remnawave в этом репозитории не прогоняются. Sandbox подтверждает только локальный контур оплаты.
@@ -102,6 +115,20 @@ Outbound payment HTTP uses a DNS-pinned client: the address must be public, the 
 `APP_SECRET` must be at least 32 characters. It signs JWTs and encrypts TOTP, recovery codes and the staging config. Metrics require `METRICS_TOKEN`. Public OpenAPI is disabled. Do not commit `.env`.
 
 Wallet top-ups credit `wallet_balance` once, after provider confirmation, under the payment lock. Wallet spend and gift purchase debit the balance under the user lock. A gift buyer cannot redeem their own code. A required Telegram channel check returns 503 on a Telegram API failure and does not create a charge.
+
+## Platform 2.6.0
+
+The agent token, API key and webhook secret are returned only from the create response. The platform summary returns the agent name, the key prefix and the webhook URL. It does not return `token_hash`, `secret_hash` or a decrypted secret.
+
+The agent authenticates with `X-Agent-Token`. The server stores the SHA-256 of the token. Heartbeat marks only `throttle` and `clear` as delivered. Any other queued kind is marked `rejected` and is not sent to the node.
+
+Observations with an invalid IP are dropped. Raw addresses stay in the observation table for an administrator with `read`. Public server routes still omit addresses.
+
+A user with `restricted_at` receives 403 on trial, payment creation and wallet spend. An HWID blacklist action `block` returns 403 on device registration. An action `alert` does not stop registration. `auto_hard_block` is off by default.
+
+An API key starts with `rw_` and is checked by hash and scope. `GET /api/v3/status` requires the `read` scope. A webhook URL must pass `validate_public_url`. The body is signed with HMAC-SHA256 in `X-Shop-Signature`. A delivery failure is stored as “delivery failed” without the exception text.
+
+The SMTP test sends only to the current administrator's `admin.email`. The SMTP password and the DKIM private key are stored with `encrypt_secret`. Extra Prometheus lines are emitted when the `metrics` module is enabled. `/metrics` itself still requires `METRICS_TOKEN`.
 
 ## Limits
 

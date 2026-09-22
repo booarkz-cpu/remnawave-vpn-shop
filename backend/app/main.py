@@ -24,7 +24,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.5.0"
+APP_VERSION = "2.6.0"
+# Historical compatibility marker: APP_VERSION = "2.5.0"
 # Historical compatibility marker: APP_VERSION = "2.4.0"
 # Historical compatibility marker: APP_VERSION = "2.3.0"
 # Historical compatibility marker: APP_VERSION = "2.2.1"
@@ -42,8 +43,10 @@ logger = logging.getLogger("remnawave")
 app = FastAPI(title="Remnawave VPN Shop API", version=APP_VERSION, docs_url=None, redoc_url=None, openapi_url=None)
 from .cabinet_api import router as cabinet_router
 from .tariff_api import router as tariff_router
+from .platform_api import router as platform_router
 app.include_router(cabinet_router)
 app.include_router(tariff_router)
+app.include_router(platform_router)
 
 MAX_REQUEST_BYTES = 12 * 1024 * 1024
 RATE_BUCKET: dict[str, list[float]] = {}
@@ -64,6 +67,8 @@ RATE_LIMITS = {
     "/api/public/servers": 30,
     "/api/me/servers": 30,
     "/api/tariff-constructors": 60,
+    "/api/agent/heartbeat": 120,
+    "/api/agent/observations": 60,
     "/api/promo/validate": 60,
     "/api/me/support/tickets": 10,
     "/api/me/referral/withdrawals": 5,
@@ -443,7 +448,13 @@ async def metrics(request:Request):
     if not settings.metrics_enabled: raise HTTPException(404,"Metrics disabled")
     if not settings.metrics_token: raise HTTPException(503,"Metrics authentication is not configured")
     if not hmac.compare_digest(request.headers.get("X-Metrics-Token", ""),settings.metrics_token): raise HTTPException(401,"Metrics authentication required")
-    body="\n".join(f"vpnshop_{k} {v}" for k,v in _METRICS.items())+"\n"
+    extra=""
+    try:
+        from .platform_api import prometheus_lines
+        extra=await prometheus_lines()
+    except Exception:
+        extra=""
+    body="\n".join(f"vpnshop_{k} {v}" for k,v in _METRICS.items())+"\n"+extra
     return Response(content=body, media_type="text/plain; version=0.0.4")
 
 # ---------- Telegram auth ----------
@@ -641,6 +652,10 @@ async def my_devices(request: Request, db: AsyncSession=Depends(get_db)):
 @app.post("/api/me/devices")
 async def register_device(payload:DeviceRegisterIn, request:Request, db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db); now=datetime.utcnow()
+    from .platform_api import blacklist_decision
+    decision=await blacklist_decision(db, payload.device_key)
+    if decision=="block":
+        raise HTTPException(403,"Устройство в чёрном списке")
     # Serialize device-limit checks per user. Without this lock, two concurrent
     # registrations could both observe the same active_count and exceed the plan limit.
     await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": 710000000 + int(user.id)})
@@ -656,6 +671,9 @@ async def register_device(payload:DeviceRegisterIn, request:Request, db:AsyncSes
     if not x:
         x=UserDevice(user_id=user.id,device_key=payload.device_key,name=payload.name,platform=payload.platform); db.add(x)
     else: x.name=payload.name; x.platform=payload.platform; x.status="active"; x.revoked_at=None
+    if decision=="alert":
+        from .models import AbuseViolation
+        db.add(AbuseViolation(user_id=user.id, score=40, recommendation="warn", analyzers={"hits":[{"name":"hwid","detail":"черный список alert"}]}, summary="Регистрация устройства из чёрного списка со действием alert", status="open", created_at=now))
     x.last_ip=_client_ip(request); x.last_seen_at=now; await db.commit(); await db.refresh(x)
     return {"ok":True,"id":x.id,"status":x.status}
 
@@ -668,6 +686,8 @@ async def revoke_device(device_id:int,request:Request,db:AsyncSession=Depends(ge
 @app.post("/api/me/trial")
 async def claim_trial(payload:TrialIn,request:Request,db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db)
+    from .platform_api import reject_restricted
+    reject_restricted(user)
     # Serialize trial claims per user; the UNIQUE constraint remains the final
     # database invariant, while this prevents duplicate grants under concurrency.
     await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": 720000000 + int(user.id)})
@@ -937,6 +957,8 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
     if await setting_value(db,PRODUCTION_PAYMENTS_GATE_KEY,"0") != "1" and not sandbox_requested:
         raise HTTPException(503,"Реальные платежи временно заблокированы: требуется успешный staging E2E")
     user=await user_from_token(request,db)
+    from .platform_api import reject_restricted
+    reject_restricted(user)
     constructor_requested=payload.get("constructor_id") not in (None, "", 0, "0")
     constructor_quote=None
     quote_error=None
@@ -1969,6 +1991,8 @@ async def wallet_topup(payload:dict, request:Request, db:AsyncSession=Depends(ge
 async def wallet_spend(payload:dict, request:Request, db:AsyncSession=Depends(get_db)):
     if await maintenance_enabled(db): raise HTTPException(503,"Service is in maintenance mode")
     user=await user_from_token(request,db)
+    from .platform_api import reject_restricted
+    reject_restricted(user)
     constructor_requested=payload.get("constructor_id") not in (None, "", 0, "0")
     constructor_quote=None
     quote_error=None

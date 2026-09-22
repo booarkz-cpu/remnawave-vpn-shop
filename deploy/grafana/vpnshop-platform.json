@@ -1,0 +1,28 @@
+{
+  "title": "Remnawave VPN Shop platform",
+  "uid": "vpnshop-platform",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "refresh": "1m",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Open abuse violations",
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+      "targets": [{"refId": "A", "expr": "vpnshop_abuse_open"}]
+    },
+    {
+      "type": "stat",
+      "title": "Agents online",
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
+      "targets": [{"refId": "A", "expr": "vpnshop_agents_online"}]
+    },
+    {
+      "type": "stat",
+      "title": "Webhook delivery failures",
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
+      "targets": [{"refId": "A", "expr": "vpnshop_webhook_failures"}]
+    }
+  ],
+  "time": {"from": "now-6h", "to": "now"}
+}
