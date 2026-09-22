@@ -341,6 +341,16 @@ python3 scripts/node-agent.py
 5. Кнопка **Удалить логотип** очищает `client_logo`. Логотип панели в разделе «Брендинг панели» при этом не меняется.
 6. Откройте личный кабинет. Над вкладками есть блок «Приложения». Язык блока совпадает с языком кабинета.
 
+## 9.8. Установка APK и сборка iOS (2.9.0)
+
+1. На странице релиза v2.9.0 скачайте `remnawave_vpn_shop_android_user_2_9_0.apk`, `remnawave_vpn_shop_android_admin_2_9_0.apk` и файлы `.sha256`.
+2. Проверьте сумму: `sha256sum -c remnawave_vpn_shop_android_user_2_9_0.apk.sha256`.
+3. Установите пакет командой `adb install -r файл.apk` либо откройте APK на телефоне после разрешения установки из этого источника.
+4. В приложении укажите адрес API с `https://`. `http://` принимается для `localhost`, `127.0.0.1` и `10.0.2.2`.
+5. Повторная сборка из исходников: задайте `ANDROID_HOME` и `GRADLE_BIN`, затем `bash scripts/build-android-apk.sh /tmp/apk`. Каталоги `mobile/android-user` и `mobile/android-admin` также открываются в Android Studio.
+6. iOS: на macOS откройте `mobile/ios-user/VpnShopUser.xcodeproj` и `mobile/ios-admin/VpnShopAdmin.xcodeproj` в Xcode 15 или новее, выберите команду подписи и нажмите Run. IPA создаёт Product → Archive.
+7. Подпись APK в релизе — debug-ключ машины сборки. Сборка на другой машине может потребовать удалить уже установленное приложение, если отладочный ключ отличается.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -765,6 +775,16 @@ The four source trees live under `mobile/`: `android-user`, `android-admin`, `io
 4. Upload a PNG, JPG or WEBP in the logo block. The server stores a PNG under `/media/`. That file appears in the user cabinet header and in the Android and iOS apps.
 5. **Удалить логотип** clears `client_logo`. The panel logo in **Брендинг панели** stays as it is.
 6. Open the user cabinet. The **Приложения** block sits above the tabs and follows the cabinet language.
+
+## 9.8. APK install and the iOS build (2.9.0)
+
+1. From the v2.9.0 release, download `remnawave_vpn_shop_android_user_2_9_0.apk`, `remnawave_vpn_shop_android_admin_2_9_0.apk` and the `.sha256` files.
+2. Check the digest with `sha256sum -c remnawave_vpn_shop_android_user_2_9_0.apk.sha256`.
+3. Install with `adb install -r file.apk`, or open the APK on the phone after allowing installs from that source.
+4. Enter the API address as `https://`. `http://` is accepted for `localhost`, `127.0.0.1` and `10.0.2.2`.
+5. Rebuild from source with `ANDROID_HOME` and `GRADLE_BIN` set, then `bash scripts/build-android-apk.sh /tmp/apk`. Android Studio opens `mobile/android-user` and `mobile/android-admin` as well.
+6. iOS: on macOS, open `mobile/ios-user/VpnShopUser.xcodeproj` and `mobile/ios-admin/VpnShopAdmin.xcodeproj` in Xcode 15 or newer, select a signing team and press Run. Product → Archive creates the IPA.
+7. The release APKs are signed with the build machine's debug key. A later build on another machine can require uninstalling the previous copy when the debug key differs.
 
 ## 10. Mini App
 

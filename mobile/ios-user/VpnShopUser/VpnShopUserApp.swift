@@ -9,7 +9,7 @@ struct VpnShopUserApp: App {
     }
 }
 
-private let localHttpHosts: Set<String> = ["localhost", "127.0.0.1", "10.0.2.2"]
+let localHttpHosts: Set<String> = ["localhost", "127.0.0.1", "10.0.2.2"]
 
 func normalizeBase(_ raw: String) throws -> String {
     let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -74,7 +74,7 @@ final class ShopClient: NSObject, URLSessionTaskDelegate {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(lang, forHTTPHeaderField: "Accept-Language")
-        request.setValue("RemnawaveShop-iOS-User/2.8.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("RemnawaveShop-iOS-User/2.9.0", forHTTPHeaderField: "User-Agent")
         request.setValue("ios-user", forHTTPHeaderField: "X-Shop-Client")
         if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         if let idempotency { request.setValue(idempotency, forHTTPHeaderField: "Idempotency-Key") }

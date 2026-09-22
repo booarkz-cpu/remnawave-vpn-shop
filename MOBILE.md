@@ -1,8 +1,8 @@
-# Мобильные приложения 2.8.0 / Mobile apps 2.8.0
+# Мобильные приложения 2.9.0 / Mobile apps 2.9.0
 
-Текущая версия приложений **2.8.0**. Исходники появились в **2.7.0**. В **2.8.0** администратор задаёт тексты карточек и общий логотип.
+Текущая версия приложений **2.9.0**. Исходники появились в **2.7.0**. В **2.8.0** администратор задаёт тексты карточек и общий логотип. В **2.9.0** релиз GitHub содержит debug APK покупателя и администратора.
 
-The current app version is **2.8.0**. The sources arrived in **2.7.0**. In **2.8.0** an administrator edits the cards and the shared logo.
+The current app version is **2.9.0**. The sources arrived in **2.7.0**. In **2.8.0** an administrator edits the cards and the shared logo. In **2.9.0** the GitHub release contains debug APKs for the buyer and the administrator.
 
 Четыре отдельных клиента магазина: Android и iOS для покупателя, Android и iOS для администратора. Общий вид — тёмная схема Material Design и акцент Web 3.0 `#00E5C0`. В каждом приложении есть переключатель **RU / EN**.
 
@@ -26,10 +26,10 @@ The apps are part of Remnawave VPN Shop and are covered by the Remnawave VPN Sho
 
 | Приложение | Каталог | Идентификатор | `X-Shop-Client` | User-Agent |
 | --- | --- | --- | --- | --- |
-| Android, покупатель | `mobile/android-user` | `shop.remnawave.user` | `android-user` | `RemnawaveShop-Android-User/2.8.0` |
-| Android, администратор | `mobile/android-admin` | `shop.remnawave.admin` | `android-admin` | `RemnawaveShop-Android-Admin/2.8.0` |
-| iOS, покупатель | `mobile/ios-user` | `shop.remnawave.user` | `ios-user` | `RemnawaveShop-iOS-User/2.8.0` |
-| iOS, администратор | `mobile/ios-admin` | `shop.remnawave.admin` | `ios-admin` | `RemnawaveShop-iOS-Admin/2.8.0` |
+| Android, покупатель | `mobile/android-user` | `shop.remnawave.user` | `android-user` | `RemnawaveShop-Android-User/2.9.0` |
+| Android, администратор | `mobile/android-admin` | `shop.remnawave.admin` | `android-admin` | `RemnawaveShop-Android-Admin/2.9.0` |
+| iOS, покупатель | `mobile/ios-user` | `shop.remnawave.user` | `ios-user` | `RemnawaveShop-iOS-User/2.9.0` |
+| iOS, администратор | `mobile/ios-admin` | `shop.remnawave.admin` | `ios-admin` | `RemnawaveShop-iOS-Admin/2.9.0` |
 
 User-Agent должен оставаться одинаковым между входом и следующими запросами: сессия привязана к нему, смена строки отзывает сессию.
 
@@ -108,13 +108,22 @@ Sign-in posts email, password and a 2FA code only when the field is not blank. O
 
 ## Сборка
 
-Android: откройте `mobile/android-user` или `mobile/android-admin` в Android Studio (AGP 8.7, Kotlin 2.0, compileSdk 35, minSdk 26) и соберите debug или release. Gradle Wrapper в репозиторий не вложен. Cleartext в `network_security.xml` разрешён только для трёх локальных хостов.
+Android: релиз **2.9.0** прикладывает два debug APK. Имена файлов: `remnawave_vpn_shop_android_user_2_9_0.apk` и `remnawave_vpn_shop_android_admin_2_9_0.apk`. Рядом лежит `.sha256`. Повторная сборка:
 
-iOS: откройте `mobile/ios-user/VpnShopUser.xcodeproj` или `mobile/ios-admin/VpnShopAdmin.xcodeproj` в Xcode 15+ (iOS 16, Swift 5). В проекте `CODE_SIGNING_ALLOWED = NO`, чтобы дерево собиралось без команды; для устройства подпись настраивается в Xcode. `NSAllowsLocalNetworking` разрешает локальный HTTP.
+```bash
+ANDROID_HOME=$HOME/android-sdk GRADLE_BIN=$HOME/gradle-8.10.2/bin/gradle bash scripts/build-android-apk.sh /tmp/apk
+```
 
-На этой среде сборки нет Android SDK, kotlinc и Swift, поэтому бинарные APK и IPA в релиз не входят. Контракты исходников проверяет `tests/test_v270_mobile_apps.py`.
+Нужны Android SDK 35, build-tools 35.0.0 и Gradle 8.10.2. Скрипт вызывает `:app:assembleDebug` в `mobile/android-user` и `mobile/android-admin` (AGP 8.7, Kotlin 2.0, compileSdk 35, minSdk 26, versionName `2.9.0`). После `gradle wrapper` в каталоге приложения можно вызывать `./gradlew :app:assembleDebug`. Cleartext в `network_security.xml` разрешён только для трёх локальных хостов. Пакет подписан отладочным ключом машины сборки и ставится вручную. Для Google Play подпись задаёт владелец.
 
-Android: open `mobile/android-user` or `mobile/android-admin` in Android Studio and assemble a debug or release build. The Gradle wrapper JAR is not committed. iOS: open the `.xcodeproj` in Xcode. Signing is disabled in the project file so the tree can be built without a team; a device build needs a signing team in Xcode. This environment has no Android SDK and no Swift compiler, so the GitHub release does not contain an APK or an IPA.
+iOS: откройте `mobile/ios-user/VpnShopUser.xcodeproj` или `mobile/ios-admin/VpnShopAdmin.xcodeproj` в Xcode 15+ на macOS (iOS 16, Swift 5, MARKETING_VERSION `2.9.0`). В проекте `CODE_SIGNING_ALLOWED = NO`, чтобы дерево собиралось без команды; для устройства подпись настраивается в Xcode. `NSAllowsLocalNetworking` разрешает локальный HTTP. IPA появляется после Product → Archive в Xcode. На Linux Xcode нет, поэтому релиз IPA не содержит.
+
+Android: the **2.9.0** GitHub release attaches `remnawave_vpn_shop_android_user_2_9_0.apk` and `remnawave_vpn_shop_android_admin_2_9_0.apk` with `.sha256` files. Rebuild with `scripts/build-android-apk.sh` (SDK 35, Gradle 8.10.2, `assembleDebug`). The packages are debug-signed sideload builds. iOS: open the `.xcodeproj` in Xcode on macOS. `CODE_SIGNING_ALLOWED = NO` lets the tree compile without a team; a device build needs a signing team. The IPA is produced by Xcode Archive. This Linux host has no Xcode, so the release has no IPA.
+
+## Проверенные ошибки 2.9.0
+
+- Платёжная ссылка Android сравнивалась по префиксу `http://localhost`. Адрес `http://localhost.example` проходил бы эту проверку. Теперь URL разбирается, хост сравнивается целиком, логин в адресе отклоняется.
+- `localHttpHosts` в iOS-приложении покупателя был `private` в другом файле, и экран оплаты не собирался в Xcode. Константа доступна модулю, экран оплаты её видит.
 
 ## Проверенные ошибки клиентов
 

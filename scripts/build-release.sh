@@ -5,7 +5,8 @@ cd "$ROOT"
 # Historical release: VERSION="39.0.0-production" artifact=remnawave_vpn_shop_v39_production.zip migration=0017_v39_staging_isolation
 # Previous release contract: VERSION="1.0.1-realise" artifact=remnawave_vpn_shop_v1_0_1_realise_deep_audited_fixed.zip
 # Legacy regression markers: VERSION="1.0.0-realise" artifact=remnawave_vpn_shop_v1_0_0_realise_deep_audited_fixed.zip
-VERSION="2.8.0"
+VERSION="2.9.0"
+# Historical compatibility marker: VERSION="2.8.0"
 # Historical compatibility marker: VERSION="2.7.0"
 # Historical compatibility marker: VERSION="2.6.0"
 # Historical compatibility marker: VERSION="2.5.0"
@@ -21,6 +22,7 @@ VERSION="2.8.0"
 # Previous release contract: VERSION="45.0.0-enterprise" artifact=remnawave_vpn_shop_v44_5_9_enterprise_deep_audited_fixed.zip
 # Previous migration head retained for compatibility: 0030_v44_5_16_privacy_and_refund_integrity
 # Current migration head: 0038_v2_6_0_platform
+# Historical compatibility marker: 2.9.0 keeps migration 0038_v2_6_0_platform
 # Historical compatibility marker: 2.8.0 keeps migration 0038_v2_6_0_platform
 # Historical compatibility marker: 2.7.0 keeps migration 0038_v2_6_0_platform
 # Historical compatibility marker: 0037_v2_5_0_tariff_constructor
@@ -30,7 +32,8 @@ VERSION="2.8.0"
 # Historical compatibility marker: 0032_v2_0_0_product_features
 # VERSION="43.1.0-production" legacy regression marker
 # migration_head="0021_v43_hardening_docs" legacy regression marker
-ARTIFACT="remnawave_vpn_shop_v2_8_0_full_release.zip"
+ARTIFACT="remnawave_vpn_shop_v2_9_0_full_release.zip"
+# Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v2_8_0_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v2_7_0_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v2_6_0_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v2_5_0_full_release.zip"
@@ -64,7 +67,7 @@ m=json.load(open(p)); m['sha256']=None; m['tests']=None; m['artifact']=sys.argv[
 m['note']='Template only. The exact release manifest is shipped as a detached file next to the ZIP because embedding the ZIP SHA inside the ZIP is self-referential.'
 json.dump(m,open(p,'w'),ensure_ascii=False,indent=2); open(p,'a').write('\n')
 PY
-zip -qr "$ARTIFACT" . -x '*/.env' '.env' '*/node_modules/*' '*/__pycache__/*' '*.pyc' '.pytest_cache/*' '.git/*' '*.zip' '*.sha256' '*_manifest.json' 'release-manifest.json'
+zip -qr "$ARTIFACT" . -x '*/.env' '.env' '*/node_modules/*' '*/__pycache__/*' '*.pyc' '.pytest_cache/*' '.git/*' '*.zip' '*.sha256' '*_manifest.json' 'release-manifest.json' '*.apk' '*/app/build/*' '*/.gradle/*'
 unzip -tq "$ARTIFACT" >/dev/null
 unzip -l "$ARTIFACT" | grep '\.env.example' >/dev/null
 SHA=$(sha256sum "$ARTIFACT" | awk '{print $1}')

@@ -27,6 +27,12 @@
 - [ ] Confirm `/api/public/servers` has no address, token or password fields.
 - [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
 
+## Android APK 2.9.0
+- [ ] Download `remnawave_vpn_shop_android_user_2_9_0.apk` and `remnawave_vpn_shop_android_admin_2_9_0.apk` from the GitHub release and check the `.sha256` files.
+- [ ] Install with `adb install -r` or by opening the APK after allowing installs from that source.
+- [ ] Sign in and confirm the session uses User-Agent `RemnawaveShop-Android-User/2.9.0` or `RemnawaveShop-Android-Admin/2.9.0`.
+- [ ] Open the iOS projects in Xcode on macOS when a device build is required. The release does not include an IPA.
+
 ## App catalog 2.8.0
 - [ ] Open Admin → Приложения, save Russian and English texts, and confirm the user cabinet shows only the enabled buyer cards.
 - [ ] Upload a logo and confirm it appears in the cabinet header. Confirm a non-https link is rejected.

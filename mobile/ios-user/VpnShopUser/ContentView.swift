@@ -250,7 +250,7 @@ struct UserRootView: View {
     }
 
     private func openPayment(_ url: String) {
-        guard let target = URL(string: url) else { return }
+        guard !url.contains(where: { $0.isWhitespace }), let target = URL(string: url), target.user == nil, target.password == nil else { return }
         let host = target.host?.lowercased() ?? ""
         let allowed = target.scheme == "https" || (target.scheme == "http" && localHttpHosts.contains(host))
         if allowed { UIApplication.shared.open(target) }
