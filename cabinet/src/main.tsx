@@ -46,13 +46,19 @@ async function req(path: string, opts: RequestInit = {}) {
     ...((opts.headers as Record<string, string>) || {}),
   };
   if (method !== "GET") headers["X-CSRF-Token"] = csrf();
-  const r = await fetch(API + path, {...opts, headers, credentials: "include"});
-  let d: any = {};
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    d = await r.json();
-  } catch {}
-  if (!r.ok) throw Error(d.detail || d.message || `HTTP ${r.status}`);
-  return d;
+    const r = await fetch(API + path, {...opts, headers, credentials: "include", signal: ctrl.signal});
+    let d: any = {};
+    try {
+      d = await r.json();
+    } catch {}
+    if (!r.ok) throw Error(d.detail || d.message || `HTTP ${r.status}`);
+    return d;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function pickProvider(providers: string[] | undefined): string {
