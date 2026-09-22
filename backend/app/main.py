@@ -26,7 +26,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.13.0"
+APP_VERSION = "3.0.0-realise"
+# Historical compatibility marker: APP_VERSION = "2.13.0"
 # Historical compatibility marker: APP_VERSION = "2.12.0"
 # Historical compatibility marker: APP_VERSION = "2.11.0"
 # Historical compatibility marker: APP_VERSION = "2.10.0"
@@ -60,6 +61,7 @@ app.include_router(platform_router)
 app.include_router(apps_router)
 
 MAX_REQUEST_BYTES = 12 * 1024 * 1024
+PACKAGE_UPLOAD_BYTES = 80 * 1024 * 1024
 RATE_BUCKET: dict[str, list[float]] = {}
 LOGIN_BUCKET: dict[str, list[float]] = {}
 RATE_WINDOW = 60
@@ -114,19 +116,44 @@ async def _redis_allowed(key: str, limit: int, window: int) -> bool:
     except Exception:
         return False
 
+def _peer_is_trusted_proxy(host: str) -> bool:
+    # Caddy connects from loopback or a Docker bridge (RFC1918 / IPv6 ULA)
+    # and overwrites X-Forwarded-For. Python's is_private also marks
+    # documentation ranges such as 203.0.113.0/24, so those are not trusted.
+    try:
+        peer = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    networks = (
+        "127.0.0.0/8",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "169.254.0.0/16",
+        "::1/128",
+        "fc00::/7",
+        "fe80::/10",
+    )
+    return any(peer in ipaddress.ip_network(network) for network in networks)
+
+def _request_body_limit(method: str, path: str) -> int:
+    # Buyer and administrator packages are ZIP files up to 80 MB. Every other
+    # route stays on the 12 MB ceiling. A missing Content-Length still uses
+    # MAX_REQUEST_BYTES so a chunked body cannot be buffered to 80 MB.
+    if method == "POST" and path.startswith("/api/admin/apps/") and path.endswith("/file"):
+        return PACKAGE_UPLOAD_BYTES
+    return MAX_REQUEST_BYTES
+
 def _client_ip(request: Request) -> str:
-    # Production traffic reaches the API through Caddy. Caddy overwrites
-    # X-Forwarded-For with the actual peer address, allowing provider IP
-    # allowlists and rate limits to see the real client rather than Caddy's
-    # container IP. Direct backend access is not published by Compose.
+    peer = request.client.host if request.client else "unknown"
     forwarded=request.headers.get("x-forwarded-for", "")
-    if forwarded:
+    if forwarded and _peer_is_trusted_proxy(peer):
         candidate=forwarded.split(",",1)[0].strip()
         try:
             return str(ipaddress.ip_address(candidate))
         except ValueError:
             pass
-    return request.client.host if request.client else "unknown"
+    return peer
 
 def _csrf_cookie_value(request: Request) -> str:
     return request.cookies.get("rw_csrf", "")
@@ -173,14 +200,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
         if request.url.path in {"/api/payments/create"} and settings.maintenance_mode:
             return _maintenance_response()
+        limit = _request_body_limit(request.method, request.url.path)
         content_length = request.headers.get("content-length")
         if content_length:
             try:
-                if int(content_length) > MAX_REQUEST_BYTES:
-                    from fastapi.responses import JSONResponse
-                    return JSONResponse({"detail": "Request body too large"}, status_code=413)
+                declared = int(content_length)
             except ValueError:
                 return JSONResponse({"detail": "Invalid Content-Length"}, status_code=400)
+            if declared > limit:
+                from fastapi.responses import JSONResponse
+                return JSONResponse({"detail": "Request body too large"}, status_code=413)
         else:
             # Content-Length is optional for chunked HTTP requests. Without a streaming
             # guard an attacker could bypass the global 12 MiB limit with an unbounded
@@ -315,8 +344,15 @@ class DeploymentPromoteIn(BaseModel):
 
 _REQUEST_ID: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="system")
 
+def _json_ready(value):
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
 async def audit(db, action, actor, target=None, details=None):
-    db.add(AuditLog(action=action, actor=actor, target=target, request_id=_REQUEST_ID.get(), details=json.dumps(details, ensure_ascii=False) if isinstance(details,dict) else details))
+    db.add(AuditLog(action=action, actor=actor, target=target, request_id=_REQUEST_ID.get(), details=json.dumps(details, ensure_ascii=False, default=_json_ready) if isinstance(details,dict) else details))
 
 async def record_financial_event(db: AsyncSession, *, operation_key: str, user_id: int|None, payment_id: int|None, kind: str, direction: str, amount: Decimal, currency: str, metadata: dict|None = None):
     """Append an immutable financial event exactly once."""
@@ -425,7 +461,7 @@ async def health():
 async def send_alert(message:str):
     if settings.alert_telegram_chat_id and settings.bot_token:
         try:
-            async with __import__("httpx").AsyncClient(timeout=10) as c:
+            async with __import__("httpx").AsyncClient(timeout=10, trust_env=False) as c:
                 await c.post(f"https://api.telegram.org/bot{settings.bot_token}/sendMessage",json={"chat_id":settings.alert_telegram_chat_id,"text":"⚠️ VPN Shop alert\n"+message})
         except Exception as exc:
             logger.warning("Non-critical operation failed: %s", exc)
@@ -579,7 +615,7 @@ async def yandex_callback(code:str,state:str,request:Request,db:AsyncSession=Dep
     except Exception: raise HTTPException(400,"Invalid OAuth state")
     if not settings.yandex_client_secret: raise HTTPException(503,"Yandex ID secret is not configured")
     import httpx
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
         token_r=await client.post("https://oauth.yandex.ru/token",data={"grant_type":"authorization_code","code":code,"client_id":settings.yandex_client_id,"client_secret":settings.yandex_client_secret})
         if token_r.status_code!=200: raise HTTPException(401,"Yandex authorization failed")
         access=token_r.json().get("access_token")
@@ -879,8 +915,11 @@ async def mfa_disable(payload:PasswordConfirm, db:AsyncSession=Depends(get_db), 
 async def mfa_status(admin=Depends(require_permission("read"))): return {"enabled":bool(admin.mfa_enabled)}
 
 # ---------- Feature flags ----------
+async def _feature_flag(db: AsyncSession, key: str):
+    return (await db.execute(select(FeatureFlag).where(FeatureFlag.key==key))).scalar_one_or_none()
+
 async def feature_enabled(db: AsyncSession, key: str, default: bool = True) -> bool:
-    row = await db.get(FeatureFlag, key)
+    row = await _feature_flag(db, key)
     return bool(row.enabled) if row is not None else default
 
 # ---------- Payments ----------
@@ -1919,7 +1958,7 @@ async def expiry_notification_scheduler():
                     until=datetime.utcnow()+timedelta(days=settings.notification_expiry_days)
                     rows=(await db.execute(select(User,Subscription).join(Subscription,Subscription.user_id==User.id).where(User.telegram_id.is_not(None),Subscription.expires_at>datetime.utcnow(),Subscription.expires_at<=until).limit(500))).all()
                     import httpx
-                    async with httpx.AsyncClient(timeout=10) as client:
+                    async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
                         for u,sub in rows:
                             key=f"expiry-notify:{u.id}:{sub.expires_at.date()}"
                             sending_key=key+":sending"
@@ -2442,7 +2481,9 @@ async def retry_operation(operation_id:int,db:AsyncSession=Depends(get_db),admin
     if not opx: raise HTTPException(404,"Operation not found")
     opx.status="retry"; opx.updated_at=datetime.utcnow(); await db.commit()
     try: await fulfill(opx.payment_id,db)
-    except Exception as e: return {"ok":False,"error":str(e)[:500]}
+    except Exception as exc:
+        logger.warning("Provisioning retry failed for operation %s: %s", operation_id, exc)
+        return {"ok":False,"error":"Повтор выдачи не выполнен"}
     return {"ok":True,"status":"completed"}
 
 @app.get("/api/admin/refunds")
@@ -2814,7 +2855,9 @@ async def retry_payment(payment_id:int,db:AsyncSession=Depends(get_db),admin=Dep
     if p.status=="paid" and p.fulfillment_status=="completed": return {"ok":True,"status":"completed"}
     p.next_retry_at=datetime.utcnow(); p.fulfillment_status="pending"; await db.commit()
     try: await fulfill(p.id,db)
-    except Exception as e: return {"ok":False,"status":"failed","error":str(e)[:500]}
+    except Exception as exc:
+        logger.warning("Payment retry failed for payment %s: %s", payment_id, exc)
+        return {"ok":False,"status":"failed","error":"Повтор выдачи не выполнен"}
     return {"ok":True,"status":"completed"}
 
 
@@ -3030,11 +3073,15 @@ async def health_summary(db:AsyncSession=Depends(get_db),admin=Depends(require_p
     checks=[]
     try:
         await db.execute(sql_text("SELECT 1")); checks.append({"name":"PostgreSQL","status":"ok"})
-    except Exception as exc: checks.append({"name":"PostgreSQL","status":"error","error":str(exc)[:300]})
+    except Exception as exc:
+        logger.warning("Health summary PostgreSQL check failed: %s", exc)
+        checks.append({"name":"PostgreSQL","status":"error","error":"unavailable"})
     if redis_client:
         try:
             start=asyncio.get_running_loop().time(); await redis_client.ping(); checks.append({"name":"Redis","status":"ok","latency_ms":round((asyncio.get_running_loop().time()-start)*1000,1)})
-        except Exception as exc: checks.append({"name":"Redis","status":"error","error":str(exc)[:300]})
+        except Exception as exc:
+            logger.warning("Health summary Redis check failed: %s", exc)
+            checks.append({"name":"Redis","status":"error","error":"unavailable"})
     try:
         start=asyncio.get_running_loop().time(); await RemnawaveClient().list_nodes(start=0,size=1); checks.append({"name":"Remnawave","status":"ok","latency_ms":round((asyncio.get_running_loop().time()-start)*1000,1)})
     except Exception: checks.append({"name":"Remnawave","status":"error","error":"unavailable"})
@@ -3877,7 +3924,7 @@ async def admin_setting(key:str,payload:SettingIn,db:AsyncSession=Depends(get_db
     else: row.value=payload.value
     if key=="bot_name" and settings.bot_token:
         import httpx
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             r=await client.post(f"https://api.telegram.org/bot{settings.bot_token}/setMyName",json={"name":payload.value})
             if not r.is_success: raise HTTPException(502,"Telegram rejected bot name")
     await audit(db,"content.setting.updated",admin.email,key); await db.commit(); return {"ok":True}
@@ -4341,7 +4388,7 @@ V41_FEATURE_DEFAULTS = {
 
 async def _ensure_v41_defaults(db):
     for key,(enabled,desc) in V41_FEATURE_DEFAULTS.items():
-        row=await db.get(FeatureFlag,key)
+        row=await _feature_flag(db,key)
         if not row: db.add(FeatureFlag(key=key,enabled=enabled,description=desc))
     for i,p in enumerate(("yookassa","platega","rollypay"),1):
         row=(await db.execute(select(PaymentProviderHealth).where(PaymentProviderHealth.provider==p))).scalar_one_or_none()
@@ -4360,7 +4407,7 @@ class FeatureFlagIn(BaseModel):
 @app.put("/api/admin/v41/features/{key}")
 async def v41_feature_update(key:str,payload:FeatureFlagIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("feature_flags.manage"))):
     if key not in V41_FEATURE_DEFAULTS: raise HTTPException(404,"Функция не найдена")
-    row=await db.get(FeatureFlag,key)
+    row=await _feature_flag(db,key)
     if not row: row=FeatureFlag(key=key,description=V41_FEATURE_DEFAULTS[key][1]); db.add(row)
     row.enabled=payload.enabled; row.updated_at=datetime.utcnow()
     await audit(db,"feature_flag.updated",admin.email,key,{"enabled":payload.enabled}); await db.commit()

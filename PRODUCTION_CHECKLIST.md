@@ -1,108 +1,263 @@
-# V42 Production Checklist
+# Production checklist 3.0.0-realise
 
-## Before deployment
-- [ ] Generate a unique APP_SECRET (>=32 chars).
-- [ ] Set DB_PASSWORD and all provider credentials.
-- [ ] Set API_DOMAIN, ADMIN_DOMAIN, APP_DOMAIN and CABINET_DOMAIN.
-- [ ] Configure strict firewall: SSH + TCP 80/443 + UDP 443 only.
-- [ ] Configure S3/R2/B2 if off-site backups are required.
-- [ ] Configure Telegram/SMTP alerts.
+## Русский
+
+Этот файл — порядок выкладки на VPS и запись прогона на хосте сборки от 22 сентября 2026. Пункты раздела «Порядок на VPS» остаются открытыми, пока их не выполнит администратор на своём сервере. Раздел «Прогон на хосте сборки» отмечает только то, что реально запускалось здесь.
+
+Покупательский APK остаётся `remnawave_vpn_shop_android_user_2_10_0.apk` (`versionName` 2.10.0). Администраторский APK остаётся `remnawave_vpn_shop_android_admin_2_12_0.apk` (`versionName` 2.12.0, `versionCode` 2120). Голова миграции остаётся `0038_v2_6_0_platform`.
+
+### Порядок на VPS
+
+#### Перед выкладкой
+- [ ] Сгенерировать уникальный `APP_SECRET` длиной от 32 символов.
+- [ ] Задать `DB_PASSWORD` и секреты платёжных провайдеров.
+- [ ] Задать `API_DOMAIN`, `ADMIN_DOMAIN`, `APP_DOMAIN` и `CABINET_DOMAIN`.
+- [ ] Настроить файрвол: SSH, TCP 80/443 и UDP 443.
+- [ ] Настроить S3/R2/B2, если нужна внешняя копия.
+- [ ] Настроить оповещения Telegram и SMTP.
+- [ ] Запустить `scripts/preflight.sh`.
+- [ ] Запустить `scripts/security-scan.sh`.
+- [ ] Запустить `scripts/integration-test.sh` на staging с Docker.
+
+#### Первый запуск
+- [ ] `docker compose config` проходит.
+- [ ] `docker compose up -d` проходит.
+- [ ] `scripts/doctor.sh` показывает здоровье API.
+- [ ] В центре восстановления виден heartbeat воркера.
+- [ ] Администратор включает 2FA в разделе безопасности. До настройки 2FA не требуется.
+- [ ] Создать и проверить резервную копию.
+- [ ] Проверить и выполнить тестовое восстановление на staging.
+
+#### Платёж без живых касс
+- [ ] `PAYMENTS_SANDBOX=true`, секреты живых касс пустые.
+- [ ] Создать один обычный включённый тариф.
+- [ ] `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh`.
+- [ ] В `/api/public/servers` нет полей адреса, токена и пароля.
+- [ ] По желанию собрать тариф в конструкторе и купить одну комбинацию из кабинета с провайдером `sandbox`.
+
+#### Скачивание приложений 2.13.0
+- [ ] Загрузить APK на карточку покупателя и APK администратора. Файл не больше 80 МБ и начинается с заголовка ZIP.
+- [ ] В кабинете нажать **Скачать**. Ответ — пакет покупателя. `GET /api/public/apps/android-admin/download` отвечает 404.
+- [ ] В панели «Приложения» скачать карточку администратора. Сессия зрителя может скачать. Сессия без `manage_content` не может загрузить файл.
+- [ ] Сохранить тексты карточки и убедиться, что загруженный файл на месте.
+- [ ] Файл на диске не лежит в каталоге `/media/`.
+
+#### Рассылка Telegram 2.12.0
+- [ ] `BOT_TOKEN` задан, процесс бота запущен. API только ставит строку в очередь.
+- [ ] Оператор ставит короткое HTML-сообщение аудитории `inactive` или тестовой аудитории из панели «Маркетинг» и из вкладки «Рассылка» приложения администратора.
+- [ ] `GET /api/admin/marketing` показывает `queued`, затем `sending`, затем `completed` со `sent_count` и `failed_count`.
+- [ ] Зритель получает 403 на `POST /api/admin/broadcasts`.
+- [ ] Повтор используется только для `sending` или `failed`. Завершённая строка остаётся завершённой.
+- [ ] Установить `remnawave_vpn_shop_android_admin_2_12_0.apk` после проверки `.sha256`. Покупательский APK остаётся `remnawave_vpn_shop_android_user_2_10_0.apk`.
+
+#### Обновление с GitHub 2.11.0
+- [ ] Команда в панели «Релизы»: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+- [ ] После обновления на месте остаются `.env`, `.env.*`, `.rollback` и `.git`.
+- [ ] Cron выключен, пока администратор сам не выберет расписание.
+- [ ] APK покупателя и администратора остаются файлами прежних релизов. Этот чеклист их не подменяет.
+
+#### Android APK 2.10.0 и 2.9.0
+- [ ] Скачать APK 2.10.0 и 2.9.0 с релиза GitHub и сверить `.sha256`.
+- [ ] Сверить SHA-256 сертификата подписи с `RELEASE_NOTES_V2_10_0.md`. Отладочный APK 2.9.0 снять перед установкой 2.10.0.
+- [ ] Войти и убедиться, что сессия шлёт User-Agent `RemnawaveShop-Android-User/2.10.0` или `RemnawaveShop-Android-Admin/2.10.0`. Сохранённый токен запрашивает биометрию или PIN устройства.
+- [ ] `GET /api/me/devices` не содержит `device_key` и `last_ip`.
+- [ ] На хосте запускать `sudo bash /opt/vpn-shop/scripts/update-from-github.sh` после чтения команды во вкладке релизов. Cron оставить выключенным.
+- [ ] Проекты iOS открывать в Xcode на macOS, когда нужна сборка на устройство. IPA в релизе нет.
+
+#### Каталог приложений 2.8.0
+- [ ] В панели «Приложения» сохранить русский и английский тексты. Кабинет показывает только включённые карточки покупателя.
+- [ ] Загрузить логотип и увидеть его в шапке кабинета. Ссылка не на `https` отклоняется.
+- [ ] `GET /api/public/apps` не содержит карточку администратора, а путь логотипа начинается с `/media/`.
+
+#### Мобильные приложения 2.7.0
+- [ ] Собрать `mobile/android-user` и `mobile/android-admin` в Android Studio и два проекта Xcode в `mobile/ios-user` и `mobile/ios-admin`.
+- [ ] Указать API с `https://`. Адрес `http://` принимается только для localhost, 127.0.0.1 и 10.0.2.2.
+- [ ] Войти из приложения покупателя и увидеть `access_token`, потому что `X-Shop-Client` равен `android-user` или `ios-user`. Повторить из браузера и увидеть JSON без `access_token`.
+- [ ] Переключить RU/EN и убедиться, что те же экраны перезагружаются.
+- [ ] Открыть серверы и убедиться, что в строках нет адреса, токена и пароля.
+- [ ] Из приложения администратора открыть сводку платформы и убедиться, что в ней нет токена агента и секрета вебхука.
+
+#### Платформа 2.6.0
+- [ ] Открыть «Платформа» и загрузить сводку без токенов агентов и секретов вебхуков.
+- [ ] Оставить `auto_hard_block` выключенным, пока пороги оценки не проверены.
+- [ ] Создать агента узла, скопировать токен один раз и запустить `scripts/node-agent.py` с `SHOP_API_BASE` и `AGENT_TOKEN`.
+- [ ] Оставить `AGENT_APPLY_TC` пустым, пока интерфейс узла неизвестен. `AGENT_APPLY_TC=1` и `AGENT_IFACE` задавать только для одного глобального адреса.
+- [ ] Для вебхуков использовать публичный HTTPS. В доставках виден статус, а не текст исключения.
+- [ ] При настроенном SMTP отправить тест и убедиться, что письмо пришло только администратору, который нажал кнопку.
+- [ ] Снять `/metrics` с `METRICS_TOKEN` и при необходимости импортировать `deploy/grafana/vpnshop-platform.json`.
+
+#### Живой платёж
+- [ ] Создать один тестовый платёж.
+- [ ] Подтвердить статус провайдера и вебхук.
+- [ ] Подтвердить ровно одну операцию выдачи.
+- [ ] Подтвердить пользователя и подписку в Remnawave.
+- [ ] Повторить вебхук. Вторая выдача не создаётся.
+- [ ] На staging вызвать таймаут и повтор. Сверка завершает исходную операцию.
+- [ ] Проверить запрос, разбор и подтверждение возврата.
+
+#### Безопасность
+- [ ] Порты PostgreSQL, Redis и backend не опубликованы в интернет.
+- [ ] `APP_SECRET_PREVIOUS` держать только на время контролируемой смены секрета.
+- [ ] Периодически менять токен метрик.
+- [ ] Просматривать журнал аудита и сессии администраторов.
+- [ ] Копия с `.env` хранится в зашифрованном виде.
+- [ ] Проверять место на диске и срок сертификата.
+
+#### Обновление и откат
+- [ ] Запустить `scripts/update.sh` или `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+- [ ] Снимок до обновления существует.
+- [ ] Миграция и проверка здоровья проходят.
+- [ ] Если здоровье не сходится, запустить `scripts/rollback.sh` и проверить здоровье снова.
+
+### Прогон на хосте сборки
+
+Хост сборки — эта виртуальная машина, без Docker, без Xcode, без живых касс, без SMTP, без S3 и без телефона. Локальные PostgreSQL 16 и Redis 7 подняты вручную. API слушает `127.0.0.1:8000`.
+
+- [x] `alembic upgrade head` на пустой базе дошёл до `0038_v2_6_0_platform`. Колонка `alembic_version.version_num` — `VARCHAR(128)`.
+- [x] `GET /health` вернул `ok=true`, `version=3.0.0-realise`, `redis=true`, `database=true`.
+- [x] Вход администратора в браузерный JSON (`POST /api/admin/auth/login`) вернул 200 и поля `email`, `mfa_enabled`, `role`. Поля `access_token` в JSON нет.
+- [x] Создание тарифа вернуло идентификатор. Журнал аудита принял цену `Decimal` и `request_id`.
+- [x] `GET /api/public/servers` вернул `ok=false`, ошибку «Remnawave недоступен» и пустой список узлов. В ответе нет адреса, имени хоста, токена и пароля.
+- [x] Маленький ZIP загружен на `POST /api/admin/apps/android-user/file`. В JSON есть `has_file`, имени файла нет. В `/tmp/media` файлов 0, в `/tmp/app-packages` файл 1.
+- [x] `GET /api/public/apps/android-admin/download` — 404. `GET /api/public/apps/android-user/download` — 200, 147 байт.
+- [x] `Content-Length: 14000000` на `POST /api/payments/create` — 413 до чтения тела. Тот же размер на `POST /api/admin/apps/android-user/file` — 401 до чтения тела. Размер 80 МБ + 1 байт на загрузке пакета — 413.
+- [x] Зритель на `POST /api/admin/broadcasts` получил 403 «Insufficient permissions». Администратор без `BOT_TOKEN` получил 503 «BOT_TOKEN is not configured».
+- [x] `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh` прошёл здоровье, публичный конфиг, меню кабинета (6 пунктов), регистрацию и создание sandbox-платежа. Завершение `POST /api/payments/sandbox/complete` ответило HTTP 500: `REMNAWAVE_URL` пустой, выдача обращается к Remnawave. Скрипт завершился с кодом 22. Полный пункт чеклиста из-за этого не закрыт.
+- [x] В `scripts/update.sh` снимок `pre-update-$STAMP.tar.gz` стоит раньше `UPDATE_STAGE`. В скрипте есть `--exclude='./.env'` и `pg_dump`. Сам `update.sh` на VPS не запускался.
+- [x] `bash -n` для `install.sh`, `deploy/*.sh` и `scripts/*.sh` прошёл.
+- [x] `scripts/security-scan.sh` завершился с кодом 0. `compileall` прошёл. `npm audit --omit=dev --audit-level=high` для `admin`, `miniapp` и `cabinet` — 0 уязвимостей после подъёма Vite до `7.3.6`. Предупреждения: нет `pip-audit`, Docker, `trivy` и `syft`.
+- [x] Сборки `npm run build` для `admin`, `miniapp` и `cabinet` прошли на Vite `7.3.6`.
+- [x] `scripts/preflight.sh` завершился с кодом 0: 328 тестов прошли, `compileall` прошёл. Docker на хосте нет, поэтому `docker compose config` внутри preflight не вызывался.
+- [ ] `docker compose config`, `docker compose up`, `scripts/integration-test.sh` и `scripts/doctor.sh` не запускались: Docker на этом хосте нет.
+- [ ] Файрвол, S3, SMTP, живые кассы, Xcode, установка APK на телефон, резервная копия и тестовое восстановление не выполнялись.
+
+## English
+
+This file is the VPS rollout order and the record of the build-host run on 22 September 2026. Items under “VPS order” stay open until an administrator runs them on their own server. “Build-host run” marks only what actually ran here.
+
+The buyer APK stays `remnawave_vpn_shop_android_user_2_10_0.apk` (`versionName` 2.10.0). The administrator APK stays `remnawave_vpn_shop_android_admin_2_12_0.apk` (`versionName` 2.12.0, `versionCode` 2120). The migration head stays `0038_v2_6_0_platform`.
+
+### VPS order
+
+#### Before deployment
+- [ ] Generate a unique `APP_SECRET` of at least 32 characters.
+- [ ] Set `DB_PASSWORD` and the payment-provider secrets.
+- [ ] Set `API_DOMAIN`, `ADMIN_DOMAIN`, `APP_DOMAIN` and `CABINET_DOMAIN`.
+- [ ] Configure the firewall: SSH, TCP 80/443 and UDP 443.
+- [ ] Configure S3/R2/B2 when an off-site copy is required.
+- [ ] Configure Telegram and SMTP alerts.
 - [ ] Run `scripts/preflight.sh`.
 - [ ] Run `scripts/security-scan.sh`.
-- [ ] Run `scripts/integration-test.sh` on a Docker-enabled staging host.
+- [ ] Run `scripts/integration-test.sh` on a Docker staging host.
 
-## First boot
+#### First boot
 - [ ] `docker compose config` passes.
 - [ ] `docker compose up -d` passes.
-- [ ] `scripts/doctor.sh` reports API health OK.
-- [ ] Worker heartbeat is visible in Recovery Center.
-- [ ] Admin enables 2FA from Security; it is not forced before setup.
+- [ ] `scripts/doctor.sh` reports API health.
+- [ ] The worker heartbeat is visible in the recovery center.
+- [ ] The administrator enables 2FA from Security. 2FA is not required before that setup.
 - [ ] Create and verify a backup.
 - [ ] Validate and test-restore a backup in staging.
 
-## Payment smoke test without live gateways
+#### Payment smoke test without live gateways
 - [ ] Set `PAYMENTS_SANDBOX=true` and leave live gateway secrets empty.
 - [ ] Create one ordinary enabled plan.
 - [ ] Run `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh`.
 - [ ] Confirm `/api/public/servers` has no address, token or password fields.
 - [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
 
-## App downloads 2.13.0
-- [ ] Upload an APK on the buyer Android card and an administrator APK on the administrator Android card. Confirm each file is at most 80 MB and starts with a ZIP header.
+#### App downloads 2.13.0
+- [ ] Upload an APK on the buyer Android card and an administrator APK on the administrator Android card. Each file is at most 80 MB and starts with a ZIP header.
 - [ ] Open the user cabinet and use **Скачать**. The response is the buyer package. `GET /api/public/apps/android-admin/download` returns 404.
-- [ ] Open Admin → Приложения and use **Скачать** on the administrator card. A viewer session can download. A session without `manage_content` cannot upload.
+- [ ] Open Admin → Приложения and download the administrator card. A viewer session can download. A session without `manage_content` cannot upload.
 - [ ] Save the card texts and confirm the uploaded file is still present.
 - [ ] Confirm the stored file is not listed under `/media/`.
 
-## Telegram broadcast 2.12.0
+#### Telegram broadcast 2.12.0
 - [ ] `BOT_TOKEN` is set and the bot process is running. The API only queues the row.
 - [ ] An operator queues a short HTML message to `inactive` or a test audience from Admin → Маркетинг and from the administrator app tab Рассылка.
 - [ ] `GET /api/admin/marketing` shows `queued`, then `sending`, then `completed` with `sent_count` and `failed_count`.
 - [ ] A viewer receives 403 on `POST /api/admin/broadcasts`.
 - [ ] Retry is used only for `sending` or `failed`. A completed row stays completed.
-- [ ] Install `remnawave_vpn_shop_android_admin_2_12_0.apk` (`versionName` 2.12.0, `versionCode` 2120) after checking its `.sha256`. The buyer APK stays `remnawave_vpn_shop_android_user_2_10_0.apk`.
+- [ ] Install `remnawave_vpn_shop_android_admin_2_12_0.apk` after checking its `.sha256`. The buyer APK stays `remnawave_vpn_shop_android_user_2_10_0.apk`.
 
-## GitHub update 2.11.0
-- [ ] Read the command in Admin → Релизы. It is `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
-- [ ] Confirm `.env` is still present after a dry understanding of the script. The script keeps `.env`, `.env.*`, `.rollback` and `.git`.
+#### GitHub update 2.11.0
+- [ ] The command in Admin → Релизы is `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+- [ ] After an update, `.env`, `.env.*`, `.rollback` and `.git` are still present.
 - [ ] Leave cron off unless an administrator chooses a schedule.
-- [ ] The buyer and administrator APKs stay the 2.10.0 release files. This checklist does not replace them.
+- [ ] The buyer and administrator APKs stay the files from their existing releases. This checklist does not replace them.
 
-## Android APK 2.10.0
-- [ ] Download `remnawave_vpn_shop_android_user_2_10_0.apk` and `remnawave_vpn_shop_android_admin_2_10_0.apk` from the GitHub release and check the `.sha256` files.
-- [ ] Compare the signing certificate SHA-256 with `RELEASE_NOTES_V2_10_0.md`. Uninstall a 2.9.0 debug APK once before installing 2.10.0.
+#### Android APK 2.10.0 and 2.9.0
+- [ ] Download the 2.10.0 and 2.9.0 APKs from the GitHub release and check the `.sha256` files.
+- [ ] Compare the signing certificate SHA-256 with `RELEASE_NOTES_V2_10_0.md`. Remove a 2.9.0 debug APK before installing 2.10.0.
 - [ ] Sign in and confirm the session uses User-Agent `RemnawaveShop-Android-User/2.10.0` or `RemnawaveShop-Android-Admin/2.10.0`. A saved token asks for biometrics or the device PIN.
 - [ ] Confirm `GET /api/me/devices` has no `device_key` and no `last_ip`.
-- [ ] On the host, run `sudo bash /opt/vpn-shop/scripts/update-from-github.sh` only after reading the command in the admin releases tab. Leave cron off unless an administrator chooses it.
+- [ ] On the host, run `sudo bash /opt/vpn-shop/scripts/update-from-github.sh` only after reading the command in the releases tab. Leave cron off.
 - [ ] Open the iOS projects in Xcode on macOS when a device build is required. The release does not include an IPA.
 
-## Android APK 2.9.0
-- [ ] Download `remnawave_vpn_shop_android_user_2_9_0.apk` and `remnawave_vpn_shop_android_admin_2_9_0.apk` from the GitHub release and check the `.sha256` files.
-- [ ] Install with `adb install -r` or by opening the APK after allowing installs from that source.
-- [ ] Sign in and confirm the session uses User-Agent `RemnawaveShop-Android-User/2.9.0` or `RemnawaveShop-Android-Admin/2.9.0`.
-- [ ] Open the iOS projects in Xcode on macOS when a device build is required. The release does not include an IPA.
-
-## App catalog 2.8.0
+#### App catalog 2.8.0
 - [ ] Open Admin → Приложения, save Russian and English texts, and confirm the user cabinet shows only the enabled buyer cards.
-- [ ] Upload a logo and confirm it appears in the cabinet header. Confirm a non-https link is rejected.
+- [ ] Upload a logo and confirm it appears in the cabinet header. A non-https link is rejected.
 - [ ] Confirm `GET /api/public/apps` has no administrator card and the logo path starts with `/media/`.
 
-## Mobile apps 2.7.0
+#### Mobile apps 2.7.0
 - [ ] Build `mobile/android-user` and `mobile/android-admin` in Android Studio, and the two Xcode projects under `mobile/ios-user` and `mobile/ios-admin`.
-- [ ] Point each app at `https://` API. Confirm `http://` is rejected except for localhost, 127.0.0.1 and 10.0.2.2.
-- [ ] Sign in from a buyer app and confirm the JSON contains `access_token` only because `X-Shop-Client` is `android-user` or `ios-user`. Repeat from a browser and confirm the JSON has no `access_token`.
+- [ ] Point each app at an `https://` API. An `http://` address is accepted only for localhost, 127.0.0.1 and 10.0.2.2.
+- [ ] Sign in from a buyer app and confirm the JSON contains `access_token` because `X-Shop-Client` is `android-user` or `ios-user`. Repeat from a browser and confirm the JSON has no `access_token`.
 - [ ] Switch RU/EN and confirm the same screens reload.
 - [ ] Open Servers and confirm the rows have no address, token or password.
 - [ ] From the admin app, load the platform summary and confirm it has no agent token or webhook secret.
 
-## Platform 2.6.0
+#### Platform 2.6.0
 - [ ] Open Admin → Платформа and confirm the summary loads without agent tokens or webhook secrets.
 - [ ] Leave `auto_hard_block` off until the scoring thresholds are reviewed.
 - [ ] Create a node agent, copy the token once, and run `scripts/node-agent.py` with `SHOP_API_BASE` and `AGENT_TOKEN`.
 - [ ] Leave `AGENT_APPLY_TC` unset until the node interface is known. Set `AGENT_APPLY_TC=1` and `AGENT_IFACE` only for a single global address.
-- [ ] If webhooks are enabled, use a public HTTPS URL. Confirm deliveries show a status, not an exception string.
+- [ ] If webhooks are enabled, use a public HTTPS URL. Deliveries show a status, not an exception string.
 - [ ] If SMTP is configured, send the test message and confirm it arrives only at the administrator who clicked the button.
 - [ ] Scrape `/metrics` with `METRICS_TOKEN` and, if desired, import `deploy/grafana/vpnshop-platform.json`.
 
-## Payment smoke test
+#### Live payment
 - [ ] Create one test payment.
-- [ ] Confirm provider status and webhook.
+- [ ] Confirm the provider status and the webhook.
 - [ ] Confirm exactly one provisioning operation is created.
-- [ ] Confirm Remnawave user/subscription exists.
-- [ ] Replay the webhook; no duplicate provisioning occurs.
-- [ ] Force a timeout/retry in staging; reconciliation completes the original operation.
-- [ ] Test refund request/review/confirmation flow.
+- [ ] Confirm the Remnawave user and subscription exist.
+- [ ] Replay the webhook. A second provisioning operation is not created.
+- [ ] Force a timeout and retry in staging. Reconciliation completes the original operation.
+- [ ] Test the refund request, review and confirmation flow.
 
-## Security
-- [ ] Never expose PostgreSQL/Redis/backend ports publicly.
-- [ ] Keep APP_SECRET_PREVIOUS only during a controlled rotation window.
-- [ ] Rotate metrics token periodically.
+#### Security
+- [ ] Keep PostgreSQL, Redis and backend ports off the public internet.
+- [ ] Keep `APP_SECRET_PREVIOUS` only during a controlled rotation window.
+- [ ] Rotate the metrics token periodically.
 - [ ] Review audit logs and admin sessions.
-- [ ] Verify backups are encrypted when `.env` is included.
+- [ ] Keep a backup that includes `.env` encrypted.
 - [ ] Review disk usage and certificate expiry.
 
-## Update / rollback
-- [ ] Run `scripts/update.sh`.
-- [ ] Confirm pre-update snapshot exists.
-- [ ] Confirm migration + health checks pass.
-- [ ] If health fails, run `scripts/rollback.sh` and re-check health.
+#### Update and rollback
+- [ ] Run `scripts/update.sh` or `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+- [ ] Confirm the pre-update snapshot exists.
+- [ ] Confirm the migration and health checks pass.
+- [ ] If health fails, run `scripts/rollback.sh` and check health again.
+
+### Build-host run
+
+The build host is this virtual machine. It has no Docker, no Xcode, no live gateways, no SMTP, no S3 and no phone. Local PostgreSQL 16 and Redis 7 were started by hand. The API listens on `127.0.0.1:8000`.
+
+- [x] `alembic upgrade head` on an empty database reached `0038_v2_6_0_platform`. The `alembic_version.version_num` column is `VARCHAR(128)`.
+- [x] `GET /health` returned `ok=true`, `version=3.0.0-realise`, `redis=true`, `database=true`.
+- [x] A browser admin login (`POST /api/admin/auth/login`) returned 200 with `email`, `mfa_enabled` and `role`. The JSON has no `access_token`.
+- [x] Creating a plan returned an id. The audit log accepted a `Decimal` price and `request_id`.
+- [x] `GET /api/public/servers` returned `ok=false`, the error «Remnawave недоступен», and an empty node list. The payload has no address, hostname, token or password.
+- [x] A small ZIP was uploaded to `POST /api/admin/apps/android-user/file`. The JSON has `has_file` and no file name. `/tmp/media` has 0 files and `/tmp/app-packages` has 1 file.
+- [x] `GET /api/public/apps/android-admin/download` returned 404. `GET /api/public/apps/android-user/download` returned 200 and 147 bytes.
+- [x] `Content-Length: 14000000` on `POST /api/payments/create` returned 413 before the body was read. The same size on `POST /api/admin/apps/android-user/file` returned 401 before the body was read. 80 MB plus 1 byte on the package route returned 413.
+- [x] A viewer `POST /api/admin/broadcasts` returned 403 «Insufficient permissions». An administrator with no `BOT_TOKEN` received 503 «BOT_TOKEN is not configured».
+- [x] `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh` passed health, public config, the cabinet menu (6 items), registration and sandbox payment creation. `POST /api/payments/sandbox/complete` returned HTTP 500 because `REMNAWAVE_URL` is empty and fulfillment calls Remnawave. The script exited 22. That checklist item stays open.
+- [x] In `scripts/update.sh`, the snapshot `pre-update-$STAMP.tar.gz` appears before `UPDATE_STAGE`. The script contains `--exclude='./.env'` and `pg_dump`. `update.sh` itself was not run on a VPS.
+- [x] `bash -n` passed for `install.sh`, `deploy/*.sh` and `scripts/*.sh`.
+- [x] `scripts/security-scan.sh` exited 0. `compileall` passed. `npm audit --omit=dev --audit-level=high` for `admin`, `miniapp` and `cabinet` reported 0 vulnerabilities after Vite moved to `7.3.6`. Warnings: `pip-audit`, Docker, `trivy` and `syft` are absent.
+- [x] `npm run build` for `admin`, `miniapp` and `cabinet` passed on Vite `7.3.6`.
+- [x] `scripts/preflight.sh` exited 0: 328 tests passed and `compileall` passed. Docker is absent on this host, so preflight did not call `docker compose config`.
+- [ ] `docker compose config`, `docker compose up`, `scripts/integration-test.sh` and `scripts/doctor.sh` were not run. Docker is not installed on this host.
+- [ ] The firewall, S3, SMTP, live gateways, Xcode, a phone APK install, a backup and a test restore were not run.

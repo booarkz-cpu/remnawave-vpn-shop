@@ -5,6 +5,15 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON=python
+else
+  echo "FAIL: python3 is required" >&2
+  exit 1
+fi
+
 API_BASE="${SANDBOX_API_BASE:-http://127.0.0.1:8000}"
 EMAIL="${SANDBOX_EMAIL:-sandbox-$(date +%s)@example.test}"
 PASSWORD="${SANDBOX_PASSWORD:-SandboxPass123!}"
@@ -15,7 +24,7 @@ trap 'rm -f "$COOKIE_JAR"' EXIT
 echo "[sandbox] API: $API_BASE"
 
 health=$(curl -fsS --max-time 15 "$API_BASE/health")
-python - "$health" <<'PY'
+"$PYTHON" - "$health" <<'PY'
 import json,sys
 x=json.loads(sys.argv[1])
 if not x.get("ok"):
@@ -24,7 +33,7 @@ print(f"[PASS] health ok version={x.get('version')}")
 PY
 
 cfg=$(curl -fsS --max-time 15 "$API_BASE/api/public/config")
-python - "$cfg" <<'PY'
+"$PYTHON" - "$cfg" <<'PY'
 import json,sys
 cfg=json.loads(sys.argv[1])
 if not cfg.get("payments_sandbox"):
@@ -36,7 +45,7 @@ print("[PASS] public config exposes sandbox provider")
 PY
 
 menu=$(curl -fsS --max-time 15 "$API_BASE/api/public/cabinet-menu")
-python - "$menu" <<'PY'
+"$PYTHON" - "$menu" <<'PY'
 import json,sys
 rows=json.loads(sys.argv[1])
 if not isinstance(rows,list) or not rows:
@@ -44,7 +53,7 @@ if not isinstance(rows,list) or not rows:
 print(f"[PASS] cabinet menu items={len(rows)}")
 PY
 
-csrf=$(python - <<'PY'
+csrf=$("$PYTHON" - <<'PY'
 import secrets
 print(secrets.token_urlsafe(24))
 PY
@@ -57,7 +66,7 @@ curl -fsS --max-time 20 -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
   -H "Cookie: rw_csrf=$csrf" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" >/tmp/sandbox-register.json
 
-python - <<'PY'
+"$PYTHON" - <<'PY'
 import json
 d=json.load(open("/tmp/sandbox-register.json"))
 if not d.get("id"):
@@ -66,7 +75,7 @@ print(f"[PASS] registered user id={d['id']} email={d.get('email')}")
 PY
 
 # Refresh CSRF from jar after auth cookies are set
-csrf=$(python - "$COOKIE_JAR" <<'PY'
+csrf=$("$PYTHON" - "$COOKIE_JAR" <<'PY'
 import sys
 csrf=""
 for line in open(sys.argv[1]):
@@ -82,7 +91,7 @@ PY
 
 if [[ -z "$PLAN_ID" ]]; then
   plans=$(curl -fsS --max-time 15 -b "$COOKIE_JAR" "$API_BASE/api/plans")
-  PLAN_ID=$(python - "$plans" <<'PY'
+  PLAN_ID=$("$PYTHON" - "$plans" <<'PY'
 import json,sys
 rows=json.loads(sys.argv[1])
 if not rows:
@@ -101,7 +110,7 @@ pay=$(curl -fsS --max-time 30 -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
   -H "X-CSRF-Token: $csrf" \
   -d "{\"plan_id\":$PLAN_ID,\"provider\":\"sandbox\"}")
 
-python - "$pay" <<'PY'
+"$PYTHON" - "$pay" <<'PY'
 import json,sys
 d=json.loads(sys.argv[1])
 if not d.get("id"):
@@ -110,7 +119,7 @@ print(f"[PASS] sandbox payment created id={d.get('id')} status={d.get('status')}
 open("/tmp/sandbox-payment.json","w").write(json.dumps(d))
 PY
 
-payment_id=$(python - <<'PY'
+payment_id=$("$PYTHON" - <<'PY'
 import json
 print(json.load(open("/tmp/sandbox-payment.json")).get("id") or "")
 PY
@@ -121,7 +130,7 @@ complete=$(curl -fsS --max-time 30 -b "$COOKIE_JAR" \
   -H "Content-Type: application/json" \
   -H "X-CSRF-Token: $csrf" \
   -d "{\"payment_id\":\"$payment_id\"}")
-python - "$complete" <<'PY'
+"$PYTHON" - "$complete" <<'PY'
 import json,sys
 d=json.loads(sys.argv[1])
 if not d.get("ok"):
@@ -130,7 +139,7 @@ print(f"[PASS] sandbox complete fulfillment={d.get('fulfillment_status')}")
 PY
 
 dash=$(curl -fsS --max-time 15 -b "$COOKIE_JAR" "$API_BASE/api/me/dashboard")
-python - "$dash" <<'PY'
+"$PYTHON" - "$dash" <<'PY'
 import json,sys
 d=json.loads(sys.argv[1])
 sub=d.get("subscription") or {}
@@ -138,7 +147,7 @@ print(f"[PASS] dashboard loaded user={d.get('user',{}).get('id')} subscription_p
 PY
 
 servers=$(curl -fsS --max-time 15 "$API_BASE/api/public/servers")
-python - "$servers" <<'PY'
+"$PYTHON" - "$servers" <<'PY'
 import json,sys
 d=json.loads(sys.argv[1])
 blob=json.dumps(d).lower()
@@ -151,7 +160,7 @@ print(f"[PASS] public server status ok={d.get('ok')} nodes={d.get('total')}")
 PY
 
 ctors=$(curl -fsS --max-time 15 "$API_BASE/api/tariff-constructors")
-python - "$ctors" <<'PY'
+"$PYTHON" - "$ctors" <<'PY'
 import json,sys
 d=json.loads(sys.argv[1])
 if not isinstance(d, list):

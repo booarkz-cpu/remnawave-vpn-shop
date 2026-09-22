@@ -16,8 +16,17 @@ def run_migrations_offline():
     with context.begin_transaction(): context.run_migrations()
 
 def do_run_migrations(connection):
+    # Alembic 1.18 creates alembic_version.version_num as VARCHAR(32). Revision
+    # ids such as 0025_v44_5_8_entitlement_idempotency do not fit, so a fresh
+    # install stops there. Create the table at VARCHAR(128) first. An older
+    # database is widened in the same transaction.
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
+        connection.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS alembic_version ("
+            "version_num VARCHAR(128) NOT NULL PRIMARY KEY)"
+        )
+        connection.exec_driver_sql("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)")
         context.run_migrations()
 
 async def run_async():

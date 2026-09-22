@@ -405,6 +405,19 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 4. Тексты, видимость и https-ссылка по-прежнему сохраняются кнопкой **Сохранить приложения**. Сохранение текстов не удаляет уже загруженный файл. Выключенная карточка покупателя пропадает из кабинета вместе со ссылкой на скачивание. Файл приложения администратора в панели остаётся доступен администратору.
 5. Резервная копия забирает каталог `app-packages` рядом с `MEDIA_DIR`. Восстановление копирует только имена вида 32 шестнадцатеричных символа и расширение `.apk` или `.ipa`.
 
+## 9.12. Релиз 3.0.0-realise
+
+1. Версия API — `3.0.0-realise`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA в этом релизе нет: покупатель **2.10.0**, администратор Android **2.12.0**.
+2. Загрузка пакета с заголовком `Content-Length` принимает до 80 МБ. Запрос без этого заголовка остаётся на пределе 12 МБ. Это защищает процесс от буфера 80 МБ до проверки права.
+3. Обновите установленную копию командой `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. Скрипт снимет снимок до копирования файлов. `.env` не затирается. Cron по-прежнему выключен.
+4. Чеклист `PRODUCTION_CHECKLIST.md` записан на двух языках. Пункты, которые требует живой VPS, Docker, касса, SMTP, S3, Xcode или телефон, в этом окружении не отмечены выполненными.
+5. Проверка без касс: `PAYMENTS_SANDBOX=true` и `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh`. Скрипт вызывает `python3`, если команды `python` нет.
+6. `alembic upgrade head` на пустой базе доходит до `0038_v2_6_0_platform`. Колонка `alembic_version.version_num` имеет длину 128, поэтому длинные имена ревизий записываются целиком. Миграция `0027` не удаляет уже снятое ограничение, а `0033` добавляет `audit_logs.request_id` через `add_column`.
+7. Хеш пароля scrypt использует прежний коэффициент и запас `maxmem` 64 МиБ, поэтому первый администратор создаётся на OpenSSL с пределом 32 МиБ.
+8. Журнал аудита хранит `request_id`. Цена тарифа с типом Decimal и дата записываются в JSON, и создание тарифа не отвечает 500.
+9. Флаги функций читаются по колонке `key`. Создание платежа не ищет строковый ключ в целочисленном `id`.
+10. Vite в `admin`, `miniapp` и `cabinet` — `7.3.6`. Это закрывает предупреждения `npm audit` для dev-сервера. В production панели отдаёт Caddy.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -893,6 +906,19 @@ The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `
 3. To upload a file, choose an APK for Android or an IPA for iOS on the card and press **Загрузить файл** (Upload file). The permission is `manage_content`. The server accepts a zip package up to 80 MB, stores it outside `/media`, and does not put the stored file name in JSON. A new upload replaces the package. **Удалить файл** (Remove file) deletes it.
 4. Texts, visibility and the https link are still saved with **Сохранить приложения** (Save apps). Saving texts does not delete an uploaded file. A disabled buyer card disappears from the cabinet together with its download link. The administrator package stays available in the panel.
 5. A backup includes the `app-packages` directory next to `MEDIA_DIR`. Restore copies only names of 32 hexadecimal characters with an `.apk` or `.ipa` suffix.
+
+## 9.12. Release 3.0.0-realise
+
+1. The API version is `3.0.0-realise`. The schema stays `0038_v2_6_0_platform`. This release adds no APK and no IPA: the buyer app stays **2.10.0** and the Android administrator app stays **2.12.0**.
+2. A package upload that sends `Content-Length` accepts up to 80 MB. A request without that header stays at the 12 MB ceiling. That keeps an 80 MB buffer from being stored before the permission check.
+3. Update an installed copy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. The script takes a snapshot before copying files. `.env` is kept. Cron stays off.
+4. `PRODUCTION_CHECKLIST.md` is written in Russian and English. Items that need a live VPS, Docker, a payment gateway, SMTP, S3, Xcode or a phone are not marked done in this environment.
+5. The gateway-free check is `PAYMENTS_SANDBOX=true` and `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh`. The script uses `python3` when the `python` command is absent.
+6. `alembic upgrade head` on an empty database reaches `0038_v2_6_0_platform`. The `alembic_version.version_num` column is 128 characters, so long revision names are stored in full. Migration `0027` does not drop a constraint that is already gone, and `0033` adds `audit_logs.request_id` with `add_column`.
+7. Password hashing keeps the same scrypt work factor and sets `maxmem` to 64 MiB, so the first administrator is created when OpenSSL's default ceiling is 32 MiB.
+8. The audit log stores `request_id`. A plan price stored as Decimal and a datetime are written as JSON, and creating a plan does not answer 500.
+9. Feature flags are loaded by the `key` column. Payment creation does not look up a string key in the integer `id`.
+10. Vite in `admin`, `miniapp` and `cabinet` is `7.3.6`. That clears the `npm audit` findings for the dev server. In production, Caddy serves the panels.
 
 ## 10. Mini App
 

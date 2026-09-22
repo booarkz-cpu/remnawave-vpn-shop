@@ -50,6 +50,7 @@ def test_routes_and_release_scripts():
     assert '@app.post("/api/admin/plans/{plan_id}/enabled")' in main
     assert '@app.get("/api/admin/payments/{payment_id}")' in main
     assert '@app.get("/api/admin/github-update")' in main
+    assert 'APP_VERSION = "3.0.0-realise"' in main
     assert 'APP_VERSION = "2.13.0"' in main
     assert 'APP_VERSION = "2.12.0"' in main
     assert 'APP_VERSION = "2.11.0"' in main
@@ -74,7 +75,8 @@ def test_routes_and_release_scripts():
 def test_github_fetcher_rejects_zip_slip(tmp_path):
     module = _fetch_module()
     assert module.version_tuple("v2.10.0") > module.version_tuple("2.9.0")
-    assert module.current_version(ROOT) == "2.13.0"
+    assert module.current_version(ROOT) == "3.0.0-realise"
+    assert module.version_tuple("3.0.0-realise") > module.version_tuple("2.13.0")
     import io
     import zipfile
 

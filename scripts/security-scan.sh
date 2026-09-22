@@ -11,7 +11,7 @@ else
   if [[ "$STRICT_SECURITY" == "1" ]]; then echo "FAIL: pip-audit is required in strict security mode" >&2; exit 2; fi
   echo "WARN: pip-audit not installed; install it in CI to run dependency vulnerability scanning."
 fi
-for dir in admin miniapp; do
+for dir in admin miniapp cabinet; do
   if [[ -f "$dir/package-lock.json" ]] && command -v npm >/dev/null 2>&1; then
     echo "== npm audit $dir =="; (cd "$dir" && npm audit --omit=dev --audit-level=high)
   else

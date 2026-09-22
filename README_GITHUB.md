@@ -1,4 +1,4 @@
-# Remnawave VPN Shop 2.13.0
+# Remnawave VPN Shop 3.0.0-realise
 
 Магазин VPN: Telegram-бот, Mini App, личный кабинет, админ-панель, приложения Android и iOS для покупателя и администратора, release APK Android, QR и глубокие ссылки подключения, устройства и трафик, подарок и пополнение, подпись клиента, обновление проекта с GitHub на сервере, каталог приложений и общий логотип, конструктор тарифа (устройства, трафик, дни), статус узлов Remnawave, антиабьюз, агент узла и проверка без платёжных шлюзов.
 
@@ -6,8 +6,8 @@ VPN shop: Telegram bot, Mini App, user cabinet, admin console, Android and iOS a
 
 Полное описание на русском и английском: [`README.md`](README.md), [`INSTRUCTION.md`](INSTRUCTION.md), [`MOBILE.md`](MOBILE.md), [`MODULES.md`](MODULES.md), [`SECURITY.md`](SECURITY.md), [`DOCUMENTATION.md`](DOCUMENTATION.md).
 
-Текущая версия **2.13.0**. Предыдущие релизы **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. README на GitHub состоит из полной русской части и полной английской части. Панель отдаёт ссылку на приложение администратора, личный кабинет — на приложение покупателя. Обновление проекта с GitHub: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+Текущая версия **3.0.0-realise**. Предыдущие релизы **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. README на GitHub состоит из полной русской части и полной английской части. Панель отдаёт ссылку на приложение администратора, личный кабинет — на приложение покупателя. Обновление проекта с GitHub: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
 
-Current version **2.13.0**. Previous releases **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. The GitHub README has a full Russian part and a full English part. The admin panel links to the administrator app, and the user cabinet links to the buyer app. Update the project from GitHub with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+Current version **3.0.0-realise**. Previous releases **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. The GitHub README has a full Russian part and a full English part. The admin panel links to the administrator app, and the user cabinet links to the buyer app. Update the project from GitHub with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
 
 Лицензия: [Remnawave VPN Shop Proprietary License 1.0](LICENSE) (`LicenseRef-Proprietary`). Чтение разрешено. Копирование, изменение и распространение — по письменному разрешению владельца репозитория.
