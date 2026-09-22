@@ -1,12 +1,12 @@
 # Разбор функций / Function reference
 
-Версия приложения: **2.5.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский).
+Версия приложения: **2.6.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский).
 
-Добавлено в 2.5.0: модуль `tariff_api.py`, модели `TariffConstructor` и `TariffConstructorOption`, миграция `0037_v2_5_0_tariff_constructor`, расчёт `quote_constructor` в оплате и списании кошелька, очищенный статус узлов Remnawave для админки, кабинета и Mini App. Добавлено в 2.4.0: модуль `cabinet_api.py` (email/VK auth, CMS меню кабинета, sandbox complete), `SandboxProvider`, `CabinetMenuItem`, SPA `cabinet/`, админ CMS «Личный кабинет», `scripts/sandbox-e2e.sh`. Добавлено в 2.3.0: `ensure_required_channel`, `wallet_topup`, `wallet_spend`, `purchase_gift`, промокод вида `days`, автопродление за `AUTO_RENEW_LEAD_DAYS` дней, deep-link подарка в боте.
+Добавлено в 2.6.0: модули `abuse.py` и `platform_api.py`, миграция `0038_v2_6_0_platform`, агент `scripts/node-agent.py`, ограничение `users.restricted_at`, чёрный список HWID, ключи API, подписанные webhook, SMTP и DKIM, команда бота `/ops`, темы админки и манифест кабинета. Добавлено в 2.5.0: модуль `tariff_api.py`, модели `TariffConstructor` и `TariffConstructorOption`, миграция `0037_v2_5_0_tariff_constructor`, расчёт `quote_constructor` в оплате и списании кошелька, очищенный статус узлов Remnawave для админки, кабинета и Mini App. Добавлено в 2.4.0: модуль `cabinet_api.py` (email/VK auth, CMS меню кабинета, sandbox complete), `SandboxProvider`, `CabinetMenuItem`, SPA `cabinet/`, админ CMS «Личный кабинет», `scripts/sandbox-e2e.sh`. Добавлено в 2.3.0: `ensure_required_channel`, `wallet_topup`, `wallet_spend`, `purchase_gift`, промокод вида `days`, автопродление за `AUTO_RENEW_LEAD_DAYS` дней, deep-link подарка в боте.
 
 ## Архитектура
 
-Запрос проходит путь Browser или Telegram → Caddy → FastAPI (`backend/app/main.py` + `cabinet_api.py` + `tariff_api.py`) → PostgreSQL и Redis. Выдача VPN идёт в Remnawave. Платежи подтверждаются у провайдера, не по тексту вебхука. Фоновые циклы живут в API-процессе и в `backend/worker.py`.
+Запрос проходит путь Browser или Telegram → Caddy → FastAPI (`backend/app/main.py` + `cabinet_api.py` + `tariff_api.py` + `platform_api.py`) → PostgreSQL и Redis. Выдача VPN идёт в Remnawave. Платежи подтверждаются у провайдера, не по тексту вебхука. Фоновые циклы живут в API-процессе и в `backend/worker.py`. Агент узла ходит в API отдельно, с заголовком `X-Agent-Token`.
 
 Админка (`admin/src/main.tsx`), Mini App (`miniapp/src/main.tsx`) и личный кабинет (`cabinet/src/main.tsx`) ходят в API с cookie-сессией и заголовком `X-CSRF-Token`.
 

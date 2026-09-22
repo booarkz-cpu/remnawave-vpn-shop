@@ -1,21 +1,30 @@
-# Remnawave VPN Shop 2.5.0
+# Remnawave VPN Shop 2.6.0
 
-Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, выдача доступа, очереди и резервные копии.
+Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-The same product in English: a VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, provisioning, queues and backups.
+The same product in English: a VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Состояние: **2.5.0**. Предыдущий релиз: **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MODULES.md` и `PRODUCTION_CHECKLIST.md`.
+Состояние: **2.6.0**. Предыдущие релизы: **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Состав
 
 | Часть | Технология | Зачем |
 | --- | --- | --- |
 | API и бот | Python, FastAPI, aiogram, PostgreSQL, Redis | Магазин, платежи, выдача VPN, фоновые задачи |
-| Админка | React, Vite | Управление тарифами, конструктором, узлами, платежами и кабинетом |
+| Админка | React, Vite | Тарифы, конструктор, узлы, платформа, платежи и кабинет |
 | Mini App | React, Vite, Telegram WebApp | Покупка внутри Telegram |
 | Личный кабинет | React, Vite | Вход по email, Telegram, VK и Яндексу |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+## Возможности 2.6.0
+
+- **Платформа.** Вкладка «Платформа»: скоринг разделения подписки, агенты узлов, чёрный список HWID, ключи API, исходящие webhook, счётчики стран. Секрет показывается один раз.
+- **Агент узла.** `scripts/node-agent.py` отправляет heartbeat и наблюдения. Действия на узле — только `throttle` и `clear`, и только если на узле задан `AGENT_APPLY_TC=1`.
+- **Почта и метрики.** Тестовое SMTP-письмо уходит администратору, который нажал кнопку. DKIM выдаёт TXT-запись. `/metrics` добавляет три ряда, дашборд лежит в `deploy/grafana/vpnshop-platform.json`.
+- **Кабинет на домашний экран.** `cabinet/public/manifest.webmanifest`.
+- **Семь тем админки:** dark, light, midnight, graphite, lagoon, amber, paper.
+- **Лицензия.** Remnawave VPN Shop Proprietary License 1.0, файл `LICENSE`, русский и английский текст.
 
 ## Возможности 2.5.0
 
@@ -53,6 +62,9 @@ sudo bash install.sh
 | `MODULES.md` | Каждый модуль и зачем он нужен, RU/EN |
 | `FUNCTIONS.md` | Разбор функций кода |
 | `SECURITY.md` | Модель безопасности RU/EN |
+| `DOCUMENTATION.md` | Карта актуальных документов и архивных аудитов |
+| `LICENSE` | Проприетарная лицензия 1.0, RU/EN |
+| `RELEASE_NOTES_V2_6_0.md` | Что вошло в 2.6.0 и границы реализации |
 | `RELEASE_NOTES_V2_5_0.md` | Что вошло в 2.5.0 и чего нет из внешних проектов |
 | `INSTALL.md` | Установщик |
 | `PRODUCTION_CHECKLIST.md` | Чеклист production |
@@ -71,4 +83,8 @@ cd ../cabinet && npm install && npx vite build
 
 ## Лицензия
 
-В архиве лицензия не указана. Использование согласуйте с владельцем репозитория.
+**Remnawave VPN Shop Proprietary License 1.0** (`SPDX-License-Identifier: LicenseRef-Proprietary`). Полный текст на русском и английском — в `LICENSE`.
+
+Чтение репозитория разрешено. Копирование, изменение, распространение и запуск как услуги для третьих лиц требуют письменного разрешения владельца репозитория booarkz-cpu/remnawave-vpn-shop. Программа поставляется «как есть», без гарантий.
+
+English: reading the repository is allowed. Copying, modifying, redistributing, or offering the software as a service needs a written grant from the repository owner. See `LICENSE`.

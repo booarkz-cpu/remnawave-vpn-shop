@@ -8,19 +8,24 @@ def test_current_release_identity_and_migration_head():
     build = (ROOT / "scripts/build-release.sh").read_text()
     installer = (ROOT / "deploy/install-vps.sh").read_text()
     manifest = (ROOT / "release-manifest.template.json").read_text()
+    assert 'APP_VERSION = "2.6.0"' in main
     assert 'APP_VERSION = "2.5.0"' in main
     assert 'APP_VERSION = "2.4.0"' in main
     assert 'APP_VERSION = "2.3.0"' in main
     assert 'APP_VERSION = "2.2.1"' in main
+    assert 'VERSION="2.6.0"' in build
     assert 'VERSION="2.5.0"' in build
     assert 'VERSION="2.4.0"' in build
     assert 'VERSION="2.3.0"' in build
+    assert 'INSTALLER_VERSION="2.6.0"' in installer
     assert 'INSTALLER_VERSION="2.5.0"' in installer
     assert 'INSTALLER_VERSION="2.4.0"' in installer
     assert 'INSTALLER_VERSION="2.3.0"' in installer
+    assert '"version": "2.6.0"' in manifest
     assert '"version": "2.5.0"' in manifest
     assert '"version": "2.4.0"' in manifest
     assert '"version": "2.3.0"' in manifest
+    assert '0038_v2_6_0_platform' in build
     assert '0037_v2_5_0_tariff_constructor' in build
     assert '0036_v2_4_0_cabinet' in build
     assert '0035_v2_3_0_wallet_gifts' in build
@@ -29,8 +34,9 @@ def test_current_release_identity_and_migration_head():
 def test_release_tooling_uses_current_artifact():
     verify = (ROOT / "scripts/verify-release.sh").read_text()
     build = (ROOT / "scripts/build-release.sh").read_text()
-    artifact = "remnawave_vpn_shop_v2_5_0_full_release.zip"
+    artifact = "remnawave_vpn_shop_v2_6_0_full_release.zip"
     assert "${ARTIFACT%.zip}_manifest.json" in verify
+    assert 'ARTIFACT="remnawave_vpn_shop_v2_6_0_full_release.zip"' in build
     assert 'ARTIFACT="remnawave_vpn_shop_v2_5_0_full_release.zip"' in build
     assert "remnawave_vpn_shop_v2_4_0_full_release.zip" in build
     assert "remnawave_vpn_shop_v40_production.zip" not in verify

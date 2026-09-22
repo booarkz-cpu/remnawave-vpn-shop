@@ -1,8 +1,8 @@
 # Модули проекта / Project modules
 
-Версия **2.5.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4.
+Версия **2.6.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Предыдущее описание конструктора относится к **2.5.0**.
 
-Version **2.5.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4.
+Version **2.6.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The constructor description belongs to **2.5.0**.
 
 ---
 
@@ -51,6 +51,18 @@ Version **2.5.0**. This document explains why each module exists. The function-b
 
 Отключение конструктора не удаляет строки: новые покупки закрываются, история платежей остаётся.
 
+### `backend/app/abuse.py`
+
+Чистый скоринг без базы данных. Считает префикс источника, расстояние между точками и рекомендацию observe / warn / review / throttle / block. Его вызывают наблюдения агента.
+
+### `backend/app/platform_api.py`
+
+Операторская платформа: политика антиабьюза, переключатели модулей, агенты, чёрный список, разбор нарушений, ключи API, подписанные webhook, SMTP и DKIM, heartbeat и приём наблюдений, `GET /api/v3/status`, строки Prometheus. Секреты создания не попадают в сводку.
+
+### `scripts/node-agent.py`
+
+Процесс на узле. Шлёт метрики и файл наблюдений, забирает очередь `throttle` и `clear`. Ограничение трафика включается переменной `AGENT_APPLY_TC=1`.
+
 ### `backend/app/payments.py`
 
 Адаптеры касс. `YooKassaProvider`, `PlategaProvider` и `RollyPayProvider` создают платёж, читают его статус и делают возврат. `SandboxProvider` существует только для проверки без живых шлюзов: идентификатор начинается с `sandbox-`, статус сразу `succeeded`, URL ведёт в кабинет с `?sandbox_payment=`. Проверка подписи и allowlist живых провайдеров живёт рядом с этими классами и вызывается из `main.py` до выдачи.
@@ -77,7 +89,7 @@ Version **2.5.0**. This document explains why each module exists. The function-b
 
 ### `backend/app/bot.py`
 
-Telegram-бот на aiogram. Приветствие, цены, кнопка магазина, команды промокода и подарка, рассылки. Тексты есть на русском и английском. Бот не принимает деньги сам: он открывает Mini App.
+Telegram-бот на aiogram. Приветствие, цены, кнопка магазина, команды промокода и подарка, рассылки и `/ops` для `ADMIN_TELEGRAM_ID`. Тексты есть на русском и английском. Бот не принимает деньги сам: он открывает Mini App.
 
 ### `backend/app/provisioner.py`
 
@@ -97,7 +109,7 @@ Telegram-бот на aiogram. Приветствие, цены, кнопка м�
 
 ### `admin/`
 
-Панель администратора на React. Вкладки покрывают бренд, обзор, тарифы, конструктор, мониторинг Remnawave, платежи, пользователей, контент бота и Mini App, CMS кабинета, маркетинг, роли, бэкапы, безопасность, восстановление, аудит и операции. Русские подписи переводятся словарём `admin/src/i18n.tsx`, когда выбран английский.
+Панель администратора на React. Вкладки покрывают бренд, обзор, тарифы, конструктор, мониторинг Remnawave, платформу, платежи, пользователей, контент бота и Mini App, CMS кабинета, маркетинг, роли, бэкапы, безопасность, восстановление, аудит и операции. Семь тем задаются CSS-переменными. Русские подписи переводятся словарём `admin/src/i18n.tsx`, когда выбран английский.
 
 ### `miniapp/`
 
@@ -145,6 +157,18 @@ From 2.5.0, checkout and wallet spend call `quote_constructor` when `constructor
 
 The user cabinet boundary: email registration and login, VK ID start and callback, the public menu, admin menu CRUD, device-guide text, and `POST /api/payments/sandbox/complete`. The menu kind `servers` is allowed so the cabinet can show node status.
 
+### `backend/app/abuse.py`
+
+Database-free scoring. It builds the source prefix, the distance between points and the recommendation observe / warn / review / throttle / block. Agent observations call it.
+
+### `backend/app/platform_api.py`
+
+The operator platform: abuse policy, module toggles, agents, the HWID blacklist, violation review, API keys, signed webhooks, SMTP and DKIM, heartbeat, observation ingest, `GET /api/v3/status` and Prometheus lines. Create-time secrets stay out of the summary.
+
+### `scripts/node-agent.py`
+
+The process on a node. It posts metrics and an observations file and collects `throttle` and `clear`. Traffic control runs only when `AGENT_APPLY_TC=1`.
+
 ### `backend/app/tariff_api.py`
 
 Tariff constructor and safe node status. It stores constructors and `devices`, `traffic_gb` and `days` options, validates ranges, keeps a hidden anchor `Plan`, prices a selection in `quote_constructor`, and strips node payloads down to name, country, status and online users. Routes cover the public constructor list, public servers, the signed-in server view, admin monitoring, and constructor CRUD. Disabling a constructor closes new sales and keeps payment history.
@@ -175,7 +199,7 @@ The async SQLAlchemy engine and `get_db`. Alembic owns schema changes.
 
 ### `backend/app/bot.py`
 
-The aiogram Telegram bot: welcome, prices, the shop button, promo and gift commands, broadcasts. Copy exists in Russian and English. The bot does not charge cards; it opens the Mini App.
+The aiogram Telegram bot: welcome, prices, the shop button, promo and gift commands, broadcasts, and `/ops` for `ADMIN_TELEGRAM_ID`. Copy exists in Russian and English. The bot does not charge cards; it opens the Mini App.
 
 ### `backend/app/provisioner.py`
 
@@ -191,11 +215,11 @@ The queue process. It claims `Job` rows, including trials, writes `WorkerState`,
 
 ### `backend/alembic/versions/`
 
-Schema history. The 2.5.0 head is `0037_v2_5_0_tariff_constructor`. The 2.4.0 head was `0036_v2_4_0_cabinet`.
+Schema history. The 2.6.0 head is `0038_v2_6_0_platform`. The 2.5.0 head was `0037_v2_5_0_tariff_constructor`. The 2.4.0 head was `0036_v2_4_0_cabinet`.
 
 ### `admin/`, `miniapp/`, `cabinet/`
 
-`admin` is the operator console, including the plan builder and Remnawave monitoring. `miniapp` is the Telegram shop with plans, the constructor and server status. `cabinet` is the standalone account with email, Telegram, VK and Yandex sign-in, CMS-driven tabs, constructor checkout, trial, the subscription link and device guides. Russian source strings are translated by each app's `i18n.tsx` when English is selected.
+`admin` is the operator console, including the plan builder, Remnawave monitoring, the platform desk and seven themes. `miniapp` is the Telegram shop with plans, the constructor and server status. `cabinet` is the standalone account with email, Telegram, VK and Yandex sign-in, CMS-driven tabs, constructor checkout, trial, the subscription link, device guides and a web app manifest. Russian source strings are translated by each app's `i18n.tsx` when English is selected.
 
 ### `deploy/`, Compose and `scripts/`
 

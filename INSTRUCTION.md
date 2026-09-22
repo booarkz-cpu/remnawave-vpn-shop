@@ -270,6 +270,53 @@ SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh
 
 Повторите `python3 -m pytest -q` на дереве исходников до выкладки. Контейнерный `scripts/integration-test.sh` нужен на хосте с Docker.
 
+## 9.5. Платформа, агент и лицензия (2.6.0)
+
+Вкладка админки **Платформа** читает `GET /api/admin/platform/summary`. В ответе нет токена агента, хеша ключа API и секрета webhook.
+
+### Модули
+
+Переключатели: `abuse`, `agent`, `webhooks`, `mail`, `metrics`, `torrents`. Выключенный модуль отвечает 503 «Модуль отключён» на свои маршруты. Отсутствующая строка модуля считается включённой.
+
+### Скоринг
+
+Агент присылает наблюдения на `POST /api/agent/observations` (не больше 200 за запрос). Адрес без корректного IP пропускается. IPv4 схлопывается до /24, IPv6 до /64. Балл складывают анализаторы temporal, geo, asn, behavior, devices, hwid, user_agent и torrent. Нарушение появляется, когда балл не ниже `min_score` (по умолчанию 50). `auto_hard_block` по умолчанию выключен. Порог `hard_score` по умолчанию 80.
+
+Кнопки **Ограничить** и **Снять** вызывают `POST /api/admin/platform/violations/{id}/review`. Ограничение ставит `users.restricted_at` и пытается отключить пользователя в Remnawave. Пока отметка стоит, пробный период, создание платежа и списание кошелька отвечают 403 «Доступ ограничен».
+
+Чёрный список HWID: действие `block` запрещает регистрацию устройства, действие `alert` регистрацию пропускает и пишет открытое нарушение.
+
+### Агент узла
+
+На узле, отдельно от API магазина:
+
+```bash
+SHOP_API_BASE=https://api.example.com \
+AGENT_TOKEN='токен-из-админки' \
+OBSERVATIONS_FILE=/var/lib/vpnshop/observations.json \
+AGENT_INTERVAL=60 \
+python3 scripts/node-agent.py
+```
+
+Токен выдаётся один раз при создании агента и уходит в заголовке `X-Agent-Token`. Файл наблюдений — JSON-массив объектов с полями `ip`, `remnawave_uuid`, `asn`, `asn_org`, `country`, `lat`, `lon`, `user_agent`, `hwid`, `mobile`, `torrent`.
+
+По умолчанию агент только сообщает метрики и забирает очередь. Чтобы применить `throttle` или `clear` к одному глобальному IP, на узле задают `AGENT_APPLY_TC=1` и `AGENT_IFACE` (имя интерфейса до 15 символов). Другие виды действий агент не выполняет. Интерактивного терминала у агента нет.
+
+### Ключи, webhook, почта
+
+- `POST /api/admin/platform/api-keys` требует право `security.manage`. Ключ начинается с `rw_` и открывает `GET /api/v3/status` при scope `read`.
+- Webhook принимает только публичный HTTPS URL. Тело события подписывается HMAC-SHA256 в `X-Shop-Signature`.
+- Почта сохраняет SMTP в настройке `smtp_settings`. Пароль шифруется. Кнопка проверки отправляет письмо только на `admin.email`. `POST /api/admin/platform/dkim` возвращает TXT-запись и хранит закрытый ключ зашифрованным.
+- Команда бота `/ops` отвечает только Telegram ID из `ADMIN_TELEGRAM_ID`.
+
+### Кабинет и темы
+
+Кабинет отдаёт `manifest.webmanifest` и может быть добавлен на домашний экран. Админка хранит тему в `localStorage` (`rw_theme`): dark, light, midnight, graphite, lagoon, amber, paper.
+
+### Лицензия
+
+Файл `LICENSE` — Remnawave VPN Shop Proprietary License 1.0. Чтение репозитория разрешено. Копирование, изменение, распространение и сервис для третьих лиц требуют письменного разрешения владельца.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -295,6 +342,7 @@ SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh
 
 - `/start` — приветствие на языке Telegram (`en`, если `language_code` начинается с `en`, иначе русский, а при пустом коде — `DEFAULT_LANGUAGE`), актуальные цены, активные акции и кнопка Mini App.
 - `/promo КОД` — подсказывает открыть магазин и применить код. Сервер проверяет код ещё раз в момент оплаты.
+- `/ops` — только для `ADMIN_TELEGRAM_ID`: число открытых нарушений, число агентов за последние 5 минут и ссылка на панель.
 
 Меню из панели (**Бот и Mini App**) заменяет кнопку по умолчанию. Пункты типа webapp и url принимаются только с `https://`. Картинка старта не должна ломать ответ: если Telegram не принял фото, бот отправляет текст.
 
@@ -625,6 +673,51 @@ The script checks `/health`, requires `payments_sandbox` and the `sandbox` provi
 
 Run `python3 -m pytest -q` on the source tree before release. `scripts/integration-test.sh` needs a host with Docker.
 
+## 9.5. Platform, agent and license (2.6.0)
+
+The admin **Платформа** tab loads `GET /api/admin/platform/summary`. The payload omits the agent token, the API key hash and the webhook secret.
+
+### Modules
+
+Toggles: `abuse`, `agent`, `webhooks`, `mail`, `metrics`, `torrents`. A disabled module returns 503 on its own routes. A missing plugin row is treated as enabled.
+
+### Scoring
+
+The agent posts observations to `POST /api/agent/observations` (at most 200 per request). An invalid IP is skipped. IPv4 collapses to /24 and IPv6 to /64. The analyzers are temporal, geo, asn, behavior, devices, hwid, user_agent and torrent. A violation is stored when the score is at least `min_score` (default 50). `auto_hard_block` is off by default. `hard_score` defaults to 80.
+
+**Ограничить** and **Снять** call `POST /api/admin/platform/violations/{id}/review`. Restrict sets `users.restricted_at` and tries to disable the user in Remnawave. While the flag is set, trial, payment creation and wallet spend return 403. An HWID blacklist action `block` rejects device registration. An action `alert` allows registration and stores an open violation.
+
+### Node agent
+
+On the node, separate from the shop API:
+
+```bash
+SHOP_API_BASE=https://api.example.com \
+AGENT_TOKEN='token-from-admin' \
+OBSERVATIONS_FILE=/var/lib/vpnshop/observations.json \
+AGENT_INTERVAL=60 \
+python3 scripts/node-agent.py
+```
+
+The token is shown once when the agent is created and is sent as `X-Agent-Token`. The observations file is a JSON array of objects with `ip`, `remnawave_uuid`, `asn`, `asn_org`, `country`, `lat`, `lon`, `user_agent`, `hwid`, `mobile` and `torrent`.
+
+By default the agent reports metrics and collects the queue. Set `AGENT_APPLY_TC=1` and `AGENT_IFACE` on the node to apply `throttle` or `clear` to one global IP. The agent does not run any other action kind and does not open an interactive terminal.
+
+### Keys, webhooks and mail
+
+- `POST /api/admin/platform/api-keys` requires `security.manage`. The key starts with `rw_` and authorizes `GET /api/v3/status` when the scope is `read`.
+- A webhook URL must be public HTTPS. The event body is signed with HMAC-SHA256 in `X-Shop-Signature`.
+- Mail stores SMTP in `smtp_settings`. The password is encrypted. The test button sends only to `admin.email`. `POST /api/admin/platform/dkim` returns a TXT record and stores the private key encrypted.
+- The bot command `/ops` answers only the Telegram id in `ADMIN_TELEGRAM_ID`.
+
+### Cabinet and themes
+
+The cabinet serves `manifest.webmanifest` and can be added to the home screen. The admin theme is stored in `localStorage` (`rw_theme`): dark, light, midnight, graphite, lagoon, amber, paper.
+
+### License
+
+`LICENSE` is the Remnawave VPN Shop Proprietary License 1.0. Reading the repository is allowed. Copying, modifying, redistributing and offering the software as a service require the owner's written permission.
+
 ## 10. Mini App
 
 The buyer opens the shop from the bot. The app loads `/api/me/dashboard`, `/api/public/config`, `/api/plans`, billing, the security center, notifications, and the public status.
@@ -639,6 +732,7 @@ When `rw_lang` is absent, the language follows `default_language` after config l
 
 - `/start` greets the user in the Telegram language (`en` when `language_code` starts with `en`, otherwise Russian, and `DEFAULT_LANGUAGE` when the code is empty), lists current prices and active promotions, and shows the Mini App button.
 - `/promo CODE` tells the user to open the shop and apply the code. The server validates the code again at payment time.
+- `/ops` answers only `ADMIN_TELEGRAM_ID` and reports open violations, agents seen in the last five minutes, and a panel link.
 
 A menu saved under **Bot and Mini App** replaces the default button. WebApp and URL items must use `https://`. If Telegram rejects the start image, the bot still sends the text.
 
