@@ -637,6 +637,38 @@ class RollyPayProvider(BasePaymentProvider):
             raise PaymentError(f"Невалидный JSON: {e}")
 
 
+class SandboxProvider:
+    """Local payment provider for tests without live gateways."""
+
+    async def create(self, amount, order_id: str, description: str, return_url: str):
+        if not settings.payments_sandbox:
+            raise PaymentError("Sandbox payments are disabled")
+        payment_id = f"sandbox-{order_id}"
+        url = f"{(settings.cabinet_url or settings.mini_app_url or return_url).rstrip('/')}/?sandbox_payment={payment_id}"
+        return {"id": payment_id, "url": url, "status": "succeeded"}
+
+    async def verify_succeeded(self, payment_id: str, expected_amount: Decimal, currency: str, expected_order_id: str | None = None):
+        if not settings.payments_sandbox:
+            return False
+        if not str(payment_id).startswith("sandbox-"):
+            return False
+        if expected_order_id and f"sandbox-{expected_order_id}" != payment_id and expected_order_id not in payment_id:
+            return False
+        return True
+
+    async def get_payment_status(self, payment_id: str) -> str:
+        return "succeeded" if settings.payments_sandbox and str(payment_id).startswith("sandbox-") else "canceled"
+
+    async def refund(self, payment_id: str, amount: Decimal, currency: str = "RUB"):
+        return {"id": f"refund-{payment_id}", "status": "succeeded"}
+
+    async def get_refund_status(self, refund_id: str) -> str:
+        return "succeeded"
+
+    async def charge_recurring(self, *args, **kwargs):
+        raise PaymentError("Sandbox does not support recurring charges")
+
+
 # ============================================================
 # Фабрика провайдеров
 # ============================================================
@@ -653,6 +685,8 @@ def get_payment_provider(name: str) -> BasePaymentProvider:
             _providers[name] = PlategaProvider()
         elif name == "rollypay":
             _providers[name] = RollyPayProvider()
+        elif name == "sandbox":
+            _providers[name] = SandboxProvider()  # type: ignore[assignment]
         else:
             raise PaymentError(f"Неизвестный провайдер: {name}")
     return _providers[name]

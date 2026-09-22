@@ -1,4 +1,4 @@
-# Security / Безопасность — Remnawave VPN Shop 2.2.1
+# Security / Безопасность — Remnawave VPN Shop 2.4.0
 
 Граница доверия: браузер или Telegram → Caddy → API → PostgreSQL, Redis, Remnawave и платёжные провайдеры. PostgreSQL и Redis наружу не публикуются.
 
@@ -8,8 +8,9 @@ Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Rem
 
 - Администратор: пароль scrypt, необязательный TOTP, коды восстановления, JWT только вместе с записью `AdminSession`.
 - Сессия администратора живёт в HttpOnly cookie, привязана к User-Agent, гаснет через 15 минут простоя и не дольше абсолютного срока токена.
-- Покупатель: проверенный Telegram initData или опциональный Yandex ID. Cookie `rw_user` — HttpOnly.
+- Покупатель: Telegram initData, email+пароль (scrypt), опциональные VK ID и Yandex ID. Cookie `rw_user` — HttpOnly.
 - Мутации с cookie требуют заголовок `X-CSRF-Token`, равный cookie `rw_csrf`. Вебхуки и первичный вход из этого правила исключены.
+- Rate limit на `/api/auth/login`, `/api/auth/register`, OAuth и платежные маршруты.
 - RBAC: `viewer`, `operator`, `admin`. Недостаточное право отвечает 403.
 
 ## Платежи
@@ -18,6 +19,7 @@ Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Rem
 - YooKassa: вебхук отклоняется, если `YOOKASSA_WEBHOOK_IP_ALLOWLIST` пуст или IP отправителя не входит в список. Пустой список больше не означает «принять всех».
 - После вебхука API сам читает платёж у провайдера и сверяет статус, сумму, валюту и `order_id`. Текст вебхука не является доказательством оплаты.
 - Platega: заголовки магазина. RollyPay: HMAC и окно timestamp 5 минут.
+- `SandboxProvider` активен только при `PAYMENTS_SANDBOX=true` и не принимает «чужие» payment id вне префикса `sandbox-`.
 - Возврат идемпотентен по ключу `refund-{payment_id}`. Отзыв VPN не выполняется, если есть более новая успешно выданная оплата.
 - Боевые платежи выключены, пока администратор не включит production gate после staging E2E. Staging не читает production-секреты провайдеров.
 

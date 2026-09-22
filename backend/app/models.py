@@ -10,6 +10,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int|None] = mapped_column(BigInteger, unique=True, index=True)
     yandex_id: Mapped[str|None] = mapped_column(String(255), unique=True, index=True)
+    vk_id: Mapped[str|None] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str|None] = mapped_column(String(320), unique=True, index=True)
+    email_password_hash: Mapped[str|None] = mapped_column(String(512))
     username: Mapped[str|None] = mapped_column(String(255))
     referral_code: Mapped[str] = mapped_column(String(32), unique=True, index=True, default=lambda: secrets.token_urlsafe(8).upper())
     referred_by_id: Mapped[int|None] = mapped_column(Integer, index=True)
@@ -135,6 +138,16 @@ class BotMenuItem(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     action: Mapped[str] = mapped_column(String(255), nullable=False)
     item_type: Mapped[str] = mapped_column(String(32), default="webapp", nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+class CabinetMenuItem(Base):
+    __tablename__ = "cabinet_menu_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), default="custom", nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

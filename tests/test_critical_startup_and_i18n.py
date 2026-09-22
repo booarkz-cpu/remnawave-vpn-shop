@@ -16,6 +16,10 @@ def test_settings_cover_paths_used_at_import_and_backup():
         'alias="YANDEX_CLIENT_ID"',
         'alias="YANDEX_CLIENT_SECRET"',
         'alias="YANDEX_REDIRECT_URI"',
+        'alias="VK_CLIENT_ID"',
+        'alias="CABINET_URL"',
+        'alias="CABINET_DOMAIN"',
+        'alias="PAYMENTS_SANDBOX"',
         'alias="MAINTENANCE_MODE"',
         'default=False, alias="MAINTENANCE_MODE"',
         'alias="DEFAULT_LANGUAGE"',
@@ -48,9 +52,15 @@ def test_admin_enterprise_view_compiles_as_jsx_and_keeps_labels():
     admin = (ROOT / "admin/src/main.tsx").read_text()
     assert "<Корпоративный контур" not in admin
     assert "<Корпоративный d={d}" in admin
-    for label in ["Корпоративный контур", "Брендинг панели", "Переключить тему", "Операции", "Аналитика", "Инциденты", "Провайдеры", "Клиенты", "Функции", "Ключи доступа", "24/7 мониторинг", "Campaign Manager", "Rules Engine", "мультиустройства", "Trial"]:
+    for label in ["Корпоративный контур", "Брендинг панели", "Переключить тему", "Операции", "Аналитика", "Инциденты", "Провайдеры", "Клиенты", "Функции", "Ключи доступа", "24/7 мониторинг", "Campaign Manager", "Rules Engine", "мультиустройства", "Trial", "Личный кабинет"]:
         assert label in admin
     assert '"status"' in admin and '"deployments"' in admin and '"notifications"' in admin
+    assert "CabinetCMS" in admin
+    style = (ROOT / "admin/src/style.css").read_text()
+    assert "--primary: #00e5c0" in style
+    assert "Sora" in style
+    assert "#6d5dfc" not in style
+    assert "#4f6cff" not in style
 
 
 def test_interfaces_have_russian_and_english_catalogs():

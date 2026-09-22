@@ -159,7 +159,9 @@ function App() {
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     tg?.ready?.();
-    const code = new URLSearchParams(location.search).get("code");
+    const params = new URLSearchParams(location.search);
+    const code = params.get("code");
+    const sandboxPayment = params.get("sandbox_payment");
     (async () => {
       await loadPublic();
       await loadMenu();
@@ -173,6 +175,21 @@ function App() {
           history.replaceState({}, "", url.pathname + url.search + url.hash);
         }
         await loadSession();
+        if (sandboxPayment) {
+          try {
+            await req("/api/payments/sandbox/complete", {
+              method: "POST",
+              body: JSON.stringify({payment_id: sandboxPayment}),
+            });
+            flash(t("Платёж создан"));
+            await loadSession();
+          } catch (e: any) {
+            flash(e.message || t("Ошибка"), true);
+          }
+          const url = new URL(location.href);
+          url.searchParams.delete("sandbox_payment");
+          history.replaceState({}, "", url.pathname + url.search + url.hash);
+        }
       } catch (e: any) {
         setAuthed(false);
         if (code) flash(e.message || t("Ошибка"), true);

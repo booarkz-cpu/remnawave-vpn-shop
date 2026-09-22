@@ -40,3 +40,9 @@ def test_wallet_gifts_and_days_promo_are_wired():
     assert "purchaser_user_id" in models
     assert 'revision = "0035_v2_3_0_wallet_gifts"' in migration
     assert 'down_revision = "0034_v2_2_0_platform_features"' in migration
+
+
+def test_v230_release_markers_remain_as_history():
+    main = (ROOT / "backend/app/main.py").read_text()
+    assert 'APP_VERSION = "2.4.0"' in main
+    assert 'Historical compatibility marker: APP_VERSION = "2.3.0"' in main

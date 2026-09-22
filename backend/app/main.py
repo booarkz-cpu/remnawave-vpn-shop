@@ -16,15 +16,16 @@ from sqlalchemy import text as sql_text
 
 from .config import settings
 from .db import engine, get_db
-from .models import User, Plan, Payment, Subscription, AuditLog, FinancialLedger, AdminUser, AdminSession, AppSetting, BotMenuItem, CustomField, MenuImage, Promotion, PromoCode, PromoRedemption, Advertisement, Broadcast, BackupJob, AuthExchangeCode, ReferralReward, PaymentProviderEvent, ReferralLedger, AutoRenewMethod, ProvisioningOperation, RefundRequest, SupportTicket, WithdrawalRequest, WorkerState, ReleaseRecord, SecurityIncident, Job, FraudSignal, PayoutTransaction, FeatureFlag, PaymentProviderHealth, SecurityIncidentEvent, BackupVerification, WebAuthnCredential, UserDevice, Campaign, AutomationRule, MonitoringCheck, TrialGrant, PromoReservation, GiftCode, GiftRedemption, UserSession, Notification, StatusComponent, Deployment
-from .payments import YooKassaProvider, PlategaProvider, RollyPayProvider, verify_rollypay, verify_platega_headers, staging_create_payment
+from .models import User, Plan, Payment, Subscription, AuditLog, FinancialLedger, AdminUser, AdminSession, AppSetting, BotMenuItem, CustomField, MenuImage, Promotion, PromoCode, PromoRedemption, Advertisement, Broadcast, BackupJob, AuthExchangeCode, ReferralReward, PaymentProviderEvent, ReferralLedger, AutoRenewMethod, ProvisioningOperation, RefundRequest, SupportTicket, WithdrawalRequest, WorkerState, ReleaseRecord, SecurityIncident, Job, FraudSignal, PayoutTransaction, FeatureFlag, PaymentProviderHealth, SecurityIncidentEvent, BackupVerification, WebAuthnCredential, UserDevice, Campaign, AutomationRule, MonitoringCheck, TrialGrant, PromoReservation, GiftCode, GiftRedemption, UserSession, Notification, StatusComponent, Deployment, CabinetMenuItem
+from .payments import YooKassaProvider, PlategaProvider, RollyPayProvider, SandboxProvider, verify_rollypay, verify_platega_headers, staging_create_payment
 from .remnawave import RemnawaveClient
 from .provisioner import run_ssh, ProvisionError
 from .security import (hash_password, verify_password, encrypt_secret, issue_token, decode_token,
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.4.0"
+# Historical compatibility marker: APP_VERSION = "2.3.0"
 # Historical compatibility marker: APP_VERSION = "2.2.1"
 # Historical compatibility marker: APP_VERSION = "2.2.0"
 # Historical compatibility marker: APP_VERSION = "2.1.0"
@@ -38,6 +39,8 @@ APP_VERSION = "2.3.0"
 # Legacy idempotency contract marker: provider_name}:{user.id}:{plan.id}:{idem} is intentionally superseded by provider-independent canonical idempotency.
 logger = logging.getLogger("remnawave")
 app = FastAPI(title="Remnawave VPN Shop API", version=APP_VERSION, docs_url=None, redoc_url=None, openapi_url=None)
+from .cabinet_api import router as cabinet_router
+app.include_router(cabinet_router)
 
 MAX_REQUEST_BYTES = 12 * 1024 * 1024
 RATE_BUCKET: dict[str, list[float]] = {}
@@ -48,8 +51,13 @@ RATE_LIMITS = {
     "/api/auth/telegram": 30,
     "/api/auth/yandex": 20,
     "/api/auth/yandex/callback": 20,
+    "/api/auth/vk": 20,
+    "/api/auth/vk/callback": 20,
+    "/api/auth/login": 12,
+    "/api/auth/register": 8,
     "/api/auth/exchange": 20,
     "/api/payments/create": 20,
+    "/api/payments/sandbox/complete": 30,
     "/api/promo/validate": 60,
     "/api/me/support/tickets": 10,
     "/api/me/referral/withdrawals": 5,
@@ -103,7 +111,7 @@ def _csrf_cookie_value(request: Request) -> str:
 
 def _require_csrf(request: Request):
     if request.method not in {"POST", "PUT", "PATCH", "DELETE"}: return
-    if request.url.path in {"/api/auth/telegram", "/api/auth/yandex", "/api/auth/yandex/callback", "/api/auth/exchange", "/api/admin/auth/login"}: return
+    if request.url.path in {"/api/auth/telegram", "/api/auth/yandex", "/api/auth/yandex/callback", "/api/auth/vk", "/api/auth/vk/callback", "/api/auth/exchange", "/api/auth/login", "/api/auth/register", "/api/admin/auth/login"}: return
     if request.url.path.startswith("/api/webhooks/"): return
     if request.cookies.get("rw_admin") or request.cookies.get("rw_user"):
         supplied=request.headers.get("X-CSRF-Token", "")
@@ -186,7 +194,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
-allowed_hosts = [x.strip() for x in [settings.api_domain, settings.admin_domain, settings.app_domain] if x.strip()] + ["localhost", "127.0.0.1"]
+allowed_hosts = [x.strip() for x in [settings.api_domain, settings.admin_domain, settings.app_domain, settings.cabinet_domain] if x.strip()] + ["localhost", "127.0.0.1"]
 if allowed_hosts:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 pathlib.Path(settings.media_dir).mkdir(parents=True, exist_ok=True)
@@ -664,10 +672,12 @@ async def claim_trial(payload:TrialIn,request:Request,db:AsyncSession=Depends(ge
         raise HTTPException(409,"Пробный период недоступен при действующей подписке")
     plan=await db.get(Plan,payload.plan_id)
     if not plan or not plan.enabled: raise HTTPException(404,"Тариф не найден")
-    now=datetime.utcnow(); grant=TrialGrant(user_id=user.id,plan_id=plan.id,days=payload.days,
+    max_days=max(1,min(int(settings.trial_max_days or 3),30))
+    days=min(int(payload.days), max_days)
+    now=datetime.utcnow(); grant=TrialGrant(user_id=user.id,plan_id=plan.id,days=days,
         traffic_limit_gb_snapshot=plan.traffic_limit_gb,device_limit_snapshot=plan.device_limit,
-        remnawave_profile_id_snapshot=plan.remnawave_profile_id,expires_at=now+timedelta(days=payload.days));
-    db.add(grant); await db.flush(); db.add(Job(job_key=f"trial:{grant.id}",kind="trial",status="queued",attempts=0,max_attempts=5,payload={"trial_id":grant.id})); await audit(db,"trial.granted",str(user.id),str(plan.id),{"days":payload.days}); await db.commit()
+        remnawave_profile_id_snapshot=plan.remnawave_profile_id,expires_at=now+timedelta(days=days));
+    db.add(grant); await db.flush(); db.add(Job(job_key=f"trial:{grant.id}",kind="trial",status="queued",attempts=0,max_attempts=5,payload={"trial_id":grant.id})); await audit(db,"trial.granted",str(user.id),str(plan.id),{"days":days}); await db.commit()
     return {"ok":True,"status":"queued","expires_at":grant.expires_at,"plan_id":grant.plan_id,"days":grant.days}
 
 @app.get("/api/public/config")
@@ -690,7 +700,7 @@ async def public_config(db:AsyncSession=Depends(get_db)):
         payment_providers=await _payment_provider_order(db,None)
     except HTTPException:
         payment_providers=[]
-    return {"default_language": settings.default_language if settings.default_language in {"ru","en"} else "ru","required_channel":settings.required_telegram_channel,"app_name":values.get("app_name","VPN Store"),"bot_name":values.get("bot_name","VPN Shop"),"bot_start_image":values.get("bot_start_image",""),"menu":[{"title":m.title,"action":m.action,"type":m.item_type} for m in menus],"fields":[{"key":f.key,"label":f.label,"type":f.field_type,"value":f.value} for f in fields],"images":[{"title":i.title,"url":"/media/"+i.filename} for i in images],"yandex_enabled":bool(settings.yandex_client_id and settings.yandex_redirect_uri),"advertisements":[{"title":a.title,"text":a.text,"image_url":a.image_url,"button_text":a.button_text,"button_url":a.button_url} for a in ads],"promotions":[{"id":p.id,"name":p.name,"kind":p.kind,"value":float(p.value),"description":p.description,"plan_ids":p.plan_ids} for p in promos],"miniapp":{"title":values.get("miniapp_title",values.get("app_name","VPN Store")),"subtitle":values.get("miniapp_subtitle",""),"background_color":values.get("miniapp_background_color","#f5f7fb"),"background_image":values.get("miniapp_background_image",""),"image":values.get("miniapp_image",""),"instructions":values.get("miniapp_instructions",""),"buttons":mini_buttons},"payment_providers":payment_providers}
+    return {"default_language": settings.default_language if settings.default_language in {"ru","en"} else "ru","required_channel":settings.required_telegram_channel,"app_name":values.get("app_name","VPN Store"),"bot_name":values.get("bot_name","VPN Shop"),"bot_start_image":values.get("bot_start_image",""),"menu":[{"title":m.title,"action":m.action,"type":m.item_type} for m in menus],"fields":[{"key":f.key,"label":f.label,"type":f.field_type,"value":f.value} for f in fields],"images":[{"title":i.title,"url":"/media/"+i.filename} for i in images],"yandex_enabled":bool(settings.yandex_client_id and settings.yandex_redirect_uri),"vk_enabled":bool(settings.vk_client_id and settings.vk_redirect_uri),"email_auth_enabled":True,"trial_days":max(1,min(int(settings.trial_max_days or 3),30)),"payments_sandbox":bool(settings.payments_sandbox),"cabinet_url":settings.cabinet_url or settings.mini_app_url,"advertisements":[{"title":a.title,"text":a.text,"image_url":a.image_url,"button_text":a.button_text,"button_url":a.button_url} for a in ads],"promotions":[{"id":p.id,"name":p.name,"kind":p.kind,"value":float(p.value),"description":p.description,"plan_ids":p.plan_ids} for p in promos],"miniapp":{"title":values.get("miniapp_title",values.get("app_name","VPN Store")),"subtitle":values.get("miniapp_subtitle",""),"background_color":values.get("miniapp_background_color","#f5f7fb"),"background_image":values.get("miniapp_background_image",""),"image":values.get("miniapp_image",""),"instructions":values.get("miniapp_instructions",""),"buttons":mini_buttons},"payment_providers":payment_providers}
 
 @app.get("/api/me")
 async def api_me(request:Request,db:AsyncSession=Depends(get_db)):
@@ -708,7 +718,7 @@ async def plans(db:AsyncSession=Depends(get_db)):
     return out
 
 @app.get("/api/promo/validate")
-async def validate_promo(code:str,plan_id:int,db:AsyncSession=Depends(get_db)):
+async def validate_promo(code:str,plan_id:int,request:Request,db:AsyncSession=Depends(get_db)):
     plan=await db.get(Plan,plan_id)
     if not plan or not plan.enabled: raise HTTPException(404,"Тариф не найден")
     user=await user_from_token(request,db); promo,discount=await promo_discount(db,code,plan_id,Decimal(str(plan.price)),user.id)
@@ -825,7 +835,7 @@ async def feature_enabled(db: AsyncSession, key: str, default: bool = True) -> b
 
 # ---------- Payments ----------
 async def _payment_provider_order(db: AsyncSession, requested: str|None):
-    names={"yookassa","platega","rollypay"}
+    names={"yookassa","platega","rollypay","sandbox"}
     # Provider health rows are lazily bootstrapped. Serialize that bootstrap so
     # concurrent first requests cannot race into a unique-constraint failure.
     await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": 1300000002})
@@ -835,7 +845,7 @@ async def _payment_provider_order(db: AsyncSession, requested: str|None):
     # unrelated admin screen, so bootstrap the provider-health records lazily.
     rows=(await db.execute(select(PaymentProviderHealth).order_by(PaymentProviderHealth.priority,PaymentProviderHealth.provider).with_for_update())).scalars().all()
     existing={x.provider for x in rows}
-    for i,p in enumerate(("yookassa","platega","rollypay"),1):
+    for i,p in enumerate(("yookassa","platega","rollypay","sandbox"),1):
         if p not in existing:
             row=PaymentProviderHealth(provider=p,priority=i*10,enabled=True)
             db.add(row); rows.append(row)
@@ -854,6 +864,7 @@ async def _payment_provider_order(db: AsyncSession, requested: str|None):
         "yookassa": bool(settings.yookassa_shop_id and settings.yookassa_secret_key),
         "platega": bool(settings.platega_merchant_id and settings.platega_secret),
         "rollypay": bool(settings.rollypay_api_key),
+        "sandbox": bool(settings.payments_sandbox),
     }
     enabled=[x.provider for x in rows
              if x.provider in names
@@ -911,7 +922,8 @@ async def ensure_required_channel(user:User):
 async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(get_db)):
     if await maintenance_enabled(db): raise HTTPException(503,"Service is in maintenance mode")
     if not await feature_enabled(db, "payments", True): raise HTTPException(503,"Платежи отключены администратором")
-    if await setting_value(db,PRODUCTION_PAYMENTS_GATE_KEY,"0") != "1":
+    sandbox_requested=str(payload.get("provider") or "").lower()=="sandbox" and settings.payments_sandbox
+    if await setting_value(db,PRODUCTION_PAYMENTS_GATE_KEY,"0") != "1" and not sandbox_requested:
         raise HTTPException(503,"Реальные платежи временно заблокированы: требуется успешный staging E2E")
     user=await user_from_token(request,db)
     try:
@@ -985,7 +997,7 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
     provider_order=await _payment_provider_order(db,requested_provider)
     if not provider_order: raise HTTPException(503,"Нет доступных платёжных провайдеров")
     provider_name=provider_order[0]
-    provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider()}[provider_name]
+    provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider(),"sandbox":SandboxProvider()}[provider_name]
     order_id=canonical_order_id
     lock_key=f"lock:payment-create:{hashlib.sha256(canonical_order_id.encode()).hexdigest()}"
     try:
@@ -997,7 +1009,7 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
     reservation=None; payment_row=None
     try:
         candidate=provider_order[0]
-        candidate_provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider()}[candidate]
+        candidate_provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider(),"sandbox":SandboxProvider()}[candidate]
         # Re-check after acquiring the distributed lock so two first-time callers cannot
         # create two durable intents for the same idempotency key.
         existing=(await db.execute(select(Payment).where(Payment.order_id==order_id).with_for_update())).scalar_one_or_none()
@@ -1013,7 +1025,7 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
         if reservation: reservation.payment_id=payment_row.id
         await db.commit()
         try:
-            result=await candidate_provider.create(final_amount,canonical_order_id,f"VPN {plan.name}",settings.mini_app_url)
+            result=await candidate_provider.create(final_amount,canonical_order_id,f"VPN {plan.name}",settings.cabinet_url or settings.mini_app_url)
             if not result.get("id"):
                 raise RuntimeError("Payment provider returned no payment ID")
             provider_name=candidate; provider=candidate_provider
@@ -1021,8 +1033,15 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
             if health:
                 health.success_count += 1; health.failure_count=0; health.last_error=None; health.circuit_open_until=None; health.updated_at=datetime.utcnow()
             payment_row=(await db.execute(select(Payment).where(Payment.id==payment_row.id).with_for_update())).scalar_one()
-            payment_row.provider_payment_id=result["id"]; payment_row.status="pending"; payment_row.checkout_url=result.get("url"); payment_row.fulfillment_terminal=False
-            await db.commit()
+            payment_row.provider_payment_id=result["id"]; payment_row.checkout_url=result.get("url"); payment_row.fulfillment_terminal=False
+            if candidate=="sandbox" and result.get("status")=="succeeded":
+                payment_row.status="paid"; payment_row.paid_at=datetime.utcnow(); await db.commit()
+                try:
+                    await fulfill(payment_row.id, db)
+                except Exception:
+                    pass
+            else:
+                payment_row.status="pending"; await db.commit()
         except Exception as exc:
             last_error=str(exc)[:1000]
             await db.rollback()
@@ -2082,8 +2101,18 @@ async def connection_qr(request:Request,db:AsyncSession=Depends(get_db)):
 @app.get("/api/me/connection-info")
 async def connection_info(request:Request,db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db); sub=(await db.execute(select(Subscription).where(Subscription.user_id==user.id))).scalar_one_or_none()
-    if not sub or not sub.subscription_url: raise HTTPException(404,"Subscription is not available")
-    return Response(content=json.dumps({"subscription_url":sub.subscription_url,"expires_at":sub.expires_at.isoformat() if sub.expires_at else None,"platforms":{"ios":"Use your compatible VPN client and import the subscription URL.","android":"Use your compatible VPN client and import the subscription URL.","windows":"Use your compatible VPN client and import the subscription URL.","macos":"Use your compatible VPN client and import the subscription URL.","linux":"Use your compatible VPN client and import the subscription URL."}}),media_type="application/json",headers={"Cache-Control":"private, no-store"})
+    guides={}
+    for key in ("android","ios","tv","windows","macos","linux"):
+        row=(await db.execute(select(AppSetting).where(AppSetting.key==f"guide_{key}"))).scalar_one_or_none()
+        guides[key]=row.value if row and row.value else {
+            "android":"Android: установите v2RayTun / Happ / Streisand, вставьте ссылку подписки и подключитесь.",
+            "ios":"iOS: установите Streisand или Happ из App Store, импортируйте ссылку подписки и включите VPN.",
+            "tv":"TV: откройте VPN-клиент на телевизоре, добавьте подписку по ссылке или через QR с телефона.",
+            "windows":"Windows: установите Hiddify / v2rayN, импортируйте ссылку подписки и запустите соединение.",
+            "macos":"macOS: установите Hiddify / Streisand, импортируйте ссылку подписки и подключитесь.",
+            "linux":"Linux: используйте Hiddify / Nekoray, импортируйте URI подписки и активируйте профиль.",
+        }[key]
+    return Response(content=json.dumps({"subscription_url":sub.subscription_url if sub else None,"expires_at":sub.expires_at.isoformat() if sub and sub.expires_at else None,"platforms":guides},ensure_ascii=False),media_type="application/json",headers={"Cache-Control":"private, no-store"})
 
 @app.put("/api/me/auto-renew")
 async def set_auto_renew(payload:dict,request:Request,db:AsyncSession=Depends(get_db)):
@@ -2155,7 +2184,7 @@ async def customer_dashboard(request:Request,db:AsyncSession=Depends(get_db)):
     sub=(await db.execute(select(Subscription).where(Subscription.user_id==user.id))).scalar_one_or_none()
     payments=(await db.execute(select(Payment).where(Payment.user_id==user.id).order_by(Payment.id.desc()).limit(10))).scalars().all()
     tickets=(await db.execute(select(SupportTicket).where(SupportTicket.user_id==user.id).order_by(SupportTicket.id.desc()).limit(5))).scalars().all()
-    return {"user":{"id":user.id,"username":user.username,"referral_code":user.referral_code,"referral_balance":str(user.referral_balance),"wallet_balance":str(user.wallet_balance or 0)},"subscription":None if not sub else {"plan_id":sub.plan_id,"expires_at":sub.expires_at,"subscription_url":sub.subscription_url},"payments":[{"id":p.id,"amount":str(p.amount),"currency":p.currency,"status":p.status,"fulfillment_status":p.fulfillment_status,"created_at":p.created_at} for p in payments],"tickets":[{"id":t.id,"subject":t.subject,"status":t.status} for t in tickets]}
+    return {"user":{"id":user.id,"username":user.username,"email":user.email,"referral_code":user.referral_code,"referral_balance":str(user.referral_balance),"wallet_balance":str(user.wallet_balance or 0),"auto_renew_enabled":user.auto_renew_enabled},"subscription":None if not sub else {"plan_id":sub.plan_id,"expires_at":sub.expires_at,"subscription_url":sub.subscription_url,"status":sub.lifecycle_status,"auto_renew_enabled":user.auto_renew_enabled},"payments":[{"id":p.id,"amount":str(p.amount),"currency":p.currency,"status":p.status,"fulfillment_status":p.fulfillment_status,"created_at":p.created_at} for p in payments],"tickets":[{"id":t.id,"subject":t.subject,"status":t.status} for t in tickets]}
 
 # ---------- Уведомления, статус и управление развёртываниями ----------
 @app.get("/api/me/notifications")

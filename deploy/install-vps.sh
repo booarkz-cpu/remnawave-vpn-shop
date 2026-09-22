@@ -58,7 +58,8 @@ env_line() {
 }
 
 # Previous release contract: INSTALLER_VERSION="1.0.0-realise"
-INSTALLER_VERSION="2.3.0"
+INSTALLER_VERSION="2.4.0"
+# Historical compatibility marker: INSTALLER_VERSION="2.3.0"
 # Historical compatibility marker: INSTALLER_VERSION="2.2.1"
 # Historical compatibility marker: INSTALLER_VERSION="2.2.0"
 # Historical compatibility marker: INSTALLER_VERSION="2.1.0"
@@ -68,7 +69,7 @@ INSTALLER_VERSION="2.3.0"
 # Previous release contract: INSTALLER_VERSION="45.0.0-enterprise"
 # V44.5 Enterprise legacy contract marker
 # INSTALLER_VERSION="43.1.0-production" legacy regression marker
-log "Remnawave VPN Shop — 2.3.0 русскоязычный production installer"
+log "Remnawave VPN Shop — 2.4.0 русскоязычный production installer"
 echo
 echo "Все основные настройки будут введены сейчас. После установки редактировать .env вручную не требуется."
 echo "Для HTTPS DNS-записи доменов должны уже указывать на этот VDS."
@@ -81,6 +82,7 @@ BASE_DOMAIN="${BASE_DOMAIN,,}"
 prompt API_DOMAIN "API-домен" "api.${BASE_DOMAIN}"
 prompt ADMIN_DOMAIN "Домен админки" "admin.${BASE_DOMAIN}"
 prompt APP_DOMAIN "Домен Mini App" "app.${BASE_DOMAIN}"
+prompt CABINET_DOMAIN "Домен личного кабинета" "cabinet.${BASE_DOMAIN}"
 prompt ADMIN_EMAIL "Email администратора" "admin@${BASE_DOMAIN}"
 prompt ADMIN_PASSWORD "Пароль администратора (Enter = сгенерировать)" "" 1
 prompt_required BOT_TOKEN "Telegram BOT_TOKEN от @BotFather" 1
@@ -160,6 +162,10 @@ prompt NOTIFICATION_EXPIRY_DAYS "За сколько дней предупреж
 echo
 prompt YANDEX_CLIENT_ID "Yandex OAuth Client ID (Enter = пропустить)"
 prompt YANDEX_CLIENT_SECRET "Yandex OAuth Client Secret (Enter = пропустить)" "" 1
+prompt VK_CLIENT_ID "VK OAuth Client ID (Enter = пропустить)"
+prompt VK_CLIENT_SECRET "VK OAuth Client Secret (Enter = пропустить)" "" 1
+prompt PAYMENTS_SANDBOX "Песочница платежей без шлюзов (true/false)" "false"
+prompt TRIAL_MAX_DAYS "Максимум дней пробного периода" "3"
 
 echo
 prompt S3_ENDPOINT_URL "S3 endpoint (Enter = отключить off-site backup)"
@@ -207,7 +213,8 @@ umask 077
   env_line COOKIE_SAMESITE "none"
   env_line PUBLIC_BASE_URL "https://${API_DOMAIN}"
   env_line MINI_APP_URL "https://${MINIAPP_DOMAIN:-$APP_DOMAIN}"
-  env_line ADMIN_CORS_ORIGINS "https://${ADMIN_DOMAIN}"
+  env_line CABINET_URL "https://${CABINET_DOMAIN}"
+  env_line ADMIN_CORS_ORIGINS "https://${ADMIN_DOMAIN},https://${CABINET_DOMAIN},https://${APP_DOMAIN}"
   env_line ADMIN_EMAIL "$ADMIN_EMAIL"
   env_line ADMIN_PASSWORD "$ADMIN_PASSWORD"
   env_line BOT_TOKEN "$BOT_TOKEN"
@@ -250,6 +257,11 @@ umask 077
   env_line YANDEX_CLIENT_ID "$YANDEX_CLIENT_ID"
   env_line YANDEX_CLIENT_SECRET "$YANDEX_CLIENT_SECRET"
   env_line YANDEX_REDIRECT_URI "https://${API_DOMAIN}/api/auth/yandex/callback"
+  env_line VK_CLIENT_ID "$VK_CLIENT_ID"
+  env_line VK_CLIENT_SECRET "$VK_CLIENT_SECRET"
+  env_line VK_REDIRECT_URI "https://${API_DOMAIN}/api/auth/vk/callback"
+  env_line PAYMENTS_SANDBOX "$PAYMENTS_SANDBOX"
+  env_line TRIAL_MAX_DAYS "$TRIAL_MAX_DAYS"
   env_line MEDIA_DIR "/data/media"
   env_line S3_ENDPOINT_URL "$S3_ENDPOINT_URL"
   env_line S3_BUCKET "$S3_BUCKET"
@@ -263,6 +275,7 @@ umask 077
   env_line API_DOMAIN "$API_DOMAIN"
   env_line ADMIN_DOMAIN "$ADMIN_DOMAIN"
   env_line APP_DOMAIN "$APP_DOMAIN"
+  env_line CABINET_DOMAIN "$CABINET_DOMAIN"
   env_line FIREWALL_MODE "strict"
 } > .env
 chmod 600 .env
@@ -310,7 +323,7 @@ PYTHON_BASE_IMAGE="$(resolve_build python:3.12-slim)"
 NODE_BASE_IMAGE="$(resolve_build node:22-alpine)"
 NGINX_BASE_IMAGE="$(resolve_build nginx:1.29-alpine)"
 log "Генерирую frontend lock-файлы автоматически (ручное редактирование не требуется)..."
-for app in admin miniapp; do
+for app in admin miniapp cabinet; do
   [[ -f "$app/package.json" ]] || die "Не найден $app/package.json"
   rm -rf "$app/node_modules"
   docker run --rm --user "$(id -u):$(id -g)" -v "$ROOT/$app:/app" -w /app "$NODE_BASE_IMAGE" \
@@ -354,9 +367,11 @@ printf '%s\n' ' INSTALLATION COMPLETE'
 printf '%s\n' '============================================================'
 echo "Admin:       https://${ADMIN_DOMAIN}"
 echo "Mini App:    https://${APP_DOMAIN}"
+echo "Cabinet:     https://${CABINET_DOMAIN}"
 echo "API:         https://${API_DOMAIN}"
 echo "Version:     ${INSTALLER_VERSION}"
 echo "Yandex:      https://${API_DOMAIN}/api/auth/yandex/callback"
+echo "VK:          https://${API_DOMAIN}/api/auth/vk/callback"
 echo "Admin email: ${ADMIN_EMAIL}"
 if [[ "$GENERATED_ADMIN_PASSWORD" == "1" ]]; then
   echo "Admin password (generated): ${ADMIN_PASSWORD}"

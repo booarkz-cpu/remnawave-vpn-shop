@@ -1,5 +1,8 @@
 {
-  "version": "2.3.0",
+  "version": "2.4.0",
+  "legacy_v2_3_0_contract": {
+    "version": "2.3.0"
+  },
   "legacy_v2_2_1_contract": {
     "version": "2.2.1"
   },
@@ -11,17 +14,19 @@
   "legacy_v2_0_2_contract": {
     "version": "2.0.2-audited"
   },
-  "artifact": "remnawave_vpn_shop_v2_3_0_full_release.zip",
+  "artifact": "remnawave_vpn_shop_v2_4_0_full_release.zip",
+  "legacy_v2_3_0_artifact": "remnawave_vpn_shop_v2_3_0_full_release.zip",
   "legacy_v2_2_1_artifact": "remnawave_vpn_shop_v2_2_1_full_release.zip",
   "sha256": null,
-  "migration_head": "0035_v2_3_0_wallet_gifts",
+  "migration_head": "0036_v2_4_0_cabinet",
+  "previous_migration_head_v2_3_0": "0035_v2_3_0_wallet_gifts",
   "previous_migration_head_v2_2_1": "0034_v2_2_0_platform_features",
   "previous_migration_head_legacy_marker": "0021_v43_hardening_docs",
   "tests": null,
   "signed": false,
-  "detached_manifest": "remnawave_vpn_shop_v2_2_1_full_release_manifest.json",
+  "detached_manifest": "remnawave_vpn_shop_v2_4_0_full_release_manifest.json",
   "note": "Template only. The exact release manifest is shipped as a detached file next to the ZIP because embedding the ZIP SHA inside the ZIP is self-referential.",
-  "previous_release": "2.0.0-realise",
+  "previous_release": "2.3.0",
   "legacy_version_marker": "version: 2.0.0-realise",
   "previous_release_legacy_marker": "1.0.0-realise",
   "previous_release_manifest_legacy_marker": "remnawave_vpn_shop_v1_0_2_realise_deep_audited_fixed_manifest.json",

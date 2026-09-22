@@ -1,20 +1,20 @@
 # Разбор функций / Function reference
 
-Версия приложения: **2.3.0**.
+Версия приложения: **2.4.0**.
 
-Добавлено в 2.3.0: `ensure_required_channel`, `wallet_topup`, `wallet_spend`, `purchase_gift`, промокод вида `days` (добавляет дни и не уменьшает цену), автопродление за `AUTO_RENEW_LEAD_DAYS` дней, deep-link подарка в боте. Номера строк ниже относятся к снимку 2.2.1 и могут сдвинуться.
+Добавлено в 2.4.0: модуль `cabinet_api.py` (email/VK auth, CMS меню кабинета, sandbox complete), `SandboxProvider`, `CabinetMenuItem`, SPA `cabinet/`, админ CMS «Личный кабинет», `scripts/sandbox-e2e.sh`. Добавлено в 2.3.0: `ensure_required_channel`, `wallet_topup`, `wallet_spend`, `purchase_gift`, промокод вида `days`, автопродление за `AUTO_RENEW_LEAD_DAYS` дней, deep-link подарка в боте.
 
 ## Архитектура
 
-Запрос проходит путь Browser или Telegram → Caddy → FastAPI (`backend/app/main.py`) → PostgreSQL и Redis. Выдача VPN идёт в Remnawave. Платежи подтверждаются у провайдера, а не по тексту вебхука. Фоновые циклы живут в API-процессе и в `backend/worker.py`.
+Запрос проходит путь Browser или Telegram → Caddy → FastAPI (`backend/app/main.py` + `cabinet_api.py`) → PostgreSQL и Redis. Выдача VPN идёт в Remnawave. Платежи подтверждаются у провайдера, не по тексту вебхука. Фоновые циклы живут в API-процессе и в `backend/worker.py`.
 
-Админка (`admin/src/main.tsx`) и Mini App (`miniapp/src/main.tsx`) ходят в API с cookie-сессией и заголовком `X-CSRF-Token`. Переключатель RU/EN не меняет данные на сервере: русский текст остаётся исходным, английский подставляется словарём `i18n.tsx`.
+Админка (`admin/src/main.tsx`), Mini App (`miniapp/src/main.tsx`) и личный кабинет (`cabinet/src/main.tsx`) ходят в API с cookie-сессией и заголовком `X-CSRF-Token`.
 
 ## Критические потоки
 
 1. **Вход администратора.** `admin_login` проверяет пароль, при включённой 2FA — TOTP или код восстановления, выпускает JWT с `jti` и пишет `AdminSession`. `current_admin` отклоняет токен без сессии, чужой User-Agent и простой дольше 15 минут.
-2. **Вход покупателя.** Telegram initData проверяется HMAC. Yandex ID опционален и включается только при заполненных `YANDEX_CLIENT_ID` и `YANDEX_REDIRECT_URI`. Сессия покупателя — HttpOnly cookie `rw_user`.
-3. **Оплата.** `create_payment` сначала записывает намерение в БД, затем вызывает `Provider.create`. Вебхук YooKassa принимается только с IP из allowlist. До выдачи `verify_succeeded` сверяет сумму, валюту и `order_id`.
+2. **Вход покупателя.** Telegram initData проверяется HMAC. Email+пароль, VK ID и Yandex ID опциональны (включаются переменными окружения). Сессия покупателя — HttpOnly cookie `rw_user`.
+3. **Оплата.** `create_payment` сначала записывает намерение в БД, затем вызывает `Provider.create`. При `PAYMENTS_SANDBOX=true` доступен провайдер `sandbox` без живых шлюзов. Вебхук YooKassa принимается только с IP из allowlist. До выдачи `verify_succeeded` сверяет сумму, валюту и `order_id`.
 4. **Выдача.** `fulfill` под блокировкой пользователя и платежа создаёт или продлевает пользователя Remnawave. Повтор той же операции не продлевает подписку второй раз.
 5. **Возврат.** `execute_refund` вызывает `Provider.refund`. После подтверждённого возврата доступ в Remnawave отзывается, если нет более новой оплаченной выдачи. Реферальное начисление сторнируется.
 6. **Удаление аккаунта.** `privacy_delete` и выдача делят user-lock, чтобы пробный период и автопродление не создали доступ после удаления.

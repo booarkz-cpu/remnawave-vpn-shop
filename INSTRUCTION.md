@@ -1,4 +1,4 @@
-# Полная инструкция — Remnawave VPN Shop 2.3.0
+# Полная инструкция — Remnawave VPN Shop 2.4.0
 
 Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Разбор каждой функции кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
@@ -6,19 +6,20 @@
 
 ## 1. Что это
 
-Магазин VPN: Telegram-бот, Mini App, админ-панель и API. Покупатель выбирает тариф, оплачивает через YooKassa, Platega или RollyPay. После подтверждения оплаты API создаёт или продлевает пользователя в Remnawave. Фоновый worker дожимает очередь выдачи, сверки и уведомления.
+Магазин VPN: Telegram-бот, Mini App, отдельный личный кабинет пользователя, админ-панель и API. Покупатель выбирает тариф, оплачивает через YooKassa, Platega, RollyPay или локальный sandbox. После подтверждения оплаты API создаёт или продлевает пользователя в Remnawave. Фоновый worker дожимает очередь выдачи, сверки и уведомления.
 
-Сервисы Docker Compose: `db` (PostgreSQL 16), `redis`, `backend` (FastAPI), `worker`, `bot`, `admin`, `miniapp`, `caddy`. PostgreSQL и Redis наружу не публикуются. Снаружи открыты порты Caddy: TCP 80, TCP 443, UDP 443.
+Сервисы Docker Compose: `db` (PostgreSQL 16), `redis`, `backend` (FastAPI), `worker`, `bot`, `admin`, `miniapp`, `cabinet`, `caddy`. PostgreSQL и Redis наружу не публикуются. Снаружи открыты порты Caddy: TCP 80, TCP 443, UDP 443.
 
-Интерфейс админки, Mini App и ответы бота работают на русском и английском.
+Интерфейс админки, Mini App, кабинета и ответы бота работают на русском и английском. Админка использует Material Design + Web 3.0.
 
 ## 2. Требования
 
 - Debian или Ubuntu с root для `install.sh`, либо любой хост с Docker Engine и Docker Compose plugin.
-- Домен с DNS на этот сервер, если нужен HTTPS через Caddy. Для локальной проверки допустимы `localhost`.
+- Домены с DNS на этот сервер: API, админка, Mini App, личный кабинет (`CABINET_DOMAIN`). Для локальной проверки допустимы `localhost`.
 - Доступ к панели Remnawave: URL и API-токен.
-- Токен бота от @BotFather и публичный HTTPS URL Mini App.
+- Токен бота от @BotFather и публичный HTTPS URL Mini App / кабинета.
 - Для боевых платежей: магазин выбранного провайдера и, для YooKassa, список доверенных IP вебхуков.
+- Для тестов без касс: `PAYMENTS_SANDBOX=true` и `bash scripts/sandbox-e2e.sh`.
 
 `APP_SECRET` не короче 32 символов. Пароль администратора в примере — не короче 12 символов. Пароль PostgreSQL в `.env.example` ограничен буквами и цифрами, чтобы он совпал в `DB_PASSWORD`, `POSTGRES_PASSWORD` и `DATABASE_URL`.
 
@@ -30,11 +31,11 @@
 sudo bash install.sh
 ```
 
-Скрипт сам ставит Docker, спрашивает данные, которые нельзя угадать, генерирует `APP_SECRET` и пароль базы, пишет `.env` с правами `0600`, собирает образы, поднимает PostgreSQL и Redis, применяет миграции Alembic и печатает адреса панели, Mini App и API. Он настраивает UFW (SSH, TCP 80/443, UDP 443) и Fail2Ban для SSH.
+Скрипт сам ставит Docker, спрашивает данные, которые нельзя угадать, генерирует `APP_SECRET` и пароль базы, пишет `.env` с правами `0600`, собирает образы, поднимает PostgreSQL и Redis, применяет миграции Alembic и печатает адреса панели, Mini App, кабинета и API. Он настраивает UFW (SSH, TCP 80/443, UDP 443) и Fail2Ban для SSH.
 
-`install.sh` ставит Docker, клонирует репозиторий при запуске через `curl` и выполняет `deploy/install-vps.sh`. Все операторские поля вводятся в этом скрипте: домены, почта TLS, бот и его username, Telegram ID, Remnawave, язык `ru`/`en`, валюта, цены 1/3/6/12, автопродление и срок списания, обязательный канал, реферальный процент, YooKassa, Platega, RollyPay, Yandex ID и S3. Секреты приложения и базы скрипт генерирует сам. Повторный вопрос не задаётся, если экспортнуты переменные и указан `INSTALL_NONINTERACTIVE=1`.
+`install.sh` ставит Docker, клонирует репозиторий при запуске через `curl` и выполняет `deploy/install-vps.sh`. Все операторские поля вводятся в этом скрипте: домены (включая кабинет), почта TLS, бот и его username, Telegram ID, Remnawave, язык `ru`/`en`, валюта, цены 1/3/6/12, автопродление и срок списания, обязательный канал, реферальный процент, YooKassa, Platega, RollyPay, Yandex ID, VK ID, sandbox и S3. Секреты приложения и базы скрипт генерирует сам. Повторный вопрос не задаётся, если экспортнуты переменные и указан `INSTALL_NONINTERACTIVE=1`.
 
-Firewall после установки: SSH, TCP 80/443 и UDP 443. Порты API, админки, Mini App, PostgreSQL и Redis наружу не открываются.
+Firewall после установки: SSH, TCP 80/443 и UDP 443. Порты API, админки, Mini App, кабинета, PostgreSQL и Redis наружу не открываются.
 
 Каталог `deploy/` содержит Caddyfile. Установщик копирует проект в `/opt/vpn-shop`. Если каталог уже занят, скрипт останавливается, чтобы не затереть рабочую установку. Обновление: `./scripts/update.sh`.
 
@@ -206,6 +207,13 @@ python3 -m pytest -q
 - **Канал.** `REQUIRED_TELEGRAM_CHANNEL` пустой — проверка выключена. Иначе оплата, пополнение и списание требуют статуса member, administrator или creator. Сбой Telegram отвечает 503.
 - **Автопродление.** При `AUTO_RENEW_ENABLED=true` списание начинается за `AUTO_RENEW_LEAD_DAYS` дней до конца (по умолчанию 3, допустимо 1–14).
 
+## 9.2. Личный кабинет и sandbox (2.4.0)
+
+- Отдельный домен `CABINET_DOMAIN` / `CABINET_URL` обслуживает SPA `cabinet/`.
+- Вход: email+пароль, Telegram WebApp, VK ID, Яндекс ID. Вкладки меню и тексты инструкций устройств настраиваются в админке → «Личный кабинет».
+- Покупатель видит тарифы, пробный период (до `TRIAL_MAX_DAYS` дней), ссылку подписки и инструкции Android / iOS / TV / компьютер.
+- `PAYMENTS_SANDBOX=true` включает провайдер `sandbox`. Проверка без касс: `bash scripts/sandbox-e2e.sh`.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -315,17 +323,17 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 2.3.0
+# Full instruction — Remnawave VPN Shop 2.4.0
 
 This is the operator guide for installing the shop, turning payments on, and running the admin panel. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
 ## 1. What it is
 
-A VPN shop: Telegram bot, Mini App, admin console, and API. A buyer picks a plan and pays through YooKassa, Platega, or RollyPay. After the provider confirms the payment, the API creates or extends a Remnawave user. A worker drains fulfillment, reconciliation, and notification jobs.
+A VPN shop: Telegram bot, Mini App, standalone user cabinet, admin console, and API. A buyer picks a plan and pays through YooKassa, Platega, RollyPay, or the local sandbox. After the provider confirms the payment, the API creates or extends a Remnawave user. A worker drains fulfillment, reconciliation, and notification jobs.
 
-Compose services: `db` (PostgreSQL 16), `redis`, `backend` (FastAPI), `worker`, `bot`, `admin`, `miniapp`, `caddy`. PostgreSQL and Redis are not published on the host. Caddy publishes TCP 80, TCP 443, and UDP 443.
+Compose services: `db` (PostgreSQL 16), `redis`, `backend` (FastAPI), `worker`, `bot`, `admin`, `miniapp`, `cabinet`, `caddy`. PostgreSQL and Redis are not published on the host. Caddy publishes TCP 80, TCP 443, and UDP 443.
 
-The admin UI, Mini App, and bot replies are available in Russian and English.
+The admin UI, Mini App, cabinet, and bot replies are available in Russian and English. The admin console uses Material Design + Web 3.0.
 
 ## 2. Requirements
 
@@ -508,6 +516,13 @@ The header theme button stores `rw_theme` in the browser. The server default app
 - **Day promos.** Kind `days` adds days to the plan and does not reduce the price. A numeric kind is still a currency discount, and `percent` is a percentage.
 - **Channel.** An empty `REQUIRED_TELEGRAM_CHANNEL` disables the check. Otherwise checkout, top-up and wallet spend require status member, administrator or creator. A Telegram API failure returns 503.
 - **Auto-renew.** With `AUTO_RENEW_ENABLED=true`, charging starts `AUTO_RENEW_LEAD_DAYS` days before expiry (default 3, allowed 1–14).
+
+## 9.2. User cabinet and sandbox (2.4.0)
+
+- `CABINET_DOMAIN` / `CABINET_URL` serve the `cabinet/` SPA.
+- Sign-in: email+password, Telegram WebApp, VK ID, Yandex ID. Menu tabs and device guides are edited in Admin → User cabinet.
+- Buyers see plans, a trial capped by `TRIAL_MAX_DAYS`, the subscription URL, and Android / iOS / TV / desktop guides.
+- `PAYMENTS_SANDBOX=true` enables the `sandbox` provider. Gateway-free check: `bash scripts/sandbox-e2e.sh`.
 
 ## 10. Mini App
 

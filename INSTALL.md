@@ -1,4 +1,4 @@
-# Remnawave VPN Shop 2.3.0 — Установка одной командой
+# Remnawave VPN Shop 2.4.0 — Установка одной командой
 
 ## Что устанавливает скрипт
 
@@ -8,7 +8,7 @@
 sudo bash install.sh
 ```
 
-С версии 2.3.0 корневой `install.sh` передаёт управление `deploy/install-vps.sh`. Скрипт спрашивает домены, бота, Remnawave, язык, цены, кассы, канал и S3. Секреты генерирует сам. `INSTALL_NONINTERACTIVE=1` берёт уже экспортированные переменные. Наружу открываются только SSH, TCP 80/443 и UDP 443.
+С версии 2.3.0 корневой `install.sh` передаёт управление `deploy/install-vps.sh`. С версии 2.4.0 скрипт также спрашивает `CABINET_DOMAIN`, VK OAuth, `PAYMENTS_SANDBOX` и `TRIAL_MAX_DAYS`. Секреты генерирует сам. `INSTALL_NONINTERACTIVE=1` берёт уже экспортированные переменные. Наружу открываются только SSH, TCP 80/443 и UDP 443.
 
 Скрипт автоматически:
 
@@ -18,16 +18,16 @@ sudo bash install.sh
 4. Генерирует `APP_SECRET`, пароль PostgreSQL и другие runtime secrets.
 5. Создаёт `.env` с правами `0600`; ручное редактирование не требуется.
 6. Явно пишет `BACKUP_S3_ENABLED=true/false`, поэтому отключённый S3 не ломает Pydantic Settings.
-7. Генерирует `package-lock.json` для Admin и Mini App с таймаутом, после чего Docker использует `npm ci`.
+7. Генерирует `package-lock.json` для Admin, Mini App и Cabinet с таймаутом, после чего Docker использует `npm ci`.
 8. Получает immutable digest для build-stage Python/Node/Nginx и runtime Redis/PostgreSQL/Caddy.
 9. Записывает pinned runtime images в `.env` и `.env.images`.
 10. Настраивает UFW: только SSH, TCP 80/443 и UDP 443. PostgreSQL/Redis/backend наружу не публикуются.
 11. Включает Fail2Ban для SSH и unattended security updates.
 12. Проверяет SSH-конфигурацию перед reload.
-13. Собирает backend, worker, bot, admin и Mini App.
+13. Собирает backend, worker, bot, admin, Mini App и личный кабинет.
 14. Запускает PostgreSQL/Redis и выполняет health-check.
 15. Применяет Alembic migrations.
-16. Выводит URL панели, Mini App и API.
+16. Выводит URL панели, Mini App, кабинета и API.
 
 Если npm registry недоступен, установка завершается с понятной ошибкой вместо бесконечного ожидания.
 

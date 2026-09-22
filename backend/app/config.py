@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     app_domain: str = Field(default="localhost", alias="APP_DOMAIN")
     api_domain: str = Field(default="localhost", alias="API_DOMAIN")
     miniapp_domain: str = Field(default="localhost", alias="MINIAPP_DOMAIN")
+    cabinet_domain: str = Field(default="localhost", alias="CABINET_DOMAIN")
     bot_domain: str = Field(default="localhost", alias="BOT_DOMAIN")
     webhook_domain: str = Field(default="localhost", alias="WEBHOOK_DOMAIN")
     panel_domain: str = Field(default="localhost", alias="PANEL_DOMAIN")
@@ -170,6 +171,8 @@ class Settings(BaseSettings):
     required_telegram_channel: str = Field(
         default="", alias="REQUIRED_TELEGRAM_CHANNEL"
     )
+    trial_max_days: int = Field(default=3, alias="TRIAL_MAX_DAYS", ge=1, le=30)
+    payments_sandbox: bool = Field(default=False, alias="PAYMENTS_SANDBOX")
     fulfillment_max_attempts: int = Field(
         default=8, alias="FULFILLMENT_MAX_ATTEMPTS"
     )
@@ -237,6 +240,14 @@ class Settings(BaseSettings):
     yandex_client_id: str = Field(default="", alias="YANDEX_CLIENT_ID")
     yandex_client_secret: str = Field(default="", alias="YANDEX_CLIENT_SECRET")
     yandex_redirect_uri: str = Field(default="", alias="YANDEX_REDIRECT_URI")
+
+    # ---------- VK ID ----------
+    vk_client_id: str = Field(default="", alias="VK_CLIENT_ID")
+    vk_client_secret: str = Field(default="", alias="VK_CLIENT_SECRET")
+    vk_redirect_uri: str = Field(default="", alias="VK_REDIRECT_URI")
+
+    # Public cabinet URL (separate from Telegram Mini App when needed)
+    cabinet_url: str = Field(default="", alias="CABINET_URL")
 
     # Жёсткий env-флаг. Операционный режим также хранится в настройке БД maintenance_mode.
     maintenance_mode: bool = Field(default=False, alias="MAINTENANCE_MODE")
