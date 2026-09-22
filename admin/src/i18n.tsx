@@ -481,6 +481,22 @@ export const EN: Record<string, string> = {
   "Узлы": "Nodes",
   "Цена": "Price",
   "вкл": "on",
+  "Приложения": "Apps",
+  "Тексты видит кабинет покупателя. Логотип показывается в кабинете и в приложениях Android и iOS.": "The buyer cabinet shows these texts. The logo appears in the cabinet and in the Android and iOS apps.",
+  "Сохранить приложения": "Save apps",
+  "Логотип для кабинета и приложений": "Logo for the cabinet and the apps",
+  "Загрузить логотип": "Upload logo",
+  "Удалить логотип": "Remove logo",
+  "Показывать": "Show",
+  "Название RU": "Title RU",
+  "Название EN": "Title EN",
+  "Текст RU": "Text RU",
+  "Текст EN": "Text EN",
+  "Ссылка": "Link",
+  "Покупатель": "Buyer",
+  "Приложения сохранены": "Apps saved",
+  "Логотип обновлён": "Logo updated",
+  "Логотип удалён": "Logo removed",
 };
 
 let activeLang: Lang = "ru";

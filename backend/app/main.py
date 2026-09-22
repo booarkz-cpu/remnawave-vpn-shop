@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib, hmac, ipaddress, json, os, urllib.parse, secrets, pathlib, asyncio, tarfile, shutil, re, logging, socket, uuid, contextvars
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -24,7 +26,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.7.0"
+APP_VERSION = "2.8.0"
+# Historical compatibility marker: APP_VERSION = "2.7.0"
 # Historical compatibility marker: APP_VERSION = "2.6.0"
 # Historical compatibility marker: APP_VERSION = "2.5.0"
 # Historical compatibility marker: APP_VERSION = "2.4.0"
@@ -45,9 +48,11 @@ app = FastAPI(title="Remnawave VPN Shop API", version=APP_VERSION, docs_url=None
 from .cabinet_api import router as cabinet_router
 from .tariff_api import router as tariff_router
 from .platform_api import router as platform_router
+from .mobile_catalog import router as apps_router
 app.include_router(cabinet_router)
 app.include_router(tariff_router)
 app.include_router(platform_router)
+app.include_router(apps_router)
 
 MAX_REQUEST_BYTES = 12 * 1024 * 1024
 RATE_BUCKET: dict[str, list[float]] = {}
@@ -650,6 +655,11 @@ async def my_devices(request: Request, db: AsyncSession=Depends(get_db)):
     rows=(await db.execute(select(UserDevice).where(UserDevice.user_id==user.id).order_by(UserDevice.created_at.desc()))).scalars().all()
     return [{"id":x.id,"device_key":x.device_key,"name":x.name,"platform":x.platform,"last_ip":x.last_ip,"last_seen_at":x.last_seen_at,"status":x.status,"created_at":x.created_at} for x in rows]
 
+class DeviceRegisterIn(BaseModel):
+    device_key: str = Field(min_length=16, max_length=128)
+    name: str = Field(default="Устройство", min_length=1, max_length=100)
+    platform: str = Field(default="unknown", max_length=64)
+
 @app.post("/api/me/devices")
 async def register_device(payload:DeviceRegisterIn, request:Request, db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db); now=datetime.utcnow()
@@ -755,11 +765,6 @@ async def validate_promo(code:str,plan_id:int,request:Request,db:AsyncSession=De
     if not plan or not plan.enabled: raise HTTPException(404,"Тариф не найден")
     user=await user_from_token(request,db); promo,discount=await promo_discount(db,code,plan_id,Decimal(str(plan.price)),user.id)
     return {"code":promo.code,"discount":float(discount),"final_price":float((Decimal(str(plan.price))-discount).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP))}
-
-class DeviceRegisterIn(BaseModel):
-    device_key: str = Field(min_length=16, max_length=128)
-    name: str = Field(default="Устройство", min_length=1, max_length=100)
-    platform: str = Field(default="unknown", max_length=64)
 
 class CampaignIn(BaseModel):
     name: str = Field(min_length=1, max_length=255)
@@ -3816,7 +3821,7 @@ async def _store_branding_image(file:UploadFile, kind:str, max_bytes:int=2*1024*
             im.verify()
         with Image.open(BytesIO(data)) as im:
             im=ImageOps.exif_transpose(im).convert("RGBA")
-            max_side=2048 if kind=="logo" else 512
+            max_side=2048 if kind in {"logo","client-logo"} else 512
             im.thumbnail((max_side,max_side),Image.Resampling.LANCZOS)
             out=BytesIO(); im.save(out,"PNG",optimize=True)
             normalized=out.getvalue()

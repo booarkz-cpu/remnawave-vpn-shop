@@ -1,4 +1,4 @@
-# Security / Безопасность — Remnawave VPN Shop 2.7.0
+# Security / Безопасность — Remnawave VPN Shop 2.8.0
 
 Граница доверия: браузер или Telegram → Caddy → API → PostgreSQL, Redis, Remnawave и платёжные провайдеры. PostgreSQL и Redis наружу не публикуются.
 
@@ -77,9 +77,16 @@ Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Rem
 - Веб-вход администратора и покупателя по-прежнему кладёт JWT только в HttpOnly cookie и не возвращает `access_token` в JSON.
 - Нативный клиент получает `access_token`, только если заголовок `X-Shop-Client` равен `android-user`, `android-admin`, `ios-user` или `ios-admin`. Другое значение оставляет веб-путь с cookie.
 - Приложение хранит токен локально и шлёт `Authorization: Bearer`. Cookie оно не сохраняет, поэтому заголовок `X-CSRF-Token` для этих вызовов не требуется.
-- Сессия привязана к User-Agent. Строки приложений фиксированы: `RemnawaveShop-Android-User/2.7.0`, `RemnawaveShop-Android-Admin/2.7.0`, `RemnawaveShop-iOS-User/2.7.0`, `RemnawaveShop-iOS-Admin/2.7.0`. Смена строки отзывает сессию.
+- Сессия привязана к User-Agent. Строки приложений фиксированы: `RemnawaveShop-Android-User/2.8.0`, `RemnawaveShop-Android-Admin/2.8.0`, `RemnawaveShop-iOS-User/2.8.0`, `RemnawaveShop-iOS-Admin/2.8.0`. Смена строки отзывает сессию.
 - Клиенты не следуют HTTP-редиректам и не пишут токен в журнал. Платёжный URL открывается только для https или для `localhost`, `127.0.0.1` и `10.0.2.2`.
 - Экран узлов повторно оставляет поля `name`, `country`, `status`, `users_online`. Имя с признаками хоста заменяется на `node`.
+
+## Каталог приложений 2.8.0
+
+- `GET /api/public/apps` возвращает `logo_url` и включённые карточки с `audience=user`. Карточки администратора и выключенные карточки в ответ не входят.
+- Ссылка карточки сохраняется только как абсолютный `https` без логина, пароля и локального адреса. Пустая ссылка допустима.
+- `logo_url` — только путь `/media/<имя файла>`. `..`, схема и дополнительные сегменты отбрасываются.
+- Загрузка логотипа требует `manage_content`, перекодирует изображение в PNG и удаляет предыдущий файл по имени внутри `MEDIA_DIR`.
 
 ## Что это не гарантирует
 
@@ -143,9 +150,15 @@ The SMTP test sends only to the current administrator's `admin.email`. The SMTP 
 
 Web admin and buyer login still store the JWT only in an HttpOnly cookie and do not return `access_token` in JSON. A native client receives `access_token` only when `X-Shop-Client` is `android-user`, `android-admin`, `ios-user` or `ios-admin`. Any other value keeps the cookie path.
 
-The app stores the token locally and sends `Authorization: Bearer`. It does not persist cookies, so `X-CSRF-Token` is not required for those calls. The session stays bound to the User-Agent. The app strings are fixed: `RemnawaveShop-Android-User/2.7.0`, `RemnawaveShop-Android-Admin/2.7.0`, `RemnawaveShop-iOS-User/2.7.0` and `RemnawaveShop-iOS-Admin/2.7.0`. Changing the string revokes the session.
+The app stores the token locally and sends `Authorization: Bearer`. It does not persist cookies, so `X-CSRF-Token` is not required for those calls. The session stays bound to the User-Agent. The app strings are fixed: `RemnawaveShop-Android-User/2.8.0`, `RemnawaveShop-Android-Admin/2.8.0`, `RemnawaveShop-iOS-User/2.8.0` and `RemnawaveShop-iOS-Admin/2.8.0`. Changing the string revokes the session.
 
 Clients do not follow HTTP redirects and do not log the token. A payment URL opens only for https or for `localhost`, `127.0.0.1` and `10.0.2.2`. The node screen keeps `name`, `country`, `status` and `users_online`, and replaces a host-like name with `node`.
+
+## App catalog 2.8.0
+
+`GET /api/public/apps` returns `logo_url` and enabled cards whose audience is `user`. Administrator cards and disabled cards are omitted. A card link is stored only as an absolute `https` URL without user info or a local host. An empty link is allowed.
+
+`logo_url` is only a `/media/<filename>` path. `..`, a scheme and extra path segments are dropped. Logo upload requires `manage_content`, re-encodes the image to PNG and deletes the previous file by basename inside `MEDIA_DIR`.
 
 ## Limits
 

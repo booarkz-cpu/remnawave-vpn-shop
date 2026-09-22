@@ -332,6 +332,15 @@ python3 scripts/node-agent.py
 9. Админские экраны читают обзор, тарифы, платежи, мониторинг Remnawave и сводку платформы. Кнопки «Ограничить» и «Снять» вызывают разбор нарушения. Поддержка отправляет поле `reply`.
 10. Сборка: Android Studio для каталогов `mobile/android-*`, Xcode для `mobile/ios-*/*.xcodeproj`. Готового APK или IPA в архиве релиза нет.
 
+## 9.7. Тексты приложений и логотип (2.8.0)
+
+1. Войдите в админку → **Приложения**.
+2. Для каждой из четырёх карточек заполните название и текст на русском и английском. Ссылка, если она нужна, начинается с `https://`. Локальный адрес и ссылка с логином не сохраняются.
+3. Снимите «Показывать», чтобы карточка покупателя исчезла из кабинета и из `GET /api/public/apps`. Карточки администратора в публичный ответ не входят в любом случае.
+4. Загрузите PNG, JPG или WEBP в блок логотипа. Сервер сохраняет PNG в `/media/`. Этот файл виден в шапке личного кабинета и в приложениях Android и iOS.
+5. Кнопка **Удалить логотип** очищает `client_logo`. Логотип панели в разделе «Брендинг панели» при этом не меняется.
+6. Откройте личный кабинет. Над вкладками есть блок «Приложения». Язык блока совпадает с языком кабинета.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -747,6 +756,15 @@ The four source trees live under `mobile/`: `android-user`, `android-admin`, `io
 8. The administrator signs in with `X-Shop-Client: android-admin` or `ios-admin`. The 2FA code is sent only when the field is filled. The app User-Agent must stay stable because the session is bound to it.
 9. Admin screens read the overview, plans, payments, Remnawave monitoring and the platform summary. Restrict and clear call violation review. Support sends the `reply` field.
 10. Build with Android Studio for `mobile/android-*` and with Xcode for `mobile/ios-*/*.xcodeproj`. The release archive does not contain an APK or an IPA.
+
+## 9.7. App texts and logo (2.8.0)
+
+1. Open Admin → **Приложения** (Apps).
+2. Fill the Russian and English title and text for each of the four cards. A link, when present, starts with `https://`. A local address or a URL with user info is rejected.
+3. Clear **Показывать** to hide a buyer card from the cabinet and from `GET /api/public/apps`. Administrator cards are never included in the public response.
+4. Upload a PNG, JPG or WEBP in the logo block. The server stores a PNG under `/media/`. That file appears in the user cabinet header and in the Android and iOS apps.
+5. **Удалить логотип** clears `client_logo`. The panel logo in **Брендинг панели** stays as it is.
+6. Open the user cabinet. The **Приложения** block sits above the tabs and follows the cabinet language.
 
 ## 10. Mini App
 

@@ -36,6 +36,13 @@ func jsonText(_ value: Any?) -> String {
     return ""
 }
 
+func safeMediaPath(_ path: String) -> String? {
+    guard path.hasPrefix("/media/"), !path.contains(".."), !path.contains("://"), !path.contains("\\"), !path.contains("?"), !path.contains("#") else { return nil }
+    let name = String(path.dropFirst("/media/".count))
+    if name.isEmpty || name.contains("/") { return nil }
+    return path
+}
+
 func publicNode(_ row: [String: Any]) -> [String: Any] {
     let status = (row["status"] as? String) ?? "unknown"
     let safe = ["online", "offline", "disabled", "unknown"].contains(status) ? status : "unknown"
@@ -67,7 +74,7 @@ final class ShopClient: NSObject, URLSessionTaskDelegate {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(lang, forHTTPHeaderField: "Accept-Language")
-        request.setValue("RemnawaveShop-iOS-User/2.7.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("RemnawaveShop-iOS-User/2.8.0", forHTTPHeaderField: "User-Agent")
         request.setValue("ios-user", forHTTPHeaderField: "X-Shop-Client")
         if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         if let idempotency { request.setValue(idempotency, forHTTPHeaderField: "Idempotency-Key") }
@@ -90,6 +97,27 @@ final class ShopClient: NSObject, URLSessionTaskDelegate {
         if !(200...299).contains(status) { throw NSError(domain: "shop", code: status, userInfo: [NSLocalizedDescriptionKey: detailOf(payload, status)]) }
         if payload.isEmpty { return [String: Any]() }
         return try JSONSerialization.jsonObject(with: payload)
+    }
+
+    func bytes(_ path: String) throws -> Data {
+        guard let safe = safeMediaPath(path), let url = URL(string: base + safe) else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("image/png,image/jpeg,image/webp", forHTTPHeaderField: "Accept")
+        let semaphore = DispatchSemaphore(value: 0)
+        var payload = Data()
+        var status = 0
+        var failure: Error?
+        session.dataTask(with: request) { data, response, error in
+            payload = data ?? Data()
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            failure = error
+            semaphore.signal()
+        }.resume()
+        semaphore.wait()
+        if let failure { throw failure }
+        if !(200...299).contains(status) || payload.count > 2 * 1024 * 1024 { throw URLError(.badServerResponse) }
+        return payload
     }
 }
 

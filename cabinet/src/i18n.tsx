@@ -90,6 +90,9 @@ export const EN: Record<string, string> = {
   "Установите клиент для macOS, импортируйте ссылку подписки и подключитесь.": "Install a macOS VPN client, import the subscription URL, then connect.",
   "Установите клиент для Linux, импортируйте ссылку подписки через конфиг или URI.": "Install a Linux VPN client and import the subscription URL via config or URI.",
   "Use your compatible VPN client and import the subscription URL.": "Use your compatible VPN client and import the subscription URL.",
+  "Приложения": "Apps",
+  "Для Android и iOS есть отдельные приложения магазина.": "Separate shop apps are available for Android and iOS.",
+  "Открыть": "Open",
 };
 
 let activeLang: Lang = "ru";

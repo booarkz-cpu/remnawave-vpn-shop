@@ -27,6 +27,11 @@
 - [ ] Confirm `/api/public/servers` has no address, token or password fields.
 - [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
 
+## App catalog 2.8.0
+- [ ] Open Admin → Приложения, save Russian and English texts, and confirm the user cabinet shows only the enabled buyer cards.
+- [ ] Upload a logo and confirm it appears in the cabinet header. Confirm a non-https link is rejected.
+- [ ] Confirm `GET /api/public/apps` has no administrator card and the logo path starts with `/media/`.
+
 ## Mobile apps 2.7.0
 - [ ] Build `mobile/android-user` and `mobile/android-admin` in Android Studio, and the two Xcode projects under `mobile/ios-user` and `mobile/ios-admin`.
 - [ ] Point each app at `https://` API. Confirm `http://` is rejected except for localhost, 127.0.0.1 and 10.0.2.2.

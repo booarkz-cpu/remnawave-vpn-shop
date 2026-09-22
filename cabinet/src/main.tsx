@@ -141,6 +141,36 @@ function withServers(list: MenuItem[]) {
   return next;
 }
 
+function AppsNotice({apps, lang}: {apps: any[]; lang: string}) {
+  if (!apps.length) return null;
+  return (
+    <section className="form-card stack apps-note">
+      <h2 className="section-title">Приложения</h2>
+      <p className="section-sub">Для Android и iOS есть отдельные приложения магазина.</p>
+      <div className="plan-list">
+        {apps.map((row) => {
+          const title = lang === "en" ? row.title_en || row.title_ru : row.title_ru || row.title_en;
+          const text = lang === "en" ? row.text_en || row.text_ru : row.text_ru || row.text_en;
+          const url = typeof row.url === "string" && row.url.startsWith("https://") ? row.url : "";
+          return (
+            <article className="plan-item" key={row.id || title}>
+              <div>
+                <h3>{title}</h3>
+                <p className="section-sub">{text}</p>
+              </div>
+              {url && (
+                <a className="btn-primary" href={url} target="_blank" rel="noopener noreferrer">
+                  Открыть
+                </a>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const {lang, setLang} = useLang();
   const [booting, setBooting] = useState(true);
@@ -166,6 +196,8 @@ function App() {
   const [platform, setPlatform] = useState<string>("android");
   const [ticket, setTicket] = useState({subject: "", message: ""});
   const [copied, setCopied] = useState(false);
+  const [shopApps, setShopApps] = useState<any[]>([]);
+  const [clientLogo, setClientLogo] = useState("");
 
   function flash(text: string, error = false) {
     setMsg(text);
@@ -181,6 +213,15 @@ function App() {
       document.title = conf.app_name ? `${conf.app_name} · ${t("Личный кабинет")}` : t("Личный кабинет");
     } catch {
       setCfg({});
+    }
+    try {
+      const apps = await req("/api/public/apps");
+      const logo = typeof apps?.logo_url === "string" && apps.logo_url.startsWith("/media/") && !apps.logo_url.includes("..") ? apps.logo_url : "";
+      setClientLogo(logo);
+      setShopApps(Array.isArray(apps?.apps) ? apps.apps.filter((row: any) => row && row.audience === "user" && row.enabled !== false) : []);
+    } catch {
+      setClientLogo("");
+      setShopApps([]);
     }
   }
 
@@ -450,7 +491,7 @@ function App() {
       <div className="app-shell">
         <div className="topbar">
           <div className="brand-mark">
-            <span className="orb" aria-hidden />
+            {clientLogo ? <img className="brand-logo" src={API + clientLogo} alt="" /> : <span className="orb" aria-hidden />}
             <span>{brand}</span>
           </div>
           <div className="btn-row">
@@ -469,6 +510,7 @@ function App() {
           <h1>{brand}</h1>
           <p>{authed ? "Управляйте подпиской, тарифами и подключением" : "Безопасный доступ к сети"}</p>
         </header>
+        <AppsNotice apps={shopApps} lang={lang} />
 
         {!authed ? (
           <section className="auth-layout">
