@@ -110,7 +110,7 @@ class ShopApi(private val base: String, private val token: String, private val l
             readTimeout = 15000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Language", lang)
-            setRequestProperty("User-Agent", "RemnawaveShop-Android-Admin/2.8.0")
+            setRequestProperty("User-Agent", "RemnawaveShop-Android-Admin/2.9.0")
             setRequestProperty("X-Shop-Client", "android-admin")
             if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
             if (body != null) {

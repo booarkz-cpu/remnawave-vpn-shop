@@ -11,8 +11,8 @@ android {
         applicationId = "shop.remnawave.user"
         minSdk = 26
         targetSdk = 35
-        versionCode = 280
-        versionName = "2.8.0"
+        versionCode = 290
+        versionName = "2.9.0"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -28,6 +28,7 @@ dependencies {
     implementation(composeBom)
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
 }

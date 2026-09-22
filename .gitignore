@@ -39,5 +39,12 @@ logs/
 .vscode/
 .idea/
 
+# Android build output. Release APKs are attached to the GitHub release.
+*.apk
+mobile/**/build/
+mobile/**/.gradle/
+mobile/**/local.properties
+mobile/**/.cxx/
+
 # OS
 Thumbs.db

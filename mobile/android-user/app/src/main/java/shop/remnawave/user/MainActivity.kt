@@ -62,6 +62,15 @@ private fun shopColors() = darkColorScheme(
 
 private val localHttpHosts = setOf("localhost", "127.0.0.1", "10.0.2.2")
 
+fun externalUrlAllowed(raw: String): Boolean {
+    if (raw.isBlank() || raw.any { it.isWhitespace() }) return false
+    val uri = try { URI(raw) } catch (_: Exception) { return false }
+    val host = uri.host?.lowercase() ?: return false
+    if (uri.userInfo != null) return false
+    if (uri.scheme == "https") return true
+    return uri.scheme == "http" && host in localHttpHosts
+}
+
 fun normalizeBase(raw: String): String {
     val value = raw.trim().trimEnd('/')
     val uri = try { URI(value) } catch (_: Exception) { throw IllegalArgumentException("https") }
@@ -113,7 +122,7 @@ class ShopApi(private val base: String, private val token: String, private val l
             readTimeout = 15000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Language", lang)
-            setRequestProperty("User-Agent", "RemnawaveShop-Android-User/2.8.0")
+            setRequestProperty("User-Agent", "RemnawaveShop-Android-User/2.9.0")
             setRequestProperty("X-Shop-Client", "android-user")
             if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
             if (idempotency != null) setRequestProperty("Idempotency-Key", idempotency)
@@ -299,7 +308,7 @@ private fun UserApp() {
                                         val url = response.optString("url")
                                         activity.runOnUiThread {
                                             notice = t("payment_created")
-                                            if (url.startsWith("https://") || url.startsWith("http://127.0.0.1") || url.startsWith("http://localhost") || url.startsWith("http://10.0.2.2")) {
+                                            if (externalUrlAllowed(url)) {
                                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                             }
                                         }
@@ -335,7 +344,7 @@ private fun UserApp() {
                                     val url = response.optString("url")
                                     activity.runOnUiThread {
                                         notice = t("payment_created")
-                                        if (url.startsWith("https://") || url.startsWith("http://127.0.0.1") || url.startsWith("http://localhost") || url.startsWith("http://10.0.2.2")) {
+                                        if (externalUrlAllowed(url)) {
                                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                         }
                                     }

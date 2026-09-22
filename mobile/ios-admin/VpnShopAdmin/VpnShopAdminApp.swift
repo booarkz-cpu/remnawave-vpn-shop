@@ -71,7 +71,7 @@ final class ShopClient: NSObject, URLSessionTaskDelegate {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(lang, forHTTPHeaderField: "Accept-Language")
-        request.setValue("RemnawaveShop-iOS-Admin/2.8.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("RemnawaveShop-iOS-Admin/2.9.0", forHTTPHeaderField: "User-Agent")
         request.setValue("ios-admin", forHTTPHeaderField: "X-Shop-Client")
         if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         if let body {

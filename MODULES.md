@@ -1,8 +1,8 @@
 # Модули проекта / Project modules
 
-Версия **2.8.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Предыдущее описание конструктора относится к **2.5.0**.
+Версия **2.9.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Установка APK и сборка iOS — в разделе 9.8. Предыдущее описание конструктора относится к **2.5.0**. Каталог приложений описан для **2.8.0**.
 
-Version **2.8.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. The constructor description belongs to **2.5.0**.
+Version **2.9.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. APK install and the iOS build are in section 9.8. The constructor description belongs to **2.5.0**. The app catalog belongs to **2.8.0**.
 
 ---
 

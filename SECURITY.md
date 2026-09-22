@@ -1,4 +1,4 @@
-# Security / Безопасность — Remnawave VPN Shop 2.8.0
+# Security / Безопасность — Remnawave VPN Shop 2.9.0
 
 Граница доверия: браузер или Telegram → Caddy → API → PostgreSQL, Redis, Remnawave и платёжные провайдеры. PostgreSQL и Redis наружу не публикуются.
 
@@ -77,9 +77,15 @@ Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Rem
 - Веб-вход администратора и покупателя по-прежнему кладёт JWT только в HttpOnly cookie и не возвращает `access_token` в JSON.
 - Нативный клиент получает `access_token`, только если заголовок `X-Shop-Client` равен `android-user`, `android-admin`, `ios-user` или `ios-admin`. Другое значение оставляет веб-путь с cookie.
 - Приложение хранит токен локально и шлёт `Authorization: Bearer`. Cookie оно не сохраняет, поэтому заголовок `X-CSRF-Token` для этих вызовов не требуется.
-- Сессия привязана к User-Agent. Строки приложений фиксированы: `RemnawaveShop-Android-User/2.8.0`, `RemnawaveShop-Android-Admin/2.8.0`, `RemnawaveShop-iOS-User/2.8.0`, `RemnawaveShop-iOS-Admin/2.8.0`. Смена строки отзывает сессию.
+- Сессия привязана к User-Agent. Строки приложений фиксированы: `RemnawaveShop-Android-User/2.9.0`, `RemnawaveShop-Android-Admin/2.9.0`, `RemnawaveShop-iOS-User/2.9.0`, `RemnawaveShop-iOS-Admin/2.9.0`. Смена строки отзывает сессию. Строки **2.8.0** остаются в истории релизов и для новой сессии не подходят.
 - Клиенты не следуют HTTP-редиректам и не пишут токен в журнал. Платёжный URL открывается только для https или для `localhost`, `127.0.0.1` и `10.0.2.2`.
 - Экран узлов повторно оставляет поля `name`, `country`, `status`, `users_online`. Имя с признаками хоста заменяется на `node`.
+
+## Пакеты Android 2.9.0
+
+- Релиз публикует два APK, подписанных отладочным ключом сборки. Это пакеты для ручной установки. Для Google Play нужна отдельная подпись владельца.
+- Платёжный URL разбирается как адрес. Схема `https` принимается. Схема `http` принимается только если хост равен `localhost`, `127.0.0.1` или `10.0.2.2`. Логин в адресе и пробелы отклоняются.
+- APK не коммитятся в git. Архив исходников их тоже не содержит. Проверка файла — по `.sha256` рядом с релизом.
 
 ## Каталог приложений 2.8.0
 
@@ -150,9 +156,13 @@ The SMTP test sends only to the current administrator's `admin.email`. The SMTP 
 
 Web admin and buyer login still store the JWT only in an HttpOnly cookie and do not return `access_token` in JSON. A native client receives `access_token` only when `X-Shop-Client` is `android-user`, `android-admin`, `ios-user` or `ios-admin`. Any other value keeps the cookie path.
 
-The app stores the token locally and sends `Authorization: Bearer`. It does not persist cookies, so `X-CSRF-Token` is not required for those calls. The session stays bound to the User-Agent. The app strings are fixed: `RemnawaveShop-Android-User/2.8.0`, `RemnawaveShop-Android-Admin/2.8.0`, `RemnawaveShop-iOS-User/2.8.0` and `RemnawaveShop-iOS-Admin/2.8.0`. Changing the string revokes the session.
+The app stores the token locally and sends `Authorization: Bearer`. It does not persist cookies, so `X-CSRF-Token` is not required for those calls. The session stays bound to the User-Agent. The app strings are fixed: `RemnawaveShop-Android-User/2.9.0`, `RemnawaveShop-Android-Admin/2.9.0`, `RemnawaveShop-iOS-User/2.9.0` and `RemnawaveShop-iOS-Admin/2.9.0`. Changing the string revokes the session. The **2.8.0** strings belong to the previous release.
 
 Clients do not follow HTTP redirects and do not log the token. A payment URL opens only for https or for `localhost`, `127.0.0.1` and `10.0.2.2`. The node screen keeps `name`, `country`, `status` and `users_online`, and replaces a host-like name with `node`.
+
+## Android packages 2.9.0
+
+The release publishes two APKs signed with the build machine's debug key. They are sideload packages. A Play Store upload needs the owner's own signing key. A payment URL is parsed before it opens: `https` is accepted, and `http` is accepted only for the hosts `localhost`, `127.0.0.1` and `10.0.2.2`. User info and whitespace are rejected. The APK files stay out of git and out of the source archive. Check each file with the `.sha256` published next to the release.
 
 ## App catalog 2.8.0
 
