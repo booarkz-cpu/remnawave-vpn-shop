@@ -50,6 +50,7 @@ def test_routes_and_release_scripts():
     assert '@app.post("/api/admin/plans/{plan_id}/enabled")' in main
     assert '@app.get("/api/admin/payments/{payment_id}")' in main
     assert '@app.get("/api/admin/github-update")' in main
+    assert 'APP_VERSION = "2.11.0"' in main
     assert 'APP_VERSION = "2.10.0"' in main
     config = (ROOT / "backend/app/config.py").read_text()
     assert "MOBILE_REQUIRE_PROOF" in config and "MOBILE_CLIENT_KEY" in config
@@ -57,7 +58,10 @@ def test_routes_and_release_scripts():
     assert '"stale"' in platform
     updater = (ROOT / "scripts/update-from-github.sh").read_text()
     assert "scripts/update.sh" in updater
-    assert "--exclude='./.env'" in updater
+    assert "UPDATE_STAGE" in updater
+    update_sh = (ROOT / "scripts/update.sh").read_text()
+    assert "--exclude='./.env'" in update_sh
+    assert update_sh.index("pre-update-$STAMP.tar.gz") < update_sh.index("UPDATE_STAGE")
     fetch = (ROOT / "scripts/github_release_fetch.py").read_text()
     assert "sha256" in fetch and "full_release" in fetch
     assert (ROOT / "mobile/android-user/app-release.apk").exists() is False
@@ -68,7 +72,7 @@ def test_routes_and_release_scripts():
 def test_github_fetcher_rejects_zip_slip(tmp_path):
     module = _fetch_module()
     assert module.version_tuple("v2.10.0") > module.version_tuple("2.9.0")
-    assert module.current_version(ROOT) == "2.10.0"
+    assert module.current_version(ROOT) == "2.11.0"
     import io
     import zipfile
 
@@ -80,3 +84,21 @@ def test_github_fetcher_rejects_zip_slip(tmp_path):
     except SystemExit:
         return
     raise AssertionError("zip slip was accepted")
+
+
+def test_github_fetcher_rejects_symlink(tmp_path):
+    import io
+    import stat
+    import zipfile
+
+    module = _fetch_module()
+    blob = io.BytesIO()
+    with zipfile.ZipFile(blob, "w") as archive:
+        info = zipfile.ZipInfo("link")
+        info.external_attr = (stat.S_IFLNK | 0o777) << 16
+        archive.writestr(info, "/tmp/outside")
+    try:
+        module.safe_extract(blob.getvalue(), tmp_path)
+    except SystemExit:
+        return
+    raise AssertionError("symlink archive was accepted")

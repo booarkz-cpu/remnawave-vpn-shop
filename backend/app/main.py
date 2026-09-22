@@ -26,7 +26,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.10.0"
+APP_VERSION = "2.11.0"
+# Historical compatibility marker: APP_VERSION = "2.10.0"
 # Historical compatibility marker: APP_VERSION = "2.9.0"
 # Historical compatibility marker: APP_VERSION = "2.8.0"
 # Historical compatibility marker: APP_VERSION = "2.7.0"

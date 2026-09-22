@@ -381,7 +381,7 @@ bash scripts/build-android-apk.sh /tmp/apk
 sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 ```
 
-Скрипт требует `.env` в `/opt/vpn-shop` (или в каталоге `APP_DIR`). Он скачивает zip `full_release` и `.sha256` только с GitHub, отклоняет чужой хост и пути с `..`, не затирает `.env`, `.env.*`, `.rollback` и `.git`, затем запускает `scripts/update.sh`: снимок, `pg_dump`, сборка, `doctor.sh` и откат при ошибке. Если установлена та же или более новая версия, скрипт печатает «Установлена актуальная версия» и завершается с кодом 0. Расписание cron администратор добавляет сам. По умолчанию оно выключено.
+Скрипт требует `.env` в `/opt/vpn-shop` (или в каталоге `APP_DIR`). Он скачивает zip `full_release` и `.sha256` только с GitHub, отклоняет чужой хост, symlink, путь с `..` и архив больше 80 МБ, не затирает `.env`, `.env.*`, `.rollback` и `.git`. С версии 2.11.0 `scripts/update.sh` снимает снимок и делает `pg_dump` до копирования новых файлов, затем собирает проект, запускает `doctor.sh` и откатывает снимок при ошибке. Если установлена та же или более новая версия, скрипт печатает «Установлена актуальная версия» и завершается с кодом 0. Расписание cron администратор добавляет сам. По умолчанию оно выключено.
 
 ## 10. Mini App
 
@@ -848,7 +848,7 @@ Without `ANDROID_KEYSTORE` the script builds a debug APK. Keep the output outsid
 sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 ```
 
-The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `full_release` zip and the matching `.sha256` from GitHub only, rejects another host and any `..` path, keeps `.env`, `.env.*`, `.rollback` and `.git`, then runs `scripts/update.sh`: snapshot, `pg_dump`, build, `doctor.sh` and rollback on failure. When the installed version is current, it prints «Установлена актуальная версия» and exits 0. An administrator may add a cron job. It is not enabled by default.
+The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `full_release` zip and the matching `.sha256` from GitHub only, rejects another host, a symlink, any `..` path and an archive larger than 80 MB, and keeps `.env`, `.env.*`, `.rollback` and `.git`. From 2.11.0, `scripts/update.sh` snapshots the install and runs `pg_dump` before copying the new files, then builds, runs `doctor.sh` and restores the snapshot on failure. When the installed version is current, it prints «Установлена актуальная версия» and exits 0. An administrator may add a cron job. It is not enabled by default.
 
 ## 10. Mini App
 

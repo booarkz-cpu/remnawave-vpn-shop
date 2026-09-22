@@ -1,6 +1,10 @@
 # Разбор функций / Function reference
 
-Версия приложения: **2.10.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`.
+Версия приложения: **2.11.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`.
+
+Добавлено в 2.11.0: `scripts/update.sh` копирует `UPDATE_STAGE` только после tar-снимка и `pg_dump`. `scripts/github_release_fetch.py` отклоняет symlink, путь с `..` и архив больше 80 МБ. `README.md` содержит полную русскую и полную английскую части.
+
+Added in 2.11.0: `scripts/update.sh` copies `UPDATE_STAGE` only after the tar snapshot and `pg_dump`. `scripts/github_release_fetch.py` rejects a symlink, a `..` path and an archive larger than 80 MB. `README.md` has a full Russian part and a full English part.
 
 Добавлено в 2.10.0: HMAC клиента в `mobile_auth.py`, `GET /api/me/devices` без `device_key` и `last_ip`, `GET /api/me/traffic` с лимитом из снимка, sandbox в `POST /api/me/wallet/topup`, `notify_user_telegram` после пополнения и выдачи, `POST /api/admin/plans/{id}/enabled`, `GET /api/admin/payments/{id}` без текста ошибки, `stale` у агентов, `GET /api/admin/github-update` и скрипты `scripts/github_release_fetch.py` и `scripts/update-from-github.sh`. Release APK 2.10.0 подписаны отдельно от debug APK 2.9.0. IPA по-прежнему собирается в Xcode.
 

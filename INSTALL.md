@@ -1,4 +1,4 @@
-# Remnawave VPN Shop 2.10.0 — Установка одной командой
+# Remnawave VPN Shop 2.11.0 — Установка одной командой
 
 Предыдущие установщики: 2.9.0 (debug APK), 2.8.0 (тексты и логотип приложений), 2.7.0 (приложения Android и iOS), 2.6.0 (платформа антиабьюза и агент узла), 2.5.0 (конструктор тарифов и мониторинг узлов) и 2.4.0 (личный кабинет). Серверная схема остаётся на миграции `0038_v2_6_0_platform`. Установщик VPS сервер ставит, а APK на телефон не копирует. Android-пакеты 2.10.0 лежат во вложениях релиза и собираются скриптом `scripts/build-android-apk.sh`. Пакеты 2.9.0 остаются в истории релиза. iOS собирается в Xcode. Тексты и логотип задаются в админке, раздел 9.7 `INSTRUCTION.md`. Установка APK 2.9.0 — раздел 9.8. Подпись клиента, release APK и обновление с GitHub — раздел 9.9. Проверка без касс — раздел 9.4. Агент — раздел 9.5. Лицензия — `LICENSE`.
 
@@ -157,3 +157,60 @@ cd /opt/vpn-shop
 ```
 
 Перед реальными платежами необходимо выполнить staging E2E с PostgreSQL, Redis, Remnawave и sandbox выбранного платёжного провайдера.
+
+Обновление с GitHub, когда магазин уже стоит в `/opt/vpn-shop`:
+
+```bash
+sudo bash /opt/vpn-shop/scripts/update-from-github.sh
+```
+
+Скрипт 2.11.0 сверяет SHA-256, не затирает `.env` и просит `scripts/update.sh` снять снимок до замены файлов. Расписание cron не создаётся.
+
+## English
+
+Previous installers: 2.10.0 (release APKs and client proof), 2.9.0 (debug APK), 2.8.0 (app texts and logo), 2.7.0 (Android and iOS apps), 2.6.0 (abuse platform and node agent), 2.5.0 (tariff constructor and node monitoring) and 2.4.0 (user cabinet). The schema stays on migration `0038_v2_6_0_platform`. The VPS installer deploys the server. It does not copy an APK to a phone. The 2.10.0 APKs are release attachments. The 2.9.0 packages stay in that release. iOS is built in Xcode. App texts and the logo are section 9.7 of `INSTRUCTION.md`. The 2.9.0 APK install is section 9.8. Client proof, the release APK and the GitHub update are section 9.9. The gateway-free test is section 9.4. The agent is section 9.5. The license is `LICENSE`.
+
+### What the script installs
+
+```bash
+sudo bash install.sh
+```
+
+Since 2.3.0 the root `install.sh` calls `deploy/install-vps.sh`. Since 2.4.0 the script also asks for `CABINET_DOMAIN`, VK OAuth, `PAYMENTS_SANDBOX` and `TRIAL_MAX_DAYS`. It generates secrets. `INSTALL_NONINTERACTIVE=1` uses variables that are already exported. The firewall opens SSH, TCP 80/443 and UDP 443 only.
+
+The script checks root and Debian/Ubuntu, installs Docker Engine and Compose, asks only for values it cannot invent, generates `APP_SECRET` and the PostgreSQL password, writes `.env` as mode `0600`, records `BACKUP_S3_ENABLED` explicitly, generates `package-lock.json` for Admin, Mini App and Cabinet, pins image digests, configures UFW and Fail2Ban, checks SSH before reload, builds the backend, worker, bot, admin, Mini App and cabinet, starts PostgreSQL and Redis, applies Alembic migrations, and prints the panel, Mini App, cabinet and API URLs.
+
+If the npm registry is unreachable, the install stops with an error instead of waiting forever.
+
+### After install
+
+2FA is not turned on automatically. Enable it in Admin → Безопасность.
+
+```bash
+cd /opt/vpn-shop
+./scripts/preflight.sh
+./scripts/security-scan.sh
+./scripts/doctor.sh
+```
+
+Rebuild the current tree:
+
+```bash
+./scripts/update.sh
+```
+
+Roll back:
+
+```bash
+./scripts/rollback.sh
+```
+
+Update the whole project from the latest GitHub release:
+
+```bash
+sudo bash /opt/vpn-shop/scripts/update-from-github.sh
+```
+
+The 2.11.0 script checks SHA-256, keeps `.env`, and asks `scripts/update.sh` to snapshot the install before replacing files. It does not create a cron job.
+
+Run a staging end-to-end check with PostgreSQL, Redis, Remnawave and the sandbox provider before live payments.

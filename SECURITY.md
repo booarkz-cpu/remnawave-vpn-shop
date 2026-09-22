@@ -1,4 +1,4 @@
-# Security / Безопасность — Remnawave VPN Shop 2.10.0
+# Security / Безопасность — Remnawave VPN Shop 2.11.0
 
 Граница доверия: браузер или Telegram → Caddy → API → PostgreSQL, Redis, Remnawave и платёжные провайдеры. PostgreSQL и Redis наружу не публикуются.
 
@@ -89,7 +89,7 @@ Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Rem
 - User-Agent 2.10.0: `RemnawaveShop-Android-User/2.10.0`, `RemnawaveShop-Android-Admin/2.10.0`, `RemnawaveShop-iOS-User/2.10.0`, `RemnawaveShop-iOS-Admin/2.10.0`. Смена строки начинает новую сессию. Строки 2.9.0 остаются в истории.
 - `GET /api/me/devices` не возвращает `device_key` и `last_ip`. Карточка платежа администратора не возвращает `fulfillment_error`, `checkout_url` и `provider_payment_id`.
 - Сохранённый токен в приложении закрыт биометрией или PIN. Устройство без этого способа открывается сразу, чтобы телефон не остался заблокированным.
-- `GET /api/admin/github-update` только читает метаданные релиза. API не скачивает и не распаковывает архив. Скрипт на хосте сверяет SHA-256, не затирает `.env` и вызывает `scripts/update.sh`.
+- `GET /api/admin/github-update` только читает метаданные релиза. API не скачивает и не распаковывает архив. Скрипт на хосте сверяет SHA-256, отклоняет symlink и путь с `..`, не затирает `.env` и вызывает `scripts/update.sh`. С версии 2.11.0 снимок и `pg_dump` делаются до копирования новых файлов.
 
 ## Пакеты Android 2.9.0
 
@@ -180,7 +180,7 @@ The 2.10.0 User-Agent strings are `RemnawaveShop-Android-User/2.10.0`, `Remnawav
 
 `GET /api/me/devices` omits `device_key` and `last_ip`. The admin payment card omits `fulfillment_error`, `checkout_url` and `provider_payment_id`. A saved token is locked with biometrics or the device PIN. A device that cannot authenticate opens immediately.
 
-`GET /api/admin/github-update` reads release metadata only. The API does not download or extract the archive. The host script checks SHA-256, keeps `.env` and runs `scripts/update.sh`.
+`GET /api/admin/github-update` reads release metadata only. The API does not download or extract the archive. The host script checks SHA-256, rejects a symlink and a `..` path, keeps `.env` and runs `scripts/update.sh`. From 2.11.0 the snapshot and `pg_dump` happen before the new files are copied.
 
 ## Android packages 2.9.0
 
