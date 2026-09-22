@@ -31,7 +31,7 @@ class EmailAuthIn(BaseModel):
 class CabinetMenuIn(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     slug: str = Field(min_length=2, max_length=64, pattern=r"^[a-z0-9_-]+$")
-    kind: str = Field(default="custom", pattern="^(overview|plans|trial|connection|support|custom)$")
+    kind: str = Field(default="custom", pattern="^(overview|plans|trial|connection|support|servers|custom)$")
     body: str = Field(default="", max_length=20000)
     sort_order: int = Field(default=0, ge=-10000, le=10000)
     enabled: bool = True

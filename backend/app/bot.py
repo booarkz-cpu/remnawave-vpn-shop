@@ -8,7 +8,7 @@ from sqlalchemy import select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 from .config import settings
 from .db import engine
-from .models import AppSetting,BotMenuItem,CustomField,Promotion,Advertisement,Plan,Broadcast,User,Subscription
+from .models import AppSetting,BotMenuItem,CustomField,Promotion,Advertisement,Plan,Broadcast,User,Subscription,AbuseViolation,NodeAgent
 
 router=Router()
 
@@ -21,6 +21,8 @@ _BOT_TEXT = {
         "promo_usage": "Использование: /promo КОД",
         "promo_ready": "Промокод <b>{code}</b>. Откройте магазин и примените его к тарифу.",
         "gift_ready": "Подарок <b>{code}</b>. Откройте магазин, чтобы активировать его.",
+        "ops_denied": "Команда только для владельца магазина.",
+        "ops_status": "Открытых нарушений: {violations}. Агентов за 5 минут: {agents}. Панель: {url}",
     },
     "en": {
         "welcome": "Welcome to {name}!",
@@ -30,6 +32,8 @@ _BOT_TEXT = {
         "promo_usage": "Usage: /promo CODE",
         "promo_ready": "Promo code <b>{code}</b>. Open the shop and apply it to a plan.",
         "gift_ready": "Gift <b>{code}</b>. Open the shop to activate it.",
+        "ops_denied": "This command is only for the shop owner.",
+        "ops_status": "Open violations: {violations}. Agents seen in 5 minutes: {agents}. Panel: {url}",
     },
 }
 
@@ -175,6 +179,22 @@ async def promo(message:Message):
     from urllib.parse import quote
     promo_code=code[1].strip().upper()
     await message.answer(_tr(lang,"promo_ready",code=escape(promo_code)),reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=_tr(lang,"open"),web_app=WebAppInfo(url=settings.mini_app_url+"?promo="+quote(promo_code)))] ]),parse_mode="HTML")
+
+@router.message(Command("ops"))
+async def ops(message: Message):
+    lang = _lang(message)
+    if not message.from_user or int(message.from_user.id) != int(settings.admin_telegram_id or 0):
+        await message.answer(_tr(lang, "ops_denied"))
+        return
+    from datetime import timedelta
+    from sqlalchemy import func
+    async with AsyncSession(engine, expire_on_commit=False) as db:
+        violations = int(await db.scalar(select(func.count()).select_from(AbuseViolation).where(AbuseViolation.status == "open")) or 0)
+        cutoff = datetime.utcnow() - timedelta(minutes=5)
+        agents = int(await db.scalar(select(func.count()).select_from(NodeAgent).where(NodeAgent.last_seen_at.is_not(None), NodeAgent.last_seen_at >= cutoff)) or 0)
+    url = f"https://{settings.admin_domain}" if settings.admin_domain and settings.admin_domain != "localhost" else settings.public_base_url
+    buttons = [[InlineKeyboardButton(text="Панель" if lang == "ru" else "Panel", url=url)]]
+    await message.answer(_tr(lang, "ops_status", violations=violations, agents=agents, url=escape(url)), reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML")
 
 async def main():
     if not settings.bot_token: raise RuntimeError("BOT_TOKEN is empty")

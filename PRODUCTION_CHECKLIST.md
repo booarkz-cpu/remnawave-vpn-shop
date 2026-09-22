@@ -20,6 +20,22 @@
 - [ ] Create and verify a backup.
 - [ ] Validate and test-restore a backup in staging.
 
+## Payment smoke test without live gateways
+- [ ] Set `PAYMENTS_SANDBOX=true` and leave live gateway secrets empty.
+- [ ] Create one ordinary enabled plan.
+- [ ] Run `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh`.
+- [ ] Confirm `/api/public/servers` has no address, token or password fields.
+- [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
+
+## Platform 2.6.0
+- [ ] Open Admin → Платформа and confirm the summary loads without agent tokens or webhook secrets.
+- [ ] Leave `auto_hard_block` off until the scoring thresholds are reviewed.
+- [ ] Create a node agent, copy the token once, and run `scripts/node-agent.py` with `SHOP_API_BASE` and `AGENT_TOKEN`.
+- [ ] Leave `AGENT_APPLY_TC` unset until the node interface is known. Set `AGENT_APPLY_TC=1` and `AGENT_IFACE` only for a single global address.
+- [ ] If webhooks are enabled, use a public HTTPS URL. Confirm deliveries show a status, not an exception string.
+- [ ] If SMTP is configured, send the test message and confirm it arrives only at the administrator who clicked the button.
+- [ ] Scrape `/metrics` with `METRICS_TOKEN` and, if desired, import `deploy/grafana/vpnshop-platform.json`.
+
 ## Payment smoke test
 - [ ] Create one test payment.
 - [ ] Confirm provider status and webhook.

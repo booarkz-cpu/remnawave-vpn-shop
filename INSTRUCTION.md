@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 2.4.0
+# Полная инструкция — Remnawave VPN Shop 2.5.0
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Разбор каждой функции кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`. Предыдущий полный контур кабинета описан как 2.4.0 и сохранён.
 
 ---
 
@@ -214,6 +214,109 @@ python3 -m pytest -q
 - Покупатель видит тарифы, пробный период (до `TRIAL_MAX_DAYS` дней), ссылку подписки и инструкции Android / iOS / TV / компьютер.
 - `PAYMENTS_SANDBOX=true` включает провайдер `sandbox`. Проверка без касс: `bash scripts/sandbox-e2e.sh`.
 
+## 9.3. Конструктор тарифов и статус серверов (2.5.0)
+
+### Конструктор
+
+1. Войдите в админку → **Конструктор тарифов**.
+2. Укажите название, описание, базовую цену и при необходимости `remnawave_profile_id`.
+3. Добавьте хотя бы один включённый пункт каждого вида:
+   - **Устройства** — целое от 1 до 100, своя доплата.
+   - **Трафик, ГБ** — целое от 0 до 100000. Значение 0 означает безлимит и в подписке хранится как отсутствие лимита.
+   - **Дни** — целое от 1 до 3650, своя доплата.
+4. Сохраните. API создаёт скрытый якорный тариф, чтобы у платежа оставался `plan_id`. Этот тариф не показывается в `GET /api/plans` и не продаётся напрямую, пробным периодом или подарком.
+5. Покупатель в личном кабинете (вкладка «Тарифы») и в Mini App выбирает по одному пункту каждого вида. На экране видна сумма: база + цены пунктов.
+6. Оплата идёт обычным `POST /api/payments/create` или `POST /api/me/wallet/spend` с полями `constructor_id`, `device_option_id`, `traffic_option_id`, `days_option_id` и заголовком `Idempotency-Key`.
+7. Кнопка «Отключить» не удаляет историю: конструктор и якорный тариф становятся недоступны для новой покупки. Уже оплаченные снимки срока, трафика и устройств не пересчитываются.
+
+Одинаковый `Idempotency-Key` с другой комбинацией пунктов отвечает 409.
+
+### Статус серверов
+
+- Админка → **Мониторинг Remnawave**: доступность панели, задержка, число онлайн/офлайн/отключённых узлов. Адресов и токенов нет.
+- Кабинет: вкладка **Серверы** и блок на обзоре. Без входа доступен `GET /api/public/servers`. После входа кабинет читает `GET /api/me/servers` и получает ещё флаг активности подписки.
+- Если панель Remnawave не отвечает, интерфейс показывает «Remnawave недоступен», а не текст исключения.
+
+## 9.4. Как протестировать проект до релиза без платёжных шлюзов
+
+Этот прогон не требует магазинов YooKassa, Platega и RollyPay и не открывает production gate.
+
+1. В `.env` установите `PAYMENTS_SANDBOX=true`. Боевые ключи касс можно оставить пустыми.
+2. Поднимите стек: `docker compose up -d --build`. Дождитесь `GET /health` с `"ok": true`.
+3. В админке создайте хотя бы один обычный включённый тариф (скрипт покупает его, не конструктор). Либо передайте `SANDBOX_PLAN_ID`.
+4. С хоста, который видит API:
+
+```bash
+SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh
+```
+
+Если API опубликован только через Caddy, укажите `https://<API_DOMAIN>`.
+
+Скрипт сам:
+
+- проверяет `/health`;
+- требует `payments_sandbox: true` и провайдер `sandbox` в `/api/public/config`;
+- читает публичное меню кабинета;
+- регистрирует нового пользователя `sandbox-<время>@example.test`;
+- берёт CSRF из cookie;
+- создаёт платёж `provider=sandbox` с новым `Idempotency-Key`;
+- завершает его через `POST /api/payments/sandbox/complete`;
+- открывает `/api/me/dashboard`;
+- читает `/api/public/servers` и убеждается, что в JSON нет полей адреса, hostname, token, password и private;
+- читает `/api/tariff-constructors` (пустой список допустим).
+
+5. Ручной контур кабинета: откройте `CABINET_URL`, зарегистрируйтесь, на вкладке «Тарифы» соберите конструктор, если он создан, нажмите «Оплатить» при выбранном провайдере sandbox. Возврат на кабинет с `?sandbox_payment=` завершает выдачу. Вкладка «Серверы» должна показать статус без IP.
+6. Что этот прогон не заменяет: боевой вебхук YooKassa, реальный SSH-провижининг узла и сверку суммы у живого провайдера. Если Remnawave недоступен, sandbox-платёж может быть отмечен оплаченным, а выдача останется в очереди или с ошибкой fulfillment — это видно в админке → Платежи и Центр восстановления, и это не означает, что касса подключена.
+
+Повторите `python3 -m pytest -q` на дереве исходников до выкладки. Контейнерный `scripts/integration-test.sh` нужен на хосте с Docker.
+
+## 9.5. Платформа, агент и лицензия (2.6.0)
+
+Вкладка админки **Платформа** читает `GET /api/admin/platform/summary`. В ответе нет токена агента, хеша ключа API и секрета webhook.
+
+### Модули
+
+Переключатели: `abuse`, `agent`, `webhooks`, `mail`, `metrics`, `torrents`. Выключенный модуль отвечает 503 «Модуль отключён» на свои маршруты. Отсутствующая строка модуля считается включённой.
+
+### Скоринг
+
+Агент присылает наблюдения на `POST /api/agent/observations` (не больше 200 за запрос). Адрес без корректного IP пропускается. IPv4 схлопывается до /24, IPv6 до /64. Балл складывают анализаторы temporal, geo, asn, behavior, devices, hwid, user_agent и torrent. Нарушение появляется, когда балл не ниже `min_score` (по умолчанию 50). `auto_hard_block` по умолчанию выключен. Порог `hard_score` по умолчанию 80.
+
+Кнопки **Ограничить** и **Снять** вызывают `POST /api/admin/platform/violations/{id}/review`. Ограничение ставит `users.restricted_at` и пытается отключить пользователя в Remnawave. Пока отметка стоит, пробный период, создание платежа и списание кошелька отвечают 403 «Доступ ограничен».
+
+Чёрный список HWID: действие `block` запрещает регистрацию устройства, действие `alert` регистрацию пропускает и пишет открытое нарушение.
+
+### Агент узла
+
+На узле, отдельно от API магазина:
+
+```bash
+SHOP_API_BASE=https://api.example.com \
+AGENT_TOKEN='токен-из-админки' \
+OBSERVATIONS_FILE=/var/lib/vpnshop/observations.json \
+AGENT_INTERVAL=60 \
+python3 scripts/node-agent.py
+```
+
+Токен выдаётся один раз при создании агента и уходит в заголовке `X-Agent-Token`. Файл наблюдений — JSON-массив объектов с полями `ip`, `remnawave_uuid`, `asn`, `asn_org`, `country`, `lat`, `lon`, `user_agent`, `hwid`, `mobile`, `torrent`.
+
+По умолчанию агент только сообщает метрики и забирает очередь. Чтобы применить `throttle` или `clear` к одному глобальному IP, на узле задают `AGENT_APPLY_TC=1` и `AGENT_IFACE` (имя интерфейса до 15 символов). Другие виды действий агент не выполняет. Интерактивного терминала у агента нет.
+
+### Ключи, webhook, почта
+
+- `POST /api/admin/platform/api-keys` требует право `security.manage`. Ключ начинается с `rw_` и открывает `GET /api/v3/status` при scope `read`.
+- Webhook принимает только публичный HTTPS URL. Тело события подписывается HMAC-SHA256 в `X-Shop-Signature`.
+- Почта сохраняет SMTP в настройке `smtp_settings`. Пароль шифруется. Кнопка проверки отправляет письмо только на `admin.email`. `POST /api/admin/platform/dkim` возвращает TXT-запись и хранит закрытый ключ зашифрованным.
+- Команда бота `/ops` отвечает только Telegram ID из `ADMIN_TELEGRAM_ID`.
+
+### Кабинет и темы
+
+Кабинет отдаёт `manifest.webmanifest` и может быть добавлен на домашний экран. Админка хранит тему в `localStorage` (`rw_theme`): dark, light, midnight, graphite, lagoon, amber, paper.
+
+### Лицензия
+
+Файл `LICENSE` — Remnawave VPN Shop Proprietary License 1.0. Чтение репозитория разрешено. Копирование, изменение, распространение и сервис для третьих лиц требуют письменного разрешения владельца.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -239,6 +342,7 @@ python3 -m pytest -q
 
 - `/start` — приветствие на языке Telegram (`en`, если `language_code` начинается с `en`, иначе русский, а при пустом коде — `DEFAULT_LANGUAGE`), актуальные цены, активные акции и кнопка Mini App.
 - `/promo КОД` — подсказывает открыть магазин и применить код. Сервер проверяет код ещё раз в момент оплаты.
+- `/ops` — только для `ADMIN_TELEGRAM_ID`: число открытых нарушений, число агентов за последние 5 минут и ссылка на панель.
 
 Меню из панели (**Бот и Mini App**) заменяет кнопку по умолчанию. Пункты типа webapp и url принимаются только с `https://`. Картинка старта не должна ломать ответ: если Telegram не принял фото, бот отправляет текст.
 
@@ -323,7 +427,7 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 2.4.0
+# Full instruction — Remnawave VPN Shop 2.5.0
 
 This is the operator guide for installing the shop, turning payments on, and running the admin panel. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
@@ -524,6 +628,96 @@ The header theme button stores `rw_theme` in the browser. The server default app
 - Buyers see plans, a trial capped by `TRIAL_MAX_DAYS`, the subscription URL, and Android / iOS / TV / desktop guides.
 - `PAYMENTS_SANDBOX=true` enables the `sandbox` provider. Gateway-free check: `bash scripts/sandbox-e2e.sh`.
 
+## 9.3. Tariff constructor and server status (2.5.0)
+
+### Constructor
+
+1. Open Admin → **Конструктор тарифов** (Plan builder).
+2. Set a name, description, base price and an optional `remnawave_profile_id`.
+3. Add at least one enabled option of each kind:
+   - **Devices** — integer 1–100, with its own surcharge.
+   - **Traffic, GB** — integer 0–100000. Zero means unlimited and is stored as no traffic cap.
+   - **Days** — integer 1–3650, with its own surcharge.
+4. Save. The API creates a hidden anchor plan so the payment still has a `plan_id`. That plan is omitted from `GET /api/plans` and cannot be bought, trialed or gifted directly.
+5. The buyer picks one option of each kind in the cabinet Plans tab and in the Mini App. The price shown is base plus the selected option prices.
+6. Checkout is the normal `POST /api/payments/create` or `POST /api/me/wallet/spend` with `constructor_id`, `device_option_id`, `traffic_option_id`, `days_option_id` and an `Idempotency-Key` header.
+7. Disable does not erase history. The constructor and its anchor plan stop accepting new purchases. Snapshots already stored on payments are not recomputed.
+
+The same `Idempotency-Key` with a different selection returns 409.
+
+### Server status
+
+- Admin → **Мониторинг Remnawave**: panel reachability, latency, and online/offline/disabled counts. No addresses and no tokens.
+- Cabinet: the **Серверы** tab and a block on the overview. Signed-out clients can call `GET /api/public/servers`. After sign-in the cabinet calls `GET /api/me/servers`, which adds only `subscription_active`.
+- If the Remnawave panel does not answer, the UI shows that it is unavailable and does not show the exception text.
+
+## 9.4. How to test before release without payment gateways
+
+This run does not need YooKassa, Platega or RollyPay shops and does not open the production payment gate.
+
+1. Set `PAYMENTS_SANDBOX=true` in `.env`. Live gateway secrets may stay empty.
+2. Start the stack: `docker compose up -d --build`. Wait until `GET /health` returns `"ok": true`.
+3. In the admin panel create at least one ordinary enabled plan (the script buys that plan, not a constructor). Or pass `SANDBOX_PLAN_ID`.
+4. From a host that can reach the API:
+
+```bash
+SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh
+```
+
+If the API is published only through Caddy, use `https://<API_DOMAIN>`.
+
+The script checks `/health`, requires `payments_sandbox` and the `sandbox` provider, reads the public cabinet menu, registers `sandbox-<time>@example.test`, reads the CSRF cookie, creates a `provider=sandbox` payment with a fresh `Idempotency-Key`, completes it via `POST /api/payments/sandbox/complete`, opens `/api/me/dashboard`, reads `/api/public/servers` and rejects payloads that contain address, hostname, token, password or private fields, then reads `/api/tariff-constructors` (an empty list is valid).
+
+5. Manual cabinet path: open `CABINET_URL`, register, build a constructor on Plans if one exists, and pay with the sandbox provider. The return URL `?sandbox_payment=` completes fulfillment. The Servers tab must show status without IP addresses.
+6. This run does not replace a live YooKassa webhook, real SSH node provisioning, or an amount check at a live provider. If Remnawave is down, a sandbox payment can still be marked paid while fulfillment stays queued or failed. That is visible under Admin → Payments and the Recovery center, and it does not mean a gateway is connected.
+
+Run `python3 -m pytest -q` on the source tree before release. `scripts/integration-test.sh` needs a host with Docker.
+
+## 9.5. Platform, agent and license (2.6.0)
+
+The admin **Платформа** tab loads `GET /api/admin/platform/summary`. The payload omits the agent token, the API key hash and the webhook secret.
+
+### Modules
+
+Toggles: `abuse`, `agent`, `webhooks`, `mail`, `metrics`, `torrents`. A disabled module returns 503 on its own routes. A missing plugin row is treated as enabled.
+
+### Scoring
+
+The agent posts observations to `POST /api/agent/observations` (at most 200 per request). An invalid IP is skipped. IPv4 collapses to /24 and IPv6 to /64. The analyzers are temporal, geo, asn, behavior, devices, hwid, user_agent and torrent. A violation is stored when the score is at least `min_score` (default 50). `auto_hard_block` is off by default. `hard_score` defaults to 80.
+
+**Ограничить** and **Снять** call `POST /api/admin/platform/violations/{id}/review`. Restrict sets `users.restricted_at` and tries to disable the user in Remnawave. While the flag is set, trial, payment creation and wallet spend return 403. An HWID blacklist action `block` rejects device registration. An action `alert` allows registration and stores an open violation.
+
+### Node agent
+
+On the node, separate from the shop API:
+
+```bash
+SHOP_API_BASE=https://api.example.com \
+AGENT_TOKEN='token-from-admin' \
+OBSERVATIONS_FILE=/var/lib/vpnshop/observations.json \
+AGENT_INTERVAL=60 \
+python3 scripts/node-agent.py
+```
+
+The token is shown once when the agent is created and is sent as `X-Agent-Token`. The observations file is a JSON array of objects with `ip`, `remnawave_uuid`, `asn`, `asn_org`, `country`, `lat`, `lon`, `user_agent`, `hwid`, `mobile` and `torrent`.
+
+By default the agent reports metrics and collects the queue. Set `AGENT_APPLY_TC=1` and `AGENT_IFACE` on the node to apply `throttle` or `clear` to one global IP. The agent does not run any other action kind and does not open an interactive terminal.
+
+### Keys, webhooks and mail
+
+- `POST /api/admin/platform/api-keys` requires `security.manage`. The key starts with `rw_` and authorizes `GET /api/v3/status` when the scope is `read`.
+- A webhook URL must be public HTTPS. The event body is signed with HMAC-SHA256 in `X-Shop-Signature`.
+- Mail stores SMTP in `smtp_settings`. The password is encrypted. The test button sends only to `admin.email`. `POST /api/admin/platform/dkim` returns a TXT record and stores the private key encrypted.
+- The bot command `/ops` answers only the Telegram id in `ADMIN_TELEGRAM_ID`.
+
+### Cabinet and themes
+
+The cabinet serves `manifest.webmanifest` and can be added to the home screen. The admin theme is stored in `localStorage` (`rw_theme`): dark, light, midnight, graphite, lagoon, amber, paper.
+
+### License
+
+`LICENSE` is the Remnawave VPN Shop Proprietary License 1.0. Reading the repository is allowed. Copying, modifying, redistributing and offering the software as a service require the owner's written permission.
+
 ## 10. Mini App
 
 The buyer opens the shop from the bot. The app loads `/api/me/dashboard`, `/api/public/config`, `/api/plans`, billing, the security center, notifications, and the public status.
@@ -538,6 +732,7 @@ When `rw_lang` is absent, the language follows `default_language` after config l
 
 - `/start` greets the user in the Telegram language (`en` when `language_code` starts with `en`, otherwise Russian, and `DEFAULT_LANGUAGE` when the code is empty), lists current prices and active promotions, and shows the Mini App button.
 - `/promo CODE` tells the user to open the shop and apply the code. The server validates the code again at payment time.
+- `/ops` answers only `ADMIN_TELEGRAM_ID` and reports open violations, agents seen in the last five minutes, and a panel link.
 
 A menu saved under **Bot and Mini App** replaces the default button. WebApp and URL items must use `https://`. If Telegram rejects the start image, the bot still sends the text.
 

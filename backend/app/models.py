@@ -21,6 +21,7 @@ class User(Base):
     wallet_balance: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     deleted_at: Mapped[datetime|None] = mapped_column(DateTime)
+    restricted_at: Mapped[datetime|None] = mapped_column(DateTime)
 
 class Plan(Base):
     __tablename__ = "plans"
@@ -140,6 +141,30 @@ class BotMenuItem(Base):
     item_type: Mapped[str] = mapped_column(String(32), default="webapp", nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+class TariffConstructor(Base):
+    __tablename__ = "tariff_constructors"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    base_price: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
+    plan_id: Mapped[int|None] = mapped_column(Integer, index=True)
+    remnawave_profile_id: Mapped[str|None] = mapped_column(String(255))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class TariffConstructorOption(Base):
+    __tablename__ = "tariff_constructor_options"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    constructor_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
 
 class CabinetMenuItem(Base):
     __tablename__ = "cabinet_menu_items"
@@ -679,3 +704,102 @@ class TrialGrant(Base):
     expires_at: Mapped[datetime|None] = mapped_column(DateTime)
     expected_before_expires_at: Mapped[datetime|None] = mapped_column(DateTime)
     expected_after_expires_at: Mapped[datetime|None] = mapped_column(DateTime)
+
+
+class ConnectionObservation(Base):
+    __tablename__ = "connection_observations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int|None] = mapped_column(Integer, index=True)
+    remnawave_uuid: Mapped[str|None] = mapped_column(String(64), index=True)
+    ip: Mapped[str] = mapped_column(String(64), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(80), nullable=False)
+    asn: Mapped[str|None] = mapped_column(String(32))
+    asn_org: Mapped[str|None] = mapped_column(String(255))
+    country: Mapped[str|None] = mapped_column(String(16))
+    lat: Mapped[float|None] = mapped_column(Numeric(8, 5))
+    lon: Mapped[float|None] = mapped_column(Numeric(8, 5))
+    user_agent: Mapped[str|None] = mapped_column(String(255))
+    hwid: Mapped[str|None] = mapped_column(String(128), index=True)
+    mobile: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    torrent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AbuseViolation(Base):
+    __tablename__ = "abuse_violations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int|None] = mapped_column(Integer, index=True)
+    score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    recommendation: Mapped[str] = mapped_column(String(32), default="observe", nullable=False)
+    analyzers: Mapped[dict|None] = mapped_column(JSON)
+    summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="open", index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    reviewed_at: Mapped[datetime|None] = mapped_column(DateTime)
+
+
+class DeviceBlacklist(Base):
+    __tablename__ = "device_blacklist"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    hwid: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    action: Mapped[str] = mapped_column(String(16), default="alert", nullable=False)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class NodeAgent(Base):
+    __tablename__ = "node_agents"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    cpu: Mapped[str|None] = mapped_column(String(32))
+    mem: Mapped[str|None] = mapped_column(String(32))
+    disk: Mapped[str|None] = mapped_column(String(32))
+    xray_ok: Mapped[bool|None] = mapped_column(Boolean)
+    version: Mapped[str|None] = mapped_column(String(32))
+    last_seen_at: Mapped[datetime|None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AgentAction(Base):
+    __tablename__ = "agent_actions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agent_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    payload: Mapped[dict|None] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ShopApiKey(Base):
+    __tablename__ = "shop_api_keys"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(24), nullable=False)
+    secret_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    scopes: Mapped[str] = mapped_column(String(255), default="read", nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_used_at: Mapped[datetime|None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class OutboundWebhook(Base):
+    __tablename__ = "outbound_webhooks"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    secret_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    events: Mapped[str] = mapped_column(String(255), default="abuse.scored", nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_status: Mapped[str|None] = mapped_column(String(32))
+    last_error: Mapped[str|None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class PlatformPlugin(Base):
+    __tablename__ = "platform_plugins"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)

@@ -1,0 +1,11 @@
+{
+  "name": "Личный кабинет",
+  "short_name": "Кабинет",
+  "description": "Личный кабинет Remnawave VPN Shop",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B0F14",
+  "theme_color": "#0B0F14",
+  "lang": "ru"
+}

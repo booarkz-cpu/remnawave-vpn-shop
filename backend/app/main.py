@@ -16,7 +16,7 @@ from sqlalchemy import text as sql_text
 
 from .config import settings
 from .db import engine, get_db
-from .models import User, Plan, Payment, Subscription, AuditLog, FinancialLedger, AdminUser, AdminSession, AppSetting, BotMenuItem, CustomField, MenuImage, Promotion, PromoCode, PromoRedemption, Advertisement, Broadcast, BackupJob, AuthExchangeCode, ReferralReward, PaymentProviderEvent, ReferralLedger, AutoRenewMethod, ProvisioningOperation, RefundRequest, SupportTicket, WithdrawalRequest, WorkerState, ReleaseRecord, SecurityIncident, Job, FraudSignal, PayoutTransaction, FeatureFlag, PaymentProviderHealth, SecurityIncidentEvent, BackupVerification, WebAuthnCredential, UserDevice, Campaign, AutomationRule, MonitoringCheck, TrialGrant, PromoReservation, GiftCode, GiftRedemption, UserSession, Notification, StatusComponent, Deployment, CabinetMenuItem
+from .models import User, Plan, Payment, Subscription, AuditLog, FinancialLedger, AdminUser, AdminSession, AppSetting, BotMenuItem, CustomField, MenuImage, Promotion, PromoCode, PromoRedemption, Advertisement, Broadcast, BackupJob, AuthExchangeCode, ReferralReward, PaymentProviderEvent, ReferralLedger, AutoRenewMethod, ProvisioningOperation, RefundRequest, SupportTicket, WithdrawalRequest, WorkerState, ReleaseRecord, SecurityIncident, Job, FraudSignal, PayoutTransaction, FeatureFlag, PaymentProviderHealth, SecurityIncidentEvent, BackupVerification, WebAuthnCredential, UserDevice, Campaign, AutomationRule, MonitoringCheck, TrialGrant, PromoReservation, GiftCode, GiftRedemption, UserSession, Notification, StatusComponent, Deployment, CabinetMenuItem, TariffConstructor
 from .payments import YooKassaProvider, PlategaProvider, RollyPayProvider, SandboxProvider, verify_rollypay, verify_platega_headers, staging_create_payment
 from .remnawave import RemnawaveClient
 from .provisioner import run_ssh, ProvisionError
@@ -24,7 +24,9 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.4.0"
+APP_VERSION = "2.6.0"
+# Historical compatibility marker: APP_VERSION = "2.5.0"
+# Historical compatibility marker: APP_VERSION = "2.4.0"
 # Historical compatibility marker: APP_VERSION = "2.3.0"
 # Historical compatibility marker: APP_VERSION = "2.2.1"
 # Historical compatibility marker: APP_VERSION = "2.2.0"
@@ -40,7 +42,11 @@ APP_VERSION = "2.4.0"
 logger = logging.getLogger("remnawave")
 app = FastAPI(title="Remnawave VPN Shop API", version=APP_VERSION, docs_url=None, redoc_url=None, openapi_url=None)
 from .cabinet_api import router as cabinet_router
+from .tariff_api import router as tariff_router
+from .platform_api import router as platform_router
 app.include_router(cabinet_router)
+app.include_router(tariff_router)
+app.include_router(platform_router)
 
 MAX_REQUEST_BYTES = 12 * 1024 * 1024
 RATE_BUCKET: dict[str, list[float]] = {}
@@ -58,6 +64,11 @@ RATE_LIMITS = {
     "/api/auth/exchange": 20,
     "/api/payments/create": 20,
     "/api/payments/sandbox/complete": 30,
+    "/api/public/servers": 30,
+    "/api/me/servers": 30,
+    "/api/tariff-constructors": 60,
+    "/api/agent/heartbeat": 120,
+    "/api/agent/observations": 60,
     "/api/promo/validate": 60,
     "/api/me/support/tickets": 10,
     "/api/me/referral/withdrawals": 5,
@@ -437,7 +448,13 @@ async def metrics(request:Request):
     if not settings.metrics_enabled: raise HTTPException(404,"Metrics disabled")
     if not settings.metrics_token: raise HTTPException(503,"Metrics authentication is not configured")
     if not hmac.compare_digest(request.headers.get("X-Metrics-Token", ""),settings.metrics_token): raise HTTPException(401,"Metrics authentication required")
-    body="\n".join(f"vpnshop_{k} {v}" for k,v in _METRICS.items())+"\n"
+    extra=""
+    try:
+        from .platform_api import prometheus_lines
+        extra=await prometheus_lines()
+    except Exception:
+        extra=""
+    body="\n".join(f"vpnshop_{k} {v}" for k,v in _METRICS.items())+"\n"+extra
     return Response(content=body, media_type="text/plain; version=0.0.4")
 
 # ---------- Telegram auth ----------
@@ -635,6 +652,10 @@ async def my_devices(request: Request, db: AsyncSession=Depends(get_db)):
 @app.post("/api/me/devices")
 async def register_device(payload:DeviceRegisterIn, request:Request, db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db); now=datetime.utcnow()
+    from .platform_api import blacklist_decision
+    decision=await blacklist_decision(db, payload.device_key)
+    if decision=="block":
+        raise HTTPException(403,"Устройство в чёрном списке")
     # Serialize device-limit checks per user. Without this lock, two concurrent
     # registrations could both observe the same active_count and exceed the plan limit.
     await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": 710000000 + int(user.id)})
@@ -650,6 +671,9 @@ async def register_device(payload:DeviceRegisterIn, request:Request, db:AsyncSes
     if not x:
         x=UserDevice(user_id=user.id,device_key=payload.device_key,name=payload.name,platform=payload.platform); db.add(x)
     else: x.name=payload.name; x.platform=payload.platform; x.status="active"; x.revoked_at=None
+    if decision=="alert":
+        from .models import AbuseViolation
+        db.add(AbuseViolation(user_id=user.id, score=40, recommendation="warn", analyzers={"hits":[{"name":"hwid","detail":"черный список alert"}]}, summary="Регистрация устройства из чёрного списка со действием alert", status="open", created_at=now))
     x.last_ip=_client_ip(request); x.last_seen_at=now; await db.commit(); await db.refresh(x)
     return {"ok":True,"id":x.id,"status":x.status}
 
@@ -662,6 +686,8 @@ async def revoke_device(device_id:int,request:Request,db:AsyncSession=Depends(ge
 @app.post("/api/me/trial")
 async def claim_trial(payload:TrialIn,request:Request,db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db)
+    from .platform_api import reject_restricted
+    reject_restricted(user)
     # Serialize trial claims per user; the UNIQUE constraint remains the final
     # database invariant, while this prevents duplicate grants under concurrency.
     await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": 720000000 + int(user.id)})
@@ -672,6 +698,9 @@ async def claim_trial(payload:TrialIn,request:Request,db:AsyncSession=Depends(ge
         raise HTTPException(409,"Пробный период недоступен при действующей подписке")
     plan=await db.get(Plan,payload.plan_id)
     if not plan or not plan.enabled: raise HTTPException(404,"Тариф не найден")
+    from .tariff_api import linked_constructor_id
+    if await linked_constructor_id(db, plan.id):
+        raise HTTPException(400,"Пробный период для конструктора недоступен")
     max_days=max(1,min(int(settings.trial_max_days or 3),30))
     days=min(int(payload.days), max_days)
     now=datetime.utcnow(); grant=TrialGrant(user_id=user.id,plan_id=plan.id,days=days,
@@ -710,8 +739,10 @@ async def api_me(request:Request,db:AsyncSession=Depends(get_db)):
 @app.get("/api/plans")
 async def plans(db:AsyncSession=Depends(get_db)):
     rows=(await db.execute(select(Plan).where(Plan.enabled.is_(True)).order_by(Plan.id))).scalars().all()
+    anchor_ids=set((await db.execute(select(TariffConstructor.plan_id).where(TariffConstructor.plan_id.is_not(None)))).scalars().all())
     out=[]
     for p in rows:
+        if p.id in anchor_ids: continue
         price=Decimal(str(p.price)); promo=await active_promotion(db,p.id); discount=discounted_amount(price,promo.kind,promo.value) if promo else Decimal("0.00")
         final_price=(price-discount).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP)
         out.append({"id":p.id,"name":p.name,"price":float(price),"final_price":float(final_price),"discount":float(discount),"discount_percent":float((discount/price*Decimal("100")).quantize(Decimal("0.01"))) if price else 0,"promotion":({"id":promo.id,"name":promo.name,"kind":promo.kind,"value":float(promo.value),"description":promo.description} if promo else None),"duration_days":p.duration_days,"traffic_limit_gb":p.traffic_limit_gb,"device_limit":p.device_limit,"remnawave_profile_id":p.remnawave_profile_id})
@@ -926,10 +957,24 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
     if await setting_value(db,PRODUCTION_PAYMENTS_GATE_KEY,"0") != "1" and not sandbox_requested:
         raise HTTPException(503,"Реальные платежи временно заблокированы: требуется успешный staging E2E")
     user=await user_from_token(request,db)
-    try:
-        plan_id=int(payload.get("plan_id"))
-    except (TypeError, ValueError):
-        raise HTTPException(400,"Invalid plan_id")
+    from .platform_api import reject_restricted
+    reject_restricted(user)
+    constructor_requested=payload.get("constructor_id") not in (None, "", 0, "0")
+    constructor_quote=None
+    quote_error=None
+    plan_id=None
+    if constructor_requested:
+        from .tariff_api import quote_constructor
+        try:
+            constructor_quote=await quote_constructor(db, payload)
+            plan_id=int(constructor_quote["plan_id"])
+        except HTTPException as exc:
+            quote_error=exc
+    else:
+        try:
+            plan_id=int(payload.get("plan_id"))
+        except (TypeError, ValueError):
+            raise HTTPException(400,"Invalid plan_id")
     idem=request.headers.get("Idempotency-Key")
     if not idem or len(idem)>128: raise HTTPException(400,"Idempotency-Key is required")
 
@@ -940,7 +985,10 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
     existing=(await db.execute(select(Payment).where(Payment.user_id==user.id,Payment.idempotency_key==idem).order_by(Payment.id.desc()))).scalar_one_or_none()
     if existing:
         if existing.plan_id != plan_id:
-            raise HTTPException(409,"Idempotency-Key уже использован для другого платежа")
+            if not (quote_error is not None and plan_id is None):
+                raise HTTPException(409,"Idempotency-Key уже использован для другого платежа")
+        if constructor_quote and (existing.duration_days_snapshot != constructor_quote["days"] or existing.traffic_limit_gb_snapshot != constructor_quote["traffic_gb"] or existing.device_limit_snapshot != constructor_quote["devices"]):
+            raise HTTPException(409,"Idempotency-Key уже использован для другой конфигурации тарифа")
         if existing.provider_payment_id or existing.status not in {"creating","creation_unknown"}:
             return {"id":existing.provider_payment_id,"url":existing.checkout_url,"provider":existing.provider,"status":existing.status}
         # An unresolved intent has already reserved the commercial terms. Do not recompute
@@ -972,10 +1020,30 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
 
     # No durable intent exists for this idempotency key, so mutable commercial state
     # is now safe to validate for a brand-new checkout.
+    if quote_error:
+        raise quote_error
+    if plan_id is None:
+        raise HTTPException(400,"Invalid plan_id")
     await ensure_required_channel(user)
     plan=await db.get(Plan,plan_id)
     if not plan or not plan.enabled: raise HTTPException(404,"Not found")
-    base_amount=Decimal(str(plan.price)); promo, promo_discount_amount=await promo_discount(db,payload.get("promo_code"),plan.id,base_amount,user.id)
+    from .tariff_api import linked_constructor_id
+    linked=await linked_constructor_id(db, plan.id)
+    if linked and (not constructor_quote or int(constructor_quote["constructor_id"]) != int(linked)):
+        raise HTTPException(400,"Этот тариф собирается в конструкторе")
+    if constructor_quote:
+        base_amount=Decimal(str(constructor_quote["amount"]))
+        snap_days=int(constructor_quote["days"])
+        snap_traffic=constructor_quote["traffic_gb"]
+        snap_devices=int(constructor_quote["devices"])
+        snap_profile=constructor_quote["profile_id"]
+    else:
+        base_amount=Decimal(str(plan.price))
+        snap_days=plan.duration_days
+        snap_traffic=plan.traffic_limit_gb
+        snap_devices=plan.device_limit
+        snap_profile=plan.remnawave_profile_id
+    promo, promo_discount_amount=await promo_discount(db,payload.get("promo_code"),plan.id,base_amount,user.id)
     if promo is None:
         promotion=await active_promotion(db,plan.id)
         discount_amount=discounted_amount(base_amount,promotion.kind,promotion.value) if promotion else Decimal("0.00")
@@ -988,7 +1056,10 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
     elif promotion is not None and promotion.kind=="days":
         bonus_days=int(Decimal(str(promotion.value)))
     expected_promo=promo.code if promo else None
-    idem_fingerprint=f"{user.id}:{plan.id}:{idem}:{promo.code if promo else promotion.id if promotion else ''}"
+    config_tag=""
+    if constructor_quote:
+        config_tag=f":c{constructor_quote['constructor_id']}:dev{constructor_quote['devices']}:tr{constructor_quote['traffic_gb']}:days{constructor_quote['days']}"
+    idem_fingerprint=f"{user.id}:{plan.id}:{idem}:{promo.code if promo else promotion.id if promotion else ''}{config_tag}"
     canonical_order_id=f"vpn-{user.id}-{plan.id}-{hashlib.sha256(idem_fingerprint.encode()).hexdigest()[:24]}"
 
     # Idempotency lookup already happened above. The order lock below protects the
@@ -1019,7 +1090,7 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
             reservation=await reserve_promo(db,promo,user.id,canonical_order_id)
         # Durable payment intent BEFORE the external provider call. A process crash after
         # provider acceptance cannot erase the fact that this order already exists.
-        payment_row=Payment(user_id=user.id,plan_id=plan.id,provider=candidate,provider_payment_id=None,order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=plan.duration_days,traffic_limit_gb_snapshot=plan.traffic_limit_gb,device_limit_snapshot=plan.device_limit,remnawave_profile_id_snapshot=plan.remnawave_profile_id,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="creating",fulfillment_status="pending",idempotency_key=idem,purpose="subscription",bonus_days=bonus_days)
+        payment_row=Payment(user_id=user.id,plan_id=plan.id,provider=candidate,provider_payment_id=None,order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=snap_days,traffic_limit_gb_snapshot=snap_traffic,device_limit_snapshot=snap_devices,remnawave_profile_id_snapshot=snap_profile,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="creating",fulfillment_status="pending",idempotency_key=idem,purpose="subscription",bonus_days=bonus_days)
         db.add(payment_row)
         await db.flush()
         if reservation: reservation.payment_id=payment_row.id
@@ -1920,21 +1991,59 @@ async def wallet_topup(payload:dict, request:Request, db:AsyncSession=Depends(ge
 async def wallet_spend(payload:dict, request:Request, db:AsyncSession=Depends(get_db)):
     if await maintenance_enabled(db): raise HTTPException(503,"Service is in maintenance mode")
     user=await user_from_token(request,db)
-    try:
-        plan_id=int(payload.get("plan_id"))
-    except (TypeError, ValueError):
-        raise HTTPException(400,"Invalid plan_id")
-    idem=request.headers.get("Idempotency-Key") or f"wallet-spend-{user.id}-{plan_id}-{uuid.uuid4().hex}"
+    from .platform_api import reject_restricted
+    reject_restricted(user)
+    constructor_requested=payload.get("constructor_id") not in (None, "", 0, "0")
+    constructor_quote=None
+    quote_error=None
+    plan_id=None
+    if constructor_requested:
+        from .tariff_api import quote_constructor
+        try:
+            constructor_quote=await quote_constructor(db, payload)
+            plan_id=int(constructor_quote["plan_id"])
+        except HTTPException as exc:
+            quote_error=exc
+    else:
+        try:
+            plan_id=int(payload.get("plan_id"))
+        except (TypeError, ValueError):
+            raise HTTPException(400,"Invalid plan_id")
+    idem=request.headers.get("Idempotency-Key") or (f"wallet-spend-{user.id}-{plan_id}-{uuid.uuid4().hex}" if plan_id is not None else f"wallet-spend-{user.id}-{uuid.uuid4().hex}")
     if len(idem)>128: raise HTTPException(400,"Idempotency-Key is required")
     existing=(await db.execute(select(Payment).where(Payment.user_id==user.id,Payment.idempotency_key==idem))).scalar_one_or_none()
     if existing:
         if existing.provider != "wallet":
             raise HTTPException(409,"Idempotency-Key уже использован для другого платежа")
+        if constructor_quote and (existing.plan_id != plan_id or existing.duration_days_snapshot != constructor_quote["days"] or existing.traffic_limit_gb_snapshot != constructor_quote["traffic_gb"] or existing.device_limit_snapshot != constructor_quote["devices"]):
+            raise HTTPException(409,"Idempotency-Key уже использован для другой конфигурации тарифа")
+        elif plan_id is not None and existing.plan_id != plan_id:
+            raise HTTPException(409,"Idempotency-Key уже использован для другого платежа")
         return {"ok":True,"payment_id":existing.id,"status":existing.status,"fulfillment_status":existing.fulfillment_status}
+    if quote_error:
+        raise quote_error
+    if plan_id is None:
+        raise HTTPException(400,"Invalid plan_id")
     await ensure_required_channel(user)
     plan=await db.get(Plan,plan_id)
     if not plan or not plan.enabled: raise HTTPException(404,"Not found")
-    base_amount=Decimal(str(plan.price)); promo, promo_discount_amount=await promo_discount(db,payload.get("promo_code"),plan.id,base_amount,user.id)
+    from .tariff_api import linked_constructor_id
+    linked=await linked_constructor_id(db, plan.id)
+    if linked and (not constructor_quote or int(constructor_quote["constructor_id"]) != int(linked)):
+        raise HTTPException(400,"Этот тариф собирается в конструкторе")
+    if constructor_quote:
+        base_amount=Decimal(str(constructor_quote["amount"]))
+        snap_days=int(constructor_quote["days"])
+        snap_traffic=constructor_quote["traffic_gb"]
+        snap_devices=int(constructor_quote["devices"])
+        snap_profile=constructor_quote["profile_id"]
+    else:
+        base_amount=Decimal(str(plan.price))
+        snap_days=plan.duration_days
+        snap_traffic=plan.traffic_limit_gb
+        snap_devices=plan.device_limit
+        snap_profile=plan.remnawave_profile_id
+    promo, promo_discount_amount=await promo_discount(db,payload.get("promo_code"),plan.id,base_amount,user.id)
     if promo is None:
         promotion=await active_promotion(db,plan.id)
         discount_amount=discounted_amount(base_amount,promotion.kind,promotion.value) if promotion else Decimal("0.00")
@@ -1949,7 +2058,7 @@ async def wallet_spend(payload:dict, request:Request, db:AsyncSession=Depends(ge
         balance=_money(user.wallet_balance or 0)
         if balance < final_amount: raise HTTPException(402,"Недостаточно средств на балансе")
         order_id=f"wallet-{user.id}-{plan.id}-{hashlib.sha256(idem.encode()).hexdigest()[:24]}"
-        row=Payment(user_id=user.id,plan_id=plan.id,provider="wallet",order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=plan.duration_days,traffic_limit_gb_snapshot=plan.traffic_limit_gb,device_limit_snapshot=plan.device_limit,remnawave_profile_id_snapshot=plan.remnawave_profile_id,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="paid",fulfillment_status="pending",idempotency_key=idem,purpose="subscription",bonus_days=bonus_days,paid_at=datetime.utcnow())
+        row=Payment(user_id=user.id,plan_id=plan.id,provider="wallet",order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=snap_days,traffic_limit_gb_snapshot=snap_traffic,device_limit_snapshot=snap_devices,remnawave_profile_id_snapshot=snap_profile,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="paid",fulfillment_status="pending",idempotency_key=idem,purpose="subscription",bonus_days=bonus_days,paid_at=datetime.utcnow())
         user.wallet_balance=_money(balance-final_amount)
         db.add(row); await db.flush()
         await record_financial_event(db,operation_key=f"wallet-spend:{row.id}",user_id=user.id,payment_id=row.id,kind="wallet_spend",direction="debit",amount=final_amount,currency=row.currency,metadata={"plan_id":plan.id})
@@ -1978,6 +2087,9 @@ async def purchase_gift(payload:dict, request:Request, db:AsyncSession=Depends(g
     await ensure_required_channel(user)
     plan=await db.get(Plan,plan_id)
     if not plan or not plan.enabled: raise HTTPException(404,"Not found")
+    from .tariff_api import linked_constructor_id
+    if await linked_constructor_id(db, plan.id):
+        raise HTTPException(400,"Подарок собирается через конструктор тарифа")
     price=_money(plan.price)
     if price <= 0: raise HTTPException(400,"Gift plan must have a positive price")
     lock,token=await _acquire_user_fulfillment_lock(user.id,ttl=300)
@@ -2871,7 +2983,7 @@ async def health_summary(db:AsyncSession=Depends(get_db),admin=Depends(require_p
         except Exception as exc: checks.append({"name":"Redis","status":"error","error":str(exc)[:300]})
     try:
         start=asyncio.get_running_loop().time(); await RemnawaveClient().list_nodes(start=0,size=1); checks.append({"name":"Remnawave","status":"ok","latency_ms":round((asyncio.get_running_loop().time()-start)*1000,1)})
-    except Exception as exc: checks.append({"name":"Remnawave","status":"error","error":str(exc)[:300]})
+    except Exception: checks.append({"name":"Remnawave","status":"error","error":"unavailable"})
     return {"status":"ok" if all(x["status"]=="ok" for x in checks) else "degraded","checks":checks,"incident_mode":(await setting_value(db,"incident_mode","0"))=="1","payments_paused":(await setting_value(db,PRODUCTION_PAYMENTS_GATE_KEY,"0"))!="1"}
 
 @app.get("/api/admin/gifts")
@@ -2893,8 +3005,11 @@ async def admin_gift_create(payload:GiftCreateIn,db:AsyncSession=Depends(get_db)
 @app.get("/api/admin/overview")
 async def admin_overview(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
     try:
-        users=await RemnawaveClient().list_users(start=0,size=1); nodes=await RemnawaveClient().list_nodes(start=0,size=100)
-    except Exception as e: users={"error":str(e)}; nodes={"error":str(e)}
+        users=await RemnawaveClient().list_users(start=0,size=1); raw_nodes=await RemnawaveClient().list_nodes(start=0,size=100)
+        from .tariff_api import _iter_nodes, public_node
+        safe_nodes=[public_node(n) for n in _iter_nodes(raw_nodes)]
+        nodes={"total":len(safe_nodes),"nodes":safe_nodes}
+    except Exception: users={"error":"unavailable"}; nodes={"error":"unavailable"}
     return {"plans":len((await db.execute(select(Plan))).scalars().all()),"payments":len((await db.execute(select(Payment))).scalars().all()),"remnawave_users":users,"nodes":nodes,"role":admin.role}
 
 @app.get("/api/admin/plans")
@@ -2941,7 +3056,9 @@ async def rw_users(start:int=0,size:int=25,admin=Depends(require_permission("rea
 @app.get("/api/admin/remnawave/users/stream")
 async def rw_user_stream(telegram_id:int|None=None,cursor:int|None=None,size:int=250,status:str|None=None,admin=Depends(require_permission("read"))): return await RemnawaveClient().stream_users(telegram_id,cursor,size,status)
 @app.get("/api/admin/remnawave/nodes")
-async def rw_nodes(start:int=0,size:int=25,admin=Depends(require_permission("read"))): return await RemnawaveClient().list_nodes(start,size)
+async def rw_nodes(start:int=0,size:int=25,admin=Depends(require_permission("read"))):
+    from .tariff_api import remnawave_server_status
+    return await remnawave_server_status("admin")
 @app.get("/api/admin/remnawave/users/{user_id}")
 async def rw_user(user_id:int,admin=Depends(require_permission("read"))): return await RemnawaveClient().get_user(user_id)
 @app.post("/api/admin/remnawave/users/{user_id}/extend")
@@ -2964,11 +3081,8 @@ async def rw_keys(user_id:int,admin=Depends(require_permission("manage_users")))
 
 @app.get("/api/admin/remnawave/health")
 async def remnawave_health(admin=Depends(require_permission("read"))):
-    started=asyncio.get_running_loop().time()
-    try:
-        data=await RemnawaveClient().list_nodes(start=0,size=100)
-        return {"ok":True,"latency_ms":round((asyncio.get_running_loop().time()-started)*1000,1),"nodes":data}
-    except Exception as exc: return {"ok":False,"latency_ms":round((asyncio.get_running_loop().time()-started)*1000,1),"error":str(exc)[:500]}
+    from .tariff_api import remnawave_server_status
+    return await remnawave_server_status("admin")
 
 @app.post("/api/admin/provision-node")
 async def provision_node(payload:dict,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("provision_nodes"))):

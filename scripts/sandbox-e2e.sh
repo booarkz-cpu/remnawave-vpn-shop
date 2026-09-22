@@ -137,5 +137,27 @@ sub=d.get("subscription") or {}
 print(f"[PASS] dashboard loaded user={d.get('user',{}).get('id')} subscription_plan={sub.get('plan_id')}")
 PY
 
+servers=$(curl -fsS --max-time 15 "$API_BASE/api/public/servers")
+python - "$servers" <<'PY'
+import json,sys
+d=json.loads(sys.argv[1])
+blob=json.dumps(d).lower()
+for forbidden in ("address","hostname","token","password","private"):
+    if f'"{forbidden}"' in blob:
+        raise SystemExit(f"FAIL: public server status leaked {forbidden}")
+if "nodes" not in d or "ok" not in d:
+    raise SystemExit(f"FAIL: public servers payload={d}")
+print(f"[PASS] public server status ok={d.get('ok')} nodes={d.get('total')}")
+PY
+
+ctors=$(curl -fsS --max-time 15 "$API_BASE/api/tariff-constructors")
+python - "$ctors" <<'PY'
+import json,sys
+d=json.loads(sys.argv[1])
+if not isinstance(d, list):
+    raise SystemExit(f"FAIL: constructors payload={d}")
+print(f"[PASS] tariff constructors listed count={len(d)}")
+PY
+
 echo "[PASS] sandbox e2e finished without live payment gateways"
 echo "[NEXT] Optional: open CABINET_URL, sign in with $EMAIL, check connection tab."
