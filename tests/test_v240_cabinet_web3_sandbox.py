@@ -50,6 +50,9 @@ def test_v240_frontends_and_sandbox_script_exist():
     assert 'family=Sora' in style or '"Sora"' in style
     assert "cabinet:" in compose
     assert "CABINET_DOMAIN" in compose
+    ci = (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "CABINET_DOMAIN=cabinet.example.test" in ci
+    assert "app: [admin, miniapp, cabinet]" in ci
     assert "{$CABINET_DOMAIN}" in caddy
     assert "reverse_proxy cabinet:80" in caddy
     assert "PAYMENTS_SANDBOX" in script

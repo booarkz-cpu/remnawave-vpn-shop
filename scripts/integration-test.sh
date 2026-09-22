@@ -3,6 +3,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 export COMPOSE_FILE="docker-compose.yml:docker-compose.integration.yml"
+export CABINET_DOMAIN="${CABINET_DOMAIN:-localhost}"
 trap 'docker compose down -v' EXIT
 docker compose build backend worker
 docker compose up -d db redis backend worker
