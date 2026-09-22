@@ -1,0 +1,500 @@
+import React, {createContext, useContext, useEffect, useLayoutEffect, useRef, useState} from "react";
+
+export type Lang = "ru" | "en";
+
+/** English equivalents of the Russian admin UI. Unknown strings stay unchanged. */
+export const EN: Record<string, string> = {
+  "Вход через Telegram доступен, если панель открыта внутри Telegram Web App": "Telegram sign-in is available when the panel is opened inside a Telegram Web App",
+  "Войти": "Sign in",
+  "Брендинг панели": "Panel branding",
+  "Обзор": "Overview",
+  "Корпоративный контур": "Enterprise suite",
+  "Сессии": "Sessions",
+  "Тарифы": "Plans",
+  "Платежи": "Payments",
+  "Финансовый журнал": "Financial ledger",
+  "Пользователи": "Users",
+  "Бот и Mini App": "Bot and Mini App",
+  "Маркетинг": "Marketing",
+  "Администраторы": "Administrators",
+  "Бекапы": "Backups",
+  "Безопасность": "Security",
+  "Центр восстановления": "Recovery center",
+  "Аудит": "Audit",
+  "Поддержка": "Support",
+  "Возвраты": "Refunds",
+  "Рабочие процессы": "Workers",
+  "Релизы": "Releases",
+  "Мониторинг": "Monitoring",
+  "Очередь задач": "Job queue",
+  "Антифрод": "Anti-fraud",
+  "Выплаты": "Payouts",
+  "Проверка тестового контура": "Staging checks",
+  "Операции": "Operations",
+  "Аналитика": "Analytics",
+  "Инциденты": "Incidents",
+  "Провайдеры": "Providers",
+  "Клиенты": "Customers",
+  "Функции": "Features",
+  "Ключи доступа": "Passkeys",
+  "Карточка клиента 360": "Customer 360",
+  "Подарки": "Gifts",
+  "Состояние системы": "System health",
+  "Статус сервиса": "Service status",
+  "Развёртывания": "Deployments",
+  "Уведомления": "Notifications",
+  "Панель управления": "Control panel",
+  "УПРАВЛЕНИЕ": "MANAGEMENT",
+  "Система работает": "System is up",
+  "Выйти": "Sign out",
+  "Переключить тему": "Toggle theme",
+  "Язык интерфейса": "Interface language",
+  "защищённая сессия": "secure session",
+  "Обновление…": "Refreshing…",
+  "Брендинг обновлён": "Branding updated",
+  "Компонент": "Component",
+  "Статус": "Status",
+  "Сообщение": "Message",
+  "Версия": "Version",
+  "Стратегия": "Strategy",
+  "Трафик": "Traffic",
+  "Ошибки": "Errors",
+  "Пользователь": "User",
+  "Канал": "Channel",
+  "Тип": "Type",
+  "Создано": "Created",
+  "Пользователи Remnawave": "Remnawave users",
+  "Имя пользователя": "Username",
+  "Создан": "Created",
+  "Журнал действий": "Activity log",
+  "Время": "Time",
+  "Администратор": "Administrator",
+  "Действие": "Action",
+  "Цель": "Target",
+  "ID пользователя": "User ID",
+  "Открыть": "Open",
+  "Подарочный код создан": "Gift code created",
+  "Подарочные коды": "Gift codes",
+  "Дней": "Days",
+  "Использований": "Uses",
+  "Создать": "Create",
+  "Коды": "Codes",
+  "Код": "Code",
+  "Использовано": "Used",
+  "Лимит": "Limit",
+  "по тарифу": "plan default",
+  "активен": "active",
+  "выключен": "disabled",
+  "Брендинг сохранён": "Branding saved",
+  "ВИЗУАЛЬНЫЕ НАСТРОЙКИ": "VISUAL SETTINGS",
+  "Название панели": "Panel name",
+  "Название, логотип, favicon и предпочтительная тема панели. Все изображения нормализуются сервером.": "Panel name, logo, favicon and preferred theme. The server normalizes every image.",
+  "Название и тема": "Name and theme",
+  "Сохраняется в БД": "Stored in the database",
+  "Тема по умолчанию": "Default theme",
+  "Тёмная": "Dark",
+  "Светлая": "Light",
+  "Сохранение…": "Saving…",
+  "Сохранить изменения": "Save changes",
+  "Логотип": "Logo",
+  "Рекомендуется квадратный или горизонтальный логотип. Сервер преобразует изображение в безопасный PNG.": "A square or horizontal logo is recommended. The server converts the image to a safe PNG.",
+  "Favicon": "Favicon",
+  "Будет нормализован в PNG до 512×512.": "It will be normalized to a PNG up to 512×512.",
+  "Название проверки": "Check name",
+  "Проверка добавлена": "Check added",
+  "Название кампании": "Campaign name",
+  "Кампания создана": "Campaign created",
+  "Название правила": "Rule name",
+  "Событие": "Event",
+  "Правило создано": "Rule created",
+  "КОРПОРАТИВНЫЙ КОНТУР": "ENTERPRISE SUITE",
+  "Все функции в одном центре.": "Every feature in one place.",
+  "Мониторинг, платежи, антифрод, кабинет, устройства, автопродление, кампании, правила и восстановление.": "Monitoring, payments, anti-fraud, account, devices, auto-renew, campaigns, rules and recovery.",
+  "включено": "enabled",
+  "Активные устройства": "Active devices",
+  "24/7 мониторинг": "24/7 monitoring",
+  "Добавить": "Add",
+  "Проверки": "Checks",
+  "Название": "Name",
+  "Задержка": "Latency",
+  "ожидание": "pending",
+  "Управление кампаниями": "Campaign manager",
+  "Кампании": "Campaigns",
+  "Отправлено": "Sent",
+  "Движок автоматизации": "Rules engine",
+  "Создать правило": "Create rule",
+  "Автоматизация": "Automation",
+  "Правило": "Rule",
+  "Состояние": "State",
+  "Приоритет": "Priority",
+  "Запусков": "Runs",
+  "выключено": "disabled",
+  "Покрытие корпоративный контур": "Enterprise coverage",
+  "Антифрод, Умная маршрутизация платежей, личный кабинет, мультиустройства, автопродление, Конструктор бота, Конструктор сообщений, Конструктор Mini App, тарифы 2.0, Trial, Управление кампаниями, аналитика, Управление узлами, Движок автоматизации, Поддержка Center и Аварийное восстановление интегрированы с существующей production-безопасностью.": "Anti-fraud, payment routing, the customer account, multiple devices, auto-renew, bot builder, message builder, Mini App builder, plans 2.0, Trial, campaign manager, analytics, node management, rules engine, support center and disaster recovery stay inside the existing production security model.",
+  "ПРОДАКШН · корпоративный контур": "PRODUCTION · enterprise suite",
+  "Всё под контролем.": "Everything is under control.",
+  "Надёжность, платежи, VPN, резервные копии, безопасность и аналитика.": "Reliability, payments, VPN, backups, security and analytics.",
+  "Активные VPN": "Active VPN",
+  "Выручка 30д": "Revenue 30d",
+  "Ошибки выдачи": "Fulfillment errors",
+  "Система": "System",
+  "РАБОТАЕТ": "UP",
+  "НЕСТАБИЛЬНО": "DEGRADED",
+  "НЕДОСТУПЕН": "DOWN",
+  "ОШИБКА": "ERROR",
+  "Выручка": "Revenue",
+  "24 часа": "24 hours",
+  "7 дней": "7 days",
+  "30 дней": "30 days",
+  "Сверить платежи": "Reconcile payments",
+  "Провайдер": "Provider",
+  "Сумма": "Amount",
+  "Платёж": "Payment",
+  "Выдача": "Fulfillment",
+  "Попытки": "Attempts",
+  "Повторить": "Retry",
+  "Завершить все ваши сессии?": "Revoke all of your sessions?",
+  "Завершить все": "Revoke all",
+  "Активные сессии": "Active sessions",
+  "Браузер": "Browser",
+  "Последняя активность": "Last seen",
+  "Истекает": "Expires",
+  "Завершить": "Revoke",
+  "2FA включена": "2FA enabled",
+  "Отключить 2FA?": "Disable 2FA?",
+  "2FA отключена": "2FA disabled",
+  "2FA / TOTP": "2FA / TOTP",
+  "ВКЛ": "ON",
+  "ВЫКЛ": "OFF",
+  "Авторизация": "Authentication",
+  "Права доступа": "Access control",
+  "Ограничение запросов": "Rate limiting",
+  "Разрешение реальных платежей": "Live payments",
+  "ВКЛ — разрешено": "ON — allowed",
+  "ВЫКЛ — заблокировано": "OFF — blocked",
+  "Включить 2FA": "Enable 2FA",
+  "Пароль": "Password",
+  "Отключить 2FA": "Disable 2FA",
+  "Реальные платежи разрешены после проверки staging E2E": "Live payments were allowed after the staging E2E check",
+  "Разрешить реальные платежи": "Allow live payments",
+  "Реальные платежи заблокированы": "Live payments blocked",
+  "Заблокировать": "Block",
+  "Настройка TOTP": "TOTP setup",
+  "Коды восстановления — сохраните офлайн:": "Recovery codes — store them offline:",
+  "Подтвердить": "Confirm",
+  "Защита production": "Production protection",
+  "Redis rate limiting, HttpOnly cookies, CSRF, strict HTTPS URLs и webhook IP allowlist.": "Redis rate limiting, HttpOnly cookies, CSRF, strict HTTPS URLs and a webhook IP allowlist.",
+  "Настройки backup сохранены": "Backup settings saved",
+  "Backup запущен": "Backup started",
+  "Backup & Аварийное восстановление": "Backup and disaster recovery",
+  "Расписание": "Schedule",
+  "Выкл.": "Off",
+  "6 часов": "6 hours",
+  "12 часов": "12 hours",
+  "Пароль шифрования": "Encryption password",
+  "Шифровать": "Encrypt",
+  "Включать .env": "Include .env",
+  "Сохранить": "Save",
+  "Создать сейчас": "Create now",
+  "История": "History",
+  "Дата": "Date",
+  "Файл": "File",
+  "Размер": "Size",
+  "Действия": "Actions",
+  "Проверить": "Verify",
+  "Архив валиден": "Archive is valid",
+  "Архив повреждён": "Archive is damaged",
+  "Восстановление перезапишет данные БД. Продолжить?": "Restore will overwrite database data. Continue?",
+  "Код 2FA (если включена)": "2FA code (if enabled)",
+  "Название приложения": "Application name",
+  "Изображение /start": " /start image",
+  "Установить изображение": "Set image",
+  "Удалить изображение": "Remove image",
+  "Меню Telegram": "Telegram menu",
+  "Новая кнопка": "New button",
+  "URL / действие": "URL / action",
+  "Поле": "Field",
+  "Изображения меню": "Menu images",
+  "Загрузить": "Upload",
+  "Изображение загружено": "Image uploaded",
+  "Заголовок": "Title",
+  "Подзаголовок": "Subtitle",
+  "Цвет фона": "Background color",
+  "Инструкция": "Instructions",
+  "Кнопки Mini App": "Mini App buttons",
+  "Текст": "Text",
+  "Промокод": "Promo code",
+  "Сохранить Mini App": "Save Mini App",
+  "Главное изображение Mini App": "Mini App hero image",
+  "Изображение Mini App сохранено": "Mini App image saved",
+  "Установить главное изображение": "Set hero image",
+  "Удалить главное изображение": "Remove hero image",
+  "Фон Mini App": "Mini App background",
+  "Загрузить фон": "Upload background",
+  "Фон загружен": "Background uploaded",
+  "Удалить фон": "Remove background",
+  "Пользовательские поля": "Custom fields",
+  "Добавить поле": "Add field",
+  "Брендинг бота": "Bot branding",
+  "Название бота": "Bot name",
+  "Изображение приветствия бота сохранено": "Bot welcome image saved",
+  "Акции": "Promotions",
+  "Название акции": "Promotion name",
+  "Акция создана": "Promotion created",
+  "Скидка": "Discount",
+  "Промокоды": "Promo codes",
+  "Промокод создан": "Promo code created",
+  "Реклама": "Advertisements",
+  "Реклама создана": "Advertisement created",
+  "Блоки": "Blocks",
+  "Порядок": "Order",
+  "Рассылки": "Broadcasts",
+  "Текст HTML-рассылки": "HTML broadcast text",
+  "Отправить в очередь": "Queue broadcast",
+  "Рассылка поставлена в очередь": "Broadcast queued",
+  "Ошибок": "Failed",
+  "Администратор создан": "Administrator created",
+  "Telegram ID используется как привязка администратора. Указывайте числовой ID пользователя Telegram.": "Telegram ID binds the administrator. Use the numeric Telegram user ID.",
+  "Пароль (не менее 12 символов)": "Password (at least 12 characters)",
+  "Наблюдатель": "Viewer",
+  "Оператор": "Operator",
+  "Список администраторов": "Administrators",
+  "Роль": "Role",
+  "ОТКЛЮЧЁН": "DISABLED",
+  "АКТИВЕН": "ACTIVE",
+  "Удалить": "Delete",
+  "Укажите токен Remnawave для staging": "Enter the Remnawave token for staging",
+  "Выберите хотя бы одного провайдера": "Select at least one provider",
+  "Конфигурация staging E2E сохранена": "Staging E2E configuration saved",
+  "Проверка тестового контура запущен": "Staging check started",
+  "Настройка боевого staging E2E": "Live staging E2E setup",
+  "Используйте только тестовые/sandbox-реквизиты. Продакшн-реквизиты платёжных систем запрещены и автоматически отклоняются.": "Use only test or sandbox credentials. Production payment credentials are rejected automatically.",
+  "Публичный HTTPS URL": "Public HTTPS URL",
+  "URL Remnawave": "Remnawave URL",
+  "Токен Remnawave": "Remnawave token",
+  "Оставьте пустым, чтобы сохранить текущий": "Leave empty to keep the current value",
+  "Bearer-токен тестового пользователя": "Test user bearer token",
+  "ID тестового тарифа": "Test plan ID",
+  "ЮKassa — sandbox": "YooKassa — sandbox",
+  "ID тестового магазина": "Test shop ID",
+  "Секретный ключ sandbox": "Sandbox secret key",
+  "Platega — тестовые реквизиты": "Platega — test credentials",
+  "Merchant ID тестового аккаунта": "Test account merchant ID",
+  "Secret тестового аккаунта": "Test account secret",
+  "RollyPay — sandbox": "RollyPay — sandbox",
+  "API-ключ sandbox": "Sandbox API key",
+  "Запуск и результат": "Run and result",
+  "не запускался": "not started",
+  "Начат": "Started",
+  "Завершён": "Finished",
+  "Выполняется…": "Running…",
+  "Запустить staging E2E": "Run staging E2E",
+  "Платёж создаётся только через отдельный staging-контур с зашифрованными тестовыми credentials. Продакшн credentials не используются.": "A payment is created only through the separate staging flow with encrypted test credentials. Production credentials are not used.",
+  "Неизменяемый журнал подтверждённых платежей и возвратов. Повторная операция не создаёт вторую запись.": "Immutable journal of confirmed payments and refunds. Repeating an operation does not create a second entry.",
+  "Операция": "Operation",
+  "Направление": "Direction",
+  "Валюта": "Currency",
+  " записей": " records",
+  "Тикеты": "Tickets",
+  "Тема": "Subject",
+  "Ответ": "Reply",
+  "Ответить": "Reply",
+  "Ответ пользователю": "Reply to the user",
+  "Центр возвратов": "Refund center",
+  "Одобрить": "Approve",
+  "Система рабочих процессов": "Worker system",
+  "Рабочий процесс": "Worker",
+  "Задача": "Job",
+  "Обновить": "Refresh",
+  "Обновление / откат": "Update / rollback",
+  "Текущая версия: ": "Current version: ",
+  "корпоративный контур": "enterprise suite",
+  "История релизов": "Release history",
+  "Откат": "Rollback",
+  "Обновление выполняется через scripts/update.sh с pre-update snapshot и health-check.": "Updates run through scripts/update.sh with a pre-update snapshot and a health check.",
+  "Технический режим": "Maintenance mode",
+  "Состояние восстановления": "Restore state",
+  "Рабочий процесс heartbeat": "Worker heartbeat",
+  "Критические ошибки выдачи": "Critical fulfillment failures",
+  "Требуется ручная проверка. Maintenance/restore mode не снимается автоматически после неуспешного restore.": "Manual review is required. Maintenance or restore mode is not cleared automatically after a failed restore.",
+  "Аварийный режим": "Incident mode",
+  "Аварийный режим включён": "Incident mode enabled",
+  "Включить": "Enable",
+  "Аварийный режим выключен": "Incident mode disabled",
+  "Выключить": "Disable",
+  "Реестр рефералов": "Referral ledger",
+  "Сверить баланс": "Reconcile balance",
+  "Центр мониторинга": "Monitoring center",
+  "Диск": "Disk",
+  "Запросы": "Requests",
+  "Задачи": "Jobs",
+  "Ошибка": "Error",
+  "Сканировать": "Scan",
+  "Сигналы": "Signals",
+  "Оценка": "Score",
+  "Подробности": "Details",
+  "Центр выплат": "Payout center",
+  "Заявка": "Request",
+  "Внешний ID": "External ID",
+  "Центр диагностики": "Diagnostics center",
+  "Общий статус": "Overall status",
+  "Проверить снова": "Check again",
+  "Готовность production": "Production readiness",
+  "Перед включением реальных платежей сначала должен пройти staging E2E. Диагностика не снимает платёжный gate.": "Staging E2E must pass before live payments are enabled. Diagnostics do not lift the payment gate.",
+  "Новые за 30 дней": "New in 30 days",
+  "Оплачено": "Paid",
+  "Конверсия": "Conversion",
+  "За всё время": "All time",
+  "За 30 дней": "Last 30 days",
+  "Средний чек": "Average payment",
+  "Завершённые возвраты": "Completed refunds",
+  "Центр инцидентов": "Incident center",
+  "Название инцидента": "Incident title",
+  "Создать инцидент": "Create incident",
+  "Уровень": "Severity",
+  "Категория": "Category",
+  "Закрыть": "Resolve",
+  "Платёжные провайдеры": "Payment providers",
+  "Включён": "Enabled",
+  "Успешно": "Successes",
+  "Автоматический circuit": "Circuit",
+  "да": "yes",
+  "нет": "no",
+  "закрыт": "closed",
+  "Клиенты пользователей": "Customer directory",
+  "Имя": "Name",
+  "Реферальный код": "Referral code",
+  "Автопродление": "Auto-renew",
+  "Флаги функций": "Feature flags",
+  "Функция": "Feature",
+  "Описание": "Description",
+  "включена": "enabled",
+  "выключена": "disabled",
+  "Ключи доступа / WebAuthn": "Passkeys / WebAuthn",
+  "Хранилище credential-ов подготовлено, но браузерная регистрация и криптографическая проверка assertion не включаются автоматически. Это предотвращает ложное ощущение MFA-защиты.": "Credential storage is prepared, but browser registration and cryptographic assertion checks are not enabled automatically. That avoids a false sense of MFA protection.",
+  "Зарегистрированные ключи": "Registered keys",
+  "Последнее использование": "Last used",
+  "Счётчик": "Counter",
+  "ЦЕНТР УПРАВЛЕНИЯ · ПРОДАКШН": "CONTROL CENTER · PRODUCTION",
+  "Под вашим контролем.": "Under your control.",
+  "Производственная веб-панель.": "Production web console.",
+  "ВХОД АДМИНИСТРАТОРА": "ADMINISTRATOR SIGN-IN",
+  "Код 2FA ": "2FA code ",
+  "если включена": "if enabled",
+  "Проверка…": "Checking…",
+  "Войти через Telegram": "Sign in with Telegram",
+  "Защищённая cookie · CSRF · 30 минут": "Secure cookie · CSRF · 30 minutes",
+  "Email": "Email",
+  "ожидает": "pending",
+  "обрабатывается": "processing",
+  "ошибка": "failed",
+  "завершено": "completed",
+  "выполняется": "running",
+  "в очереди": "queued",
+  "оплачен": "paid",
+  "запрошен": "requested",
+  "одобрен": "approved",
+  "отклонён": "rejected",
+  "повтор": "retry",
+  "отключён": "disabled",
+  "Работает": "Working",
+  "Режим инцидента: ": "Incident mode: ",
+  " · Платежи: ": " · Payments: ",
+  "дней": "days",
+  "+ Добавить": "+ Add",
+  "+ Кнопка": "+ Button",
+  "Checksum Работает": "Checksum matches",
+  "Checksum mismatch": "Checksum mismatch",
+};
+
+let activeLang: Lang = "ru";
+
+export function translate(lang: Lang, value: string): string {
+  if (!value || lang !== "en") return value;
+  if (EN[value]) return EN[value];
+  if (value.startsWith("АДМИН / ")) return "ADMIN / " + value.slice("АДМИН / ".length);
+  const records = value.match(/^(\d+) записей$/);
+  if (records) return `${records[1]} records`;
+  const latency = value.match(/^(.*)\sмс$/);
+  if (latency) return `${latency[1]} ms`;
+  const reconciled = value.match(/^Сверено: (\d+), исправлено: (\d+)$/);
+  if (reconciled) return `Checked: ${reconciled[1]}, fixed: ${reconciled[2]}`;
+  const activeUntil = value.match(/^Активна до (.+)$/);
+  if (activeUntil) return `Active until ${activeUntil[1]}`;
+  return value;
+}
+
+export function t(value: string): string {
+  return translate(activeLang, value);
+}
+
+const LangContext = createContext<{lang: Lang; setLang: (lang: Lang) => void}>({lang: "ru", setLang: () => undefined});
+
+export function detectLang(): Lang {
+  const stored = localStorage.getItem("rw_lang");
+  if (stored === "en" || stored === "ru") return stored;
+  return navigator.language?.toLowerCase().startsWith("en") ? "en" : "ru";
+}
+
+export function LangProvider({children}: {children: React.ReactNode}) {
+  const [lang, setLangState] = useState<Lang>(detectLang);
+  useEffect(() => {
+    activeLang = lang;
+    document.documentElement.lang = lang;
+  }, [lang]);
+  function setLang(next: Lang) {
+    activeLang = next;
+    localStorage.setItem("rw_lang", next);
+    setLangState(next);
+  }
+  return <LangContext.Provider value={{lang, setLang}}>{children}</LangContext.Provider>;
+}
+
+export function useLang() {
+  return useContext(LangContext);
+}
+
+function sourceOf(current: string, stored: string | undefined, lang: Lang): string {
+  if (stored && (current === stored || current === translate(lang, stored) || current === translate(lang === "en" ? "ru" : "en", stored))) return stored;
+  return current;
+}
+
+export function DomLocalizer({children}: {children: React.ReactNode}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const {lang} = useLang();
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    let current: Node | null = walker.nextNode();
+    while (current) {
+      nodes.push(current as Text);
+      current = walker.nextNode();
+    }
+    for (const node of nodes) {
+      const value = node.nodeValue ?? "";
+      const stored = (node as Text & {__i18nSource?: string}).__i18nSource;
+      const source = sourceOf(value, stored, lang);
+      (node as Text & {__i18nSource?: string}).__i18nSource = source;
+      const next = translate(lang, source);
+      if (node.nodeValue !== next) node.nodeValue = next;
+    }
+    root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input,textarea").forEach((el) => {
+      const stored = el.dataset.i18nPlaceholder;
+      const source = sourceOf(el.placeholder || "", stored, lang);
+      el.dataset.i18nPlaceholder = source;
+      const next = translate(lang, source);
+      if (el.placeholder !== next) el.placeholder = next;
+    });
+    root.querySelectorAll<HTMLElement>("[title]").forEach((el) => {
+      const title = el.getAttribute("title") || "";
+      const stored = el.dataset.i18nTitle;
+      const source = sourceOf(title, stored, lang);
+      el.dataset.i18nTitle = source;
+      const next = translate(lang, source);
+      if (title !== next) el.setAttribute("title", next);
+    });
+  });
+  return <div ref={ref} style={{display: "contents"}}>{children}</div>;
+}

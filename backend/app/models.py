@@ -10,11 +10,15 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int|None] = mapped_column(BigInteger, unique=True, index=True)
     yandex_id: Mapped[str|None] = mapped_column(String(255), unique=True, index=True)
+    vk_id: Mapped[str|None] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str|None] = mapped_column(String(320), unique=True, index=True)
+    email_password_hash: Mapped[str|None] = mapped_column(String(512))
     username: Mapped[str|None] = mapped_column(String(255))
     referral_code: Mapped[str] = mapped_column(String(32), unique=True, index=True, default=lambda: secrets.token_urlsafe(8).upper())
     referred_by_id: Mapped[int|None] = mapped_column(Integer, index=True)
     auto_renew_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     referral_balance: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
+    wallet_balance: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     deleted_at: Mapped[datetime|None] = mapped_column(DateTime)
 
@@ -58,6 +62,8 @@ class Payment(Base):
     fulfillment_max_attempts: Mapped[int] = mapped_column(Integer, default=8, nullable=False)
     fulfillment_terminal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     idempotency_key: Mapped[str|None] = mapped_column(String(128), index=True)
+    purpose: Mapped[str] = mapped_column(String(24), default="subscription", nullable=False)
+    bonus_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     checkout_url: Mapped[str|None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     paid_at: Mapped[datetime|None] = mapped_column(DateTime)
@@ -135,6 +141,16 @@ class BotMenuItem(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+class CabinetMenuItem(Base):
+    __tablename__ = "cabinet_menu_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), default="custom", nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
 class CustomField(Base):
     __tablename__ = "custom_fields"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -197,6 +213,8 @@ class GiftCode(Base):
     used_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     expires_at: Mapped[datetime|None] = mapped_column(DateTime)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    purchaser_user_id: Mapped[int|None] = mapped_column(Integer, index=True)
+    idempotency_key: Mapped[str|None] = mapped_column(String(128), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 class GiftRedemption(Base):

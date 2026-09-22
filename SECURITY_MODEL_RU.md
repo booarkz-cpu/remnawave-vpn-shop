@@ -1,36 +1,28 @@
-# Security Model V43
+# Модель безопасности 2.2.1
 
-## Границы доверия
+Граница: браузер или Telegram → Caddy → Backend → PostgreSQL / Redis / Remnawave / платёжные провайдеры.
 
-Browser/Telegram → Caddy → Backend → PostgreSQL/Redis/Remnawave/Payment Providers.
+Полная версия на русском и английском: `SECURITY.md`.
 
-## Основные меры
+## Меры
 
-- Trusted Host.
-- CORS allowlist.
-- CSRF для cookie-auth mutations.
-- HttpOnly auth cookies.
-- Rate limits.
-- Admin idle/absolute session timeout.
-- User-Agent session binding.
-- RBAC.
-- MFA/TOTP.
-- Audit Log.
-- Step-up security для критических действий.
-- Provider webhook verification.
-- Payment amount/currency verification.
-- Durable jobs и locks.
-- Idempotency.
-- Fail-closed production gate.
-- Encrypted secrets.
-- Safe archive extraction.
-- Isolated backup restore.
-- Loopback-only staging runner endpoint.
+- Trusted Host и CORS allowlist.
+- CSRF для мутаций с cookie.
+- HttpOnly cookie администратора и покупателя.
+- Привязка админ-сессии к User-Agent и таймаут простоя 15 минут.
+- RBAC `viewer` / `operator` / `admin`.
+- Необязательный TOTP и коды восстановления.
+- Журнал аудита и финансовый журнал.
+- Вебхук YooKassa только с IP из `YOOKASSA_WEBHOOK_IP_ALLOWLIST`. Пустой список отклоняет запрос.
+- Сверка суммы, валюты и `order_id` у провайдера до выдачи.
+- Блокировки пользователя и платежа для выдачи, возврата, пробного периода и удаления аккаунта.
+- DNS-pinned HTTP к платёжным API, без редиректов и без прокси из окружения.
+- Лимит тела 12 МиБ, в том числе для chunked-запросов.
+- Загрузки изображений: MIME, сигнатура, размер, перекодирование. Удаление файла — только basename внутри `MEDIA_DIR`.
+- Шифрование секретов AES-GCM ключом `APP_SECRET`.
+- Безопасная распаковка бэкапа и отдельный контур staging E2E.
+- Production gate: боевые платежи выключены, пока staging не отмечен как успешный.
 
-## Content security
+## Чего модель не обещает
 
-User/admin supplied links are validated as HTTPS URLs. Uploaded images are constrained by MIME, file signature and size. Admin content APIs do not expose raw secret settings.
-
-## Production Gate
-
-Gate нельзя считать доказательством безопасности сам по себе. Он лишь разрешает production payment creation после внешнего E2E подтверждения.
+Gate не доказывает безопасность сам по себе. Он только разрешает создание боевых платежей после внешнего E2E. WebAuthn не включается как второй фактор, пока нет браузерной регистрации и проверки assertion.

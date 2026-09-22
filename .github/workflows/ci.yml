@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [admin, miniapp]
+        app: [admin, miniapp, cabinet]
     steps:
       - uses: actions/checkout@v4
 
@@ -101,6 +101,7 @@ jobs:
           API_DOMAIN=api.example.test
           ADMIN_DOMAIN=admin.example.test
           APP_DOMAIN=app.example.test
+          CABINET_DOMAIN=cabinet.example.test
           MINIAPP_DOMAIN=miniapp.example.test
           BOT_DOMAIN=bot.example.test
           WEBHOOK_DOMAIN=webhook.example.test

@@ -1,51 +1,75 @@
-# Remnawave VPN Shop 2.2.1
+# Remnawave VPN Shop 2.4.0
 
-> **Status: 🚧 In active development — not a final production release.**
+Платформа магазина VPN: Telegram Mini App, отдельный личный кабинет пользователя, админ-панель Material Design + Web 3.0, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, выдача доступа в Remnawave, очереди, резервные копии и мониторинг.
 
-Полноценная платформа VPN-магазина с Telegram Mini App, административной панелью, backend API, платежами, провижинингом Remnawave, очередями задач, мониторингом и инструментами эксплуатации.
+The same product in English: a VPN shop with a Telegram Mini App, a standalone user cabinet, an admin console, a FastAPI backend, three payment providers plus a sandbox provider, Remnawave provisioning, backups and monitoring.
 
-## Состав проекта
+Состояние: **2.4.0**. Перед production пройдите `INSTRUCTION.md` и `PRODUCTION_CHECKLIST.md`. Предыдущая линейка 2.3.0 остаётся в истории релизов.
 
-- **Backend:** Python / FastAPI, PostgreSQL, Redis
-- **Admin:** React + Vite
-- **Mini App:** React + Vite / Telegram WebApp
-- **Infrastructure:** Docker Compose, Caddy, VPS deployment scripts
-- **Operations:** backup/restore, health checks, preflight/security checks, rollback и release tooling
-- **Tests:** regression, production и release-quality тесты
+## Состав
+
+| Часть | Технология |
+| --- | --- |
+| API и бот | Python, FastAPI, aiogram, PostgreSQL, Redis |
+| Админка | React, Vite, Material + Web3 UI |
+| Mini App | React, Vite, Telegram WebApp |
+| Личный кабинет | React, Vite, email / Telegram / VK / Яндекс |
+| Периметр | Docker Compose, Caddy |
+| Проверки | `tests/`, `scripts/sandbox-e2e.sh` |
 
 ## Возможности
 
-Проект включает подписки, мультиустройства, автопродление, промокоды и подарки, реферальную программу, поддержку, уведомления, антифрод, финансовый журнал, мониторинг, управление узлами Remnawave, резервное копирование и восстановление, аудит действий и production security hardening.
+Подписки и пробный период, несколько устройств, автопродление YooKassa, промокоды (включая дни), внутренний кошелёк, подарки, необязательная подписка на канал, реферальная программа, поддержка, уведомления, антифрод, финансовый журнал, мониторинг, резервное копирование, аудит, RBAC и 2FA.
 
-## Текущий статус
-
-Версия в архиве: **2.2.1**.
-
-Проект продолжает развиваться. Возможны незавершённые функции, изменения API/конфигурации и изменения deployment-процесса. Перед использованием в production необходимо самостоятельно пройти процедуры из `INSTALL.md`, `PRODUCTION_CHECKLIST.md` и актуальных audit/release документов.
+В 2.4.0 добавлены: отдельный личный кабинет с регистрацией/входом, CMS вкладок кабинета в админке, инструкции по устройствам, `PAYMENTS_SANDBOX` и скрипт `scripts/sandbox-e2e.sh` для проверки без живых касс. Интерфейсы доступны на **русском и английском**.
 
 ## Быстрый старт
 
-1. Скопировать `.env.example` в `.env` только для локальной настройки.
-2. Задать реальные секреты и параметры окружения.
-3. Ознакомиться с `INSTALL.md`.
-4. Для production использовать deployment-инструкции и preflight-проверки из `deploy/` и `scripts/`.
+```bash
+cp .env.example .env
+# Заполните APP_SECRET, пароль БД, BOT_TOKEN, REMNAWAVE_*, ADMIN_*,
+# API_DOMAIN, ADMIN_DOMAIN, APP_DOMAIN, CABINET_DOMAIN и allowlist YooKassa.
+docker compose up -d --build
+```
 
-**Никогда не коммитьте `.env`, реальные токены, пароли или приватные ключи.**
+Одношаговая установка на Debian/Ubuntu:
+
+```bash
+sudo bash install.sh
+```
+
+Для проверки без платёжных шлюзов:
+
+```bash
+# в .env: PAYMENTS_SANDBOX=true
+bash scripts/sandbox-e2e.sh
+```
+
+Подробности — в `INSTRUCTION.md`. Не коммитьте `.env`, токены и пароли.
 
 ## Документация
 
-- `INSTALL.md` — установка
-- `PRODUCTION_CHECKLIST.md` — production checklist
-- `OPERATIONS_RUNBOOK_RU.md` — эксплуатация
-- `API_REFERENCE_RU.md` — API
-- `SECURITY_MODEL_RU.md` — модель безопасности
-- `AUDIT_REPORT_V2_2_1_RU.md` — актуальный аудит
-- `RELEASE_DOCUMENTATION_INDEX_RU.md` — индекс release-документации
+| Файл | Содержание |
+| --- | --- |
+| `INSTRUCTION.md` | Полная инструкция RU/EN |
+| `FUNCTIONS.md` | Разбор функций |
+| `SECURITY.md` | Модель безопасности |
+| `RELEASE_NOTES_V2_4_0.md` | Что нового в 2.4.0 |
+| `INSTALL.md` | Установщик |
+| `PRODUCTION_CHECKLIST.md` | Чеклист production |
+| `.env.example` | Переменные окружения |
 
-## Contributing
+## Локальная проверка
 
-Проект находится в разработке. Issues и pull requests приветствуются. Перед внесением изменений рекомендуется ознакомиться с документацией, тестами и release/audit материалами.
+```bash
+python3 -m compileall -q backend
+python3 -m pytest -q
+bash -n install.sh deploy/install-vps.sh scripts/sandbox-e2e.sh
+cd admin && npm ci && npx vite build
+cd ../miniapp && npm install && npx vite build
+cd ../cabinet && npm install && npx vite build
+```
 
-## License
+## Лицензия
 
-License не указан в исходном архиве. Использование и распространение следует согласовать с владельцем проекта до публичного релиза.
+В архиве лицензия не указана. Использование согласуйте с владельцем репозитория.

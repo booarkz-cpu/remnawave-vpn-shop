@@ -42,6 +42,10 @@ services:
         PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}
     restart: unless-stopped
     env_file: .env
+    environment:
+      MEDIA_DIR: /data/media
+      BACKUPS_DIR: /data/backups
+      PROJECT_DIR: /project
     depends_on:
       db:
         condition: service_healthy
@@ -80,6 +84,9 @@ services:
     env_file: .env
     environment:
       WORKER_ROLE: worker
+      MEDIA_DIR: /data/media
+      BACKUPS_DIR: /data/backups
+      PROJECT_DIR: /project
     depends_on:
       db:
         condition: service_healthy
@@ -156,6 +163,25 @@ services:
     tmpfs:
       - /tmp
 
+  cabinet:
+    build:
+      context: ./cabinet
+      args:
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:22-alpine}
+        NGINX_BASE_IMAGE: ${NGINX_BASE_IMAGE:-nginx:1.29-alpine}
+        VITE_API_URL: ""
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose:
+      - "80"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
   caddy:
     image: ${CADDY_IMAGE:-caddy:2.10-alpine}
     restart: unless-stopped
@@ -163,12 +189,15 @@ services:
       API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
       ADMIN_DOMAIN: ${ADMIN_DOMAIN:?set ADMIN_DOMAIN in .env}
       APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+      CABINET_DOMAIN: ${CABINET_DOMAIN:?set CABINET_DOMAIN in .env}
     depends_on:
       backend:
         condition: service_healthy
       admin:
         condition: service_started
       miniapp:
+        condition: service_started
+      cabinet:
         condition: service_started
     ports:
       - "80:80"

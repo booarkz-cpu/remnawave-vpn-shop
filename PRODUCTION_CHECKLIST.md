@@ -3,7 +3,7 @@
 ## Before deployment
 - [ ] Generate a unique APP_SECRET (>=32 chars).
 - [ ] Set DB_PASSWORD and all provider credentials.
-- [ ] Set API_DOMAIN, ADMIN_DOMAIN and APP_DOMAIN.
+- [ ] Set API_DOMAIN, ADMIN_DOMAIN, APP_DOMAIN and CABINET_DOMAIN.
 - [ ] Configure strict firewall: SSH + TCP 80/443 + UDP 443 only.
 - [ ] Configure S3/R2/B2 if off-site backups are required.
 - [ ] Configure Telegram/SMTP alerts.

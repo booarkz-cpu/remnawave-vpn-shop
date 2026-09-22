@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     app_domain: str = Field(default="localhost", alias="APP_DOMAIN")
     api_domain: str = Field(default="localhost", alias="API_DOMAIN")
     miniapp_domain: str = Field(default="localhost", alias="MINIAPP_DOMAIN")
+    cabinet_domain: str = Field(default="localhost", alias="CABINET_DOMAIN")
     bot_domain: str = Field(default="localhost", alias="BOT_DOMAIN")
     webhook_domain: str = Field(default="localhost", alias="WEBHOOK_DOMAIN")
     panel_domain: str = Field(default="localhost", alias="PANEL_DOMAIN")
@@ -164,6 +165,14 @@ class Settings(BaseSettings):
     auto_renew_enabled: bool = Field(
         default=False, alias="AUTO_RENEW_ENABLED"
     )
+    auto_renew_lead_days: int = Field(
+        default=3, alias="AUTO_RENEW_LEAD_DAYS", ge=1, le=14
+    )
+    required_telegram_channel: str = Field(
+        default="", alias="REQUIRED_TELEGRAM_CHANNEL"
+    )
+    trial_max_days: int = Field(default=3, alias="TRIAL_MAX_DAYS", ge=1, le=30)
+    payments_sandbox: bool = Field(default=False, alias="PAYMENTS_SANDBOX")
     fulfillment_max_attempts: int = Field(
         default=8, alias="FULFILLMENT_MAX_ATTEMPTS"
     )
@@ -218,6 +227,30 @@ class Settings(BaseSettings):
     backend_port: int = Field(default=8000, alias="BACKEND_PORT")
     admin_port: int = Field(default=3000, alias="ADMIN_PORT")
     miniapp_port: int = Field(default=8080, alias="MINIAPP_PORT")
+
+    # ---------- Файлы и каталоги ----------
+    # Docker Compose монтирует эти пути в backend/worker. Не меняйте их,
+    # если не меняете volumes в docker-compose.yml.
+    media_dir: str = Field(default="/data/media", alias="MEDIA_DIR")
+    backups_dir: str = Field(default="/data/backups", alias="BACKUPS_DIR")
+    project_dir: str = Field(default="/project", alias="PROJECT_DIR")
+    backup_s3_prefix: str = Field(default="vpn-shop", alias="BACKUP_S3_PREFIX")
+
+    # ---------- Yandex ID ----------
+    yandex_client_id: str = Field(default="", alias="YANDEX_CLIENT_ID")
+    yandex_client_secret: str = Field(default="", alias="YANDEX_CLIENT_SECRET")
+    yandex_redirect_uri: str = Field(default="", alias="YANDEX_REDIRECT_URI")
+
+    # ---------- VK ID ----------
+    vk_client_id: str = Field(default="", alias="VK_CLIENT_ID")
+    vk_client_secret: str = Field(default="", alias="VK_CLIENT_SECRET")
+    vk_redirect_uri: str = Field(default="", alias="VK_REDIRECT_URI")
+
+    # Public cabinet URL (separate from Telegram Mini App when needed)
+    cabinet_url: str = Field(default="", alias="CABINET_URL")
+
+    # Жёсткий env-флаг. Операционный режим также хранится в настройке БД maintenance_mode.
+    maintenance_mode: bool = Field(default=False, alias="MAINTENANCE_MODE")
 
     # ---------- Валидаторы ----------
     @field_validator("admin_cors_origins", mode="before")
