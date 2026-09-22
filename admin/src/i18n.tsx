@@ -516,6 +516,15 @@ export const EN: Record<string, string> = {
   "Приложения сохранены": "Apps saved",
   "Логотип обновлён": "Logo updated",
   "Логотип удалён": "Logo removed",
+  "Тексты и файлы покупателя видит личный кабинет. Здесь же скачивается приложение администратора.": "The buyer cabinet shows the buyer texts and files. The administrator app is downloaded here.",
+  "Скачать приложение администратора": "Download the administrator app",
+  "Скачать": "Download",
+  "Файл не загружен": "File is not uploaded",
+  "Файл приложения": "App file",
+  "Загрузить файл": "Upload file",
+  "Удалить файл": "Remove file",
+  "Файл приложения сохранён": "App file saved",
+  "Файл приложения удалён": "App file removed",
 };
 
 let activeLang: Lang = "ru";

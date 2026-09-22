@@ -1,8 +1,8 @@
-# Remnawave VPN Shop 2.12.0
+# Remnawave VPN Shop 2.13.0
 
 Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-Состояние: **2.12.0**. Предыдущие релизы: **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **2.13.0**. Предыдущие релизы: **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Русский
 
@@ -17,6 +17,11 @@
 | Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+### Возможности 2.13.0
+
+- **Скачивание приложений.** Панель, вкладка «Приложения», даёт ссылку на приложение администратора. Личный кабинет даёт ссылку на приложение покупателя. Администратор загружает APK или IPA и меняет тексты, видимость и https-ссылку карточки. Подробности — раздел 9.11 в `INSTRUCTION.md` и `RELEASE_NOTES_V2_13_0.md`.
+- Схема базы остаётся `0038_v2_6_0_platform`. Приложения Android покупателя остаются **2.10.0**, администратора — **2.12.0**.
 
 ### Возможности 2.12.0
 
@@ -113,6 +118,7 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 | `DOCUMENTATION.md` | Карта актуальных документов и архивных аудитов |
 | `LICENSE` | Проприетарная лицензия 1.0, RU/EN |
 | `MOBILE.md` | Android и iOS: функции, сессия, логотип, сборка, RU/EN |
+| `RELEASE_NOTES_V2_13_0.md` | Скачивание приложений 2.13.0 |
 | `RELEASE_NOTES_V2_12_0.md` | Рассылка 2.12.0, разбор функций и проверка |
 | `RELEASE_NOTES_V2_11_0.md` | Документация 2.11.0 и безопасный порядок обновления |
 | `RELEASE_NOTES_V2_10_0.md` | Что вошло в 2.10.0, release APK, подпись клиента |
@@ -146,7 +152,7 @@ cd ../cabinet && npm install && npx vite build
 
 A VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Current release: **2.12.0**. Previous releases: **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
+Current release: **2.13.0**. Previous releases: **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
 
 ### What is in the tree
 
@@ -159,6 +165,11 @@ Current release: **2.12.0**. Previous releases: **2.11.0**, **2.10.0**, **2.9.0*
 | Android and iOS | Kotlin Compose, SwiftUI | Buyer and administrator, Russian and English |
 | Edge | Docker Compose, Caddy | HTTPS and separate domains |
 | Checks | `tests/`, `scripts/sandbox-e2e.sh` | Regression and a run without live gateways |
+
+### What 2.13.0 adds
+
+- **App downloads.** The admin Apps tab links to the administrator app. The user cabinet links to the buyer app. An administrator uploads an APK or IPA and edits the card text, visibility and https link. Details are in section 9.11 of `INSTRUCTION.md` and in `RELEASE_NOTES_V2_13_0.md`.
+- The database schema stays `0038_v2_6_0_platform`. The buyer Android app stays **2.10.0**. The administrator Android app stays **2.12.0**.
 
 ### What 2.12.0 adds
 
@@ -239,6 +250,7 @@ The full procedure is `INSTRUCTION.md`, section 9.9. Do not commit `.env`, token
 | `DOCUMENTATION.md` | Index of current documents and archived audits |
 | `LICENSE` | Proprietary license 1.0, RU/EN |
 | `MOBILE.md` | Android and iOS functions, session, logo and build, RU/EN |
+| `RELEASE_NOTES_V2_13_0.md` | 2.13.0 app downloads |
 | `RELEASE_NOTES_V2_12_0.md` | 2.12.0 broadcast, function reference and the check |
 | `RELEASE_NOTES_V2_11_0.md` | 2.11.0 documents and the safe update order |
 | `INSTALL.md` | Installer, RU/EN |

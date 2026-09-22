@@ -151,16 +151,18 @@ function AppsNotice({apps, lang}: {apps: any[]; lang: string}) {
         {apps.map((row) => {
           const title = lang === "en" ? row.title_en || row.title_ru : row.title_ru || row.title_en;
           const text = lang === "en" ? row.text_en || row.text_ru : row.text_ru || row.text_en;
-          const url = typeof row.url === "string" && row.url.startsWith("https://") ? row.url : "";
+          const fileHref = typeof row.download_url === "string" && /^\/api\/public\/apps\/(android-user|ios-user)\/download$/.test(row.download_url) ? API + row.download_url : "";
+          const storeHref = typeof row.url === "string" && row.url.startsWith("https://") ? row.url : "";
           return (
             <article className="plan-item" key={row.id || title}>
               <div>
                 <h3>{title}</h3>
                 <p className="section-sub">{text}</p>
               </div>
-              {url && (
-                <a className="btn-primary" href={url} target="_blank" rel="noopener noreferrer">
-                  Открыть
+              {fileHref && <a className="btn-primary" href={fileHref}>Скачать</a>}
+              {storeHref && (
+                <a className="btn-primary" href={storeHref} target="_blank" rel="noopener noreferrer">
+                  Скачать по ссылке
                 </a>
               )}
             </article>

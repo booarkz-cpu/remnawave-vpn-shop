@@ -397,6 +397,14 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 7. Если отправка обрывается, статус становится `failed`. Кнопка **Повторить** вызывает `POST /api/admin/broadcasts/{id}/retry` и возвращает `sending` или `failed` в `queued`. Воркер пропускает уже посчитанных получателей (`sent_count + failed_count`) и продолжает по порядку `id`. Уже доставленные сообщения второй раз не уходят, пока порядок пользователей не изменился. Завершённую рассылку повтор не перезапускает: для новой отправки создаётся новая запись.
 8. Приложение администратора Android в этом релизе имеет `versionName` **2.12.0** и `versionCode` **2120**, User-Agent `RemnawaveShop-Android-Admin/2.12.0`. iOS-администратор: `MARKETING_VERSION` **2.12.0**, `CURRENT_PROJECT_VERSION` **2120**, User-Agent `RemnawaveShop-iOS-Admin/2.12.0`. Приложение покупателя остаётся **2.10.0**. IPA по-прежнему собирается в Xcode.
 
+## 9.11. Ссылки на скачивание приложений (2.13.0)
+
+1. Вкладка **Приложения** в панели показывает блок **Скачать приложение администратора**. Ссылка «Скачать» ведёт на `GET /api/admin/apps/{id}/download` и требует сессию администратора с правом `read`. Внешняя https-ссылка карточки открывается отдельно.
+2. Личный кабинет показывает только карточки покупателя. Кнопка **Скачать** ведёт на `GET /api/public/apps/android-user/download` или `GET /api/public/apps/ios-user/download`. Кнопка **Скачать по ссылке** открывает https-адрес из карточки. Карточки администратора в этот ответ не входят.
+3. Загрузка файла: на карточке выберите APK для Android или IPA для iOS и нажмите **Загрузить файл**. Нужно право `manage_content`. Сервер принимает zip-пакет не больше 80 МБ, сохраняет его вне каталога `/media` и не отдаёт имя файла в JSON. Повторная загрузка заменяет пакет. **Удалить файл** стирает его.
+4. Тексты, видимость и https-ссылка по-прежнему сохраняются кнопкой **Сохранить приложения**. Сохранение текстов не удаляет уже загруженный файл. Выключенная карточка покупателя пропадает из кабинета вместе со ссылкой на скачивание. Файл приложения администратора в панели остаётся доступен администратору.
+5. Резервная копия забирает каталог `app-packages` рядом с `MEDIA_DIR`. Восстановление копирует только имена вида 32 шестнадцатеричных символа и расширение `.apk` или `.ipa`.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -877,6 +885,14 @@ The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `
 6. The worker claims one `queued` row with `FOR UPDATE SKIP LOCKED`, sets `sending`, and calls `sendMessage` or `sendPhoto`. A user is listed once even when several subscriptions are active. After each recipient, `sent_count` and `failed_count` are saved. HTTP 429 is retried once. The HTTP client ignores proxy variables (`trust_env=False`).
 7. A broken send becomes `failed`. **Повторить** (Retry) calls `POST /api/admin/broadcasts/{id}/retry` and moves `sending` or `failed` back to `queued`. The worker skips recipients already counted (`sent_count + failed_count`) and continues in `id` order. Messages already delivered are not sent again while that order stays stable. A completed broadcast is not restarted by retry. A new send is a new row.
 8. The Android administrator app in this release uses `versionName` **2.12.0** and `versionCode` **2120**, User-Agent `RemnawaveShop-Android-Admin/2.12.0`. The iOS administrator app uses `MARKETING_VERSION` **2.12.0**, `CURRENT_PROJECT_VERSION` **2120**, User-Agent `RemnawaveShop-iOS-Admin/2.12.0`. The buyer app stays **2.10.0**. The IPA is still built in Xcode.
+
+## 9.11. App download links (2.13.0)
+
+1. The admin **Приложения** (Apps) tab shows **Скачать приложение администратора** (Download the administrator app). **Скачать** (Download) calls `GET /api/admin/apps/{id}/download` and needs an administrator session with `read`. The card's external https link opens separately.
+2. The user cabinet shows buyer cards only. **Скачать** (Download) calls `GET /api/public/apps/android-user/download` or `GET /api/public/apps/ios-user/download`. **Скачать по ссылке** (Download from link) opens the https address stored on the card. Administrator cards are not in that response.
+3. To upload a file, choose an APK for Android or an IPA for iOS on the card and press **Загрузить файл** (Upload file). The permission is `manage_content`. The server accepts a zip package up to 80 MB, stores it outside `/media`, and does not put the stored file name in JSON. A new upload replaces the package. **Удалить файл** (Remove file) deletes it.
+4. Texts, visibility and the https link are still saved with **Сохранить приложения** (Save apps). Saving texts does not delete an uploaded file. A disabled buyer card disappears from the cabinet together with its download link. The administrator package stays available in the panel.
+5. A backup includes the `app-packages` directory next to `MEDIA_DIR`. Restore copies only names of 32 hexadecimal characters with an `.apk` or `.ipa` suffix.
 
 ## 10. Mini App
 

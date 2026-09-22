@@ -1,8 +1,8 @@
 # Модули проекта / Project modules
 
-Версия **2.12.0**. Этот документ объясняет, зачем существует каждый модуль. Массовая рассылка Telegram описана в разделе 9.10 `INSTRUCTION.md`. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Установка APK 2.9.0 — в разделе 9.8. Подпись клиента, release APK и обновление с GitHub — в разделе 9.9. Предыдущее описание конструктора относится к **2.5.0**. Каталог приложений описан для **2.8.0**.
+Версия **2.13.0**. Этот документ объясняет, зачем существует каждый модуль. Скачивание приложений описано в разделе 9.11 `INSTRUCTION.md`. Массовая рассылка Telegram описана в разделе 9.10 `INSTRUCTION.md`. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Тексты и логотип приложений — в разделе 9.7. Установка APK 2.9.0 — в разделе 9.8. Подпись клиента, release APK и обновление с GitHub — в разделе 9.9. Предыдущее описание конструктора относится к **2.5.0**. Каталог приложений описан для **2.8.0**.
 
-Version **2.12.0**. This document explains why each module exists. The Telegram mass broadcast is described in section 9.10 of `INSTRUCTION.md`. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. The 2.9.0 APK install is in section 9.8. Client proof, the release APK and the GitHub update are in section 9.9. The constructor description belongs to **2.5.0**. The app catalog belongs to **2.8.0**.
+Version **2.13.0**. This document explains why each module exists. App downloads are described in section 9.11 of `INSTRUCTION.md`. The Telegram mass broadcast is described in section 9.10 of `INSTRUCTION.md`. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. App texts and the logo are in section 9.7. The 2.9.0 APK install is in section 9.8. Client proof, the release APK and the GitHub update are in section 9.9. The constructor description belongs to **2.5.0**. The app catalog belongs to **2.8.0**.
 
 ---
 
@@ -14,7 +14,7 @@ Version **2.12.0**. This document explains why each module exists. The Telegram 
 
 ### `backend/app/mobile_catalog.py`
 
-Хранит четыре карточки приложений и логотип кабинета. Публичный маршрут отдаёт только включённые карточки покупателя и безопасный путь `/media/`. Запись и загрузка логотипа требуют `manage_content`.
+Хранит четыре карточки приложений, логотип кабинета и загруженные APK/IPA. Публичный маршрут отдаёт только включённые карточки покупателя, безопасный путь `/media/` и ссылку скачивания покупателя. Пакет администратора отдаёт только `GET /api/admin/apps/{id}/download`. Запись, логотип и файл требуют `manage_content`.
 
 ### `backend/app/mobile_auth.py`
 
@@ -165,7 +165,7 @@ A buyer opens the Mini App, the cabinet or the bot. An administrator opens the p
 
 ### `backend/app/mobile_catalog.py`
 
-Stores the four app cards and the cabinet logo. The public route returns only enabled buyer cards and a safe `/media/` path. Saving the catalog and uploading the logo require `manage_content`.
+Stores the four app cards, the cabinet logo and uploaded APK/IPA files. The public route returns only enabled buyer cards, a safe `/media/` path and the buyer download link. The administrator package is served only by `GET /api/admin/apps/{id}/download`. Saving the catalog, the logo and the file requires `manage_content`.
 
 ### `backend/app/mobile_auth.py`
 

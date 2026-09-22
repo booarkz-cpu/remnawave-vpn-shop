@@ -1,8 +1,14 @@
 # Разбор функций / Function reference
 
-Версия приложения: **2.12.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая рассылка — в `INSTRUCTION.md`, раздел 9.10, и в `RELEASE_NOTES_V2_12_0.md`.
+Версия приложения: **2.13.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая рассылка — в `INSTRUCTION.md`, раздел 9.10, и в `RELEASE_NOTES_V2_12_0.md`.
 
-Application version: **2.12.0**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The broadcast walkthrough is section 9.10 of `INSTRUCTION.md` and `RELEASE_NOTES_V2_12_0.md`.
+Application version: **2.13.0**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The broadcast walkthrough is section 9.10 of `INSTRUCTION.md` and `RELEASE_NOTES_V2_12_0.md`.
+
+## Скачивание приложений / App downloads (2.13.0)
+
+Администратор с правом `manage_content` загружает APK или IPA на карточку `POST /api/admin/apps/{id}/file`. Панель показывает ссылку администратора `GET /api/admin/apps/{id}/download`. Кабинет покупателя показывает ссылку `GET /api/public/apps/{id}/download` только для включённых карточек `android-user` и `ios-user`. Имя файла на диске в JSON не попадает. Каталог `app-packages` лежит рядом с `MEDIA_DIR` и входит в резервную копию.
+
+An administrator with `manage_content` uploads an APK or IPA with `POST /api/admin/apps/{id}/file`. The panel links to `GET /api/admin/apps/{id}/download` for the administrator app. The buyer cabinet links to `GET /api/public/apps/{id}/download` only for enabled `android-user` and `ios-user` cards. The stored file name is not returned in JSON. The `app-packages` directory sits next to `MEDIA_DIR` and is included in a backup.
 
 ## Рассылка Telegram / Telegram broadcast (2.12.0)
 
