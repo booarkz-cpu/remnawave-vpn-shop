@@ -1,8 +1,8 @@
-# Remnawave VPN Shop 2.13.0
+# Remnawave VPN Shop 3.0.0-realise
 
 Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-Состояние: **2.13.0**. Предыдущие релизы: **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **3.0.0-realise**. Предыдущие релизы: **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Русский
 
@@ -17,6 +17,14 @@
 | Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+### Возможности 3.0.0-realise
+
+- **Пакет приложения до 80 МБ.** `POST /api/admin/apps/{id}/file` больше не упирается в общий потолок тела 12 МБ, если у запроса есть `Content-Length`. Запрос без `Content-Length` по-прежнему ограничен 12 МБ. Право `manage_content` проверяется до чтения файла.
+- **Секреты не уходят в прокси окружения.** Вызовы Telegram, Яндекс OAuth и Remnawave создают HTTP-клиент с `trust_env=False`.
+- **Адрес клиента.** Заголовок `X-Forwarded-For` учитывается только если непосредственный сосед — loopback, частный или link-local адрес (Caddy). Прямой клиент не может подставить адрес из allowlist вебхука.
+- **Ответы без текста исключения.** Повтор выдачи и сводка здоровья не возвращают строку исключения. Подробность остаётся в журнале процесса.
+- Схема базы остаётся `0038_v2_6_0_platform`. Приложения Android покупателя остаются **2.10.0**, администратора — **2.12.0**. Подробности — раздел 9.12 в `INSTRUCTION.md` и `RELEASE_NOTES_V3_0_0.md`.
 
 ### Возможности 2.13.0
 
@@ -118,6 +126,7 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 | `DOCUMENTATION.md` | Карта актуальных документов и архивных аудитов |
 | `LICENSE` | Проприетарная лицензия 1.0, RU/EN |
 | `MOBILE.md` | Android и iOS: функции, сессия, логотип, сборка, RU/EN |
+| `RELEASE_NOTES_V3_0_0.md` | Аудит 3.0.0-realise и результат чеклиста |
 | `RELEASE_NOTES_V2_13_0.md` | Скачивание приложений 2.13.0 |
 | `RELEASE_NOTES_V2_12_0.md` | Рассылка 2.12.0, разбор функций и проверка |
 | `RELEASE_NOTES_V2_11_0.md` | Документация 2.11.0 и безопасный порядок обновления |
@@ -152,7 +161,7 @@ cd ../cabinet && npm install && npx vite build
 
 A VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Current release: **2.13.0**. Previous releases: **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
+Current release: **3.0.0-realise**. Previous releases: **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
 
 ### What is in the tree
 
@@ -165,6 +174,14 @@ Current release: **2.13.0**. Previous releases: **2.12.0**, **2.11.0**, **2.10.0
 | Android and iOS | Kotlin Compose, SwiftUI | Buyer and administrator, Russian and English |
 | Edge | Docker Compose, Caddy | HTTPS and separate domains |
 | Checks | `tests/`, `scripts/sandbox-e2e.sh` | Regression and a run without live gateways |
+
+### What 3.0.0-realise adds
+
+- **App packages up to 80 MB.** `POST /api/admin/apps/{id}/file` is no longer cut by the global 12 MB body ceiling when the request has `Content-Length`. A request without `Content-Length` stays at 12 MB. The `manage_content` permission is checked before the file is read.
+- **Secrets stay off environment proxies.** Telegram, Yandex OAuth and Remnawave HTTP clients set `trust_env=False`.
+- **Client address.** `X-Forwarded-For` is used only when the immediate peer is loopback, private or link-local (Caddy). A direct client cannot supply a webhook allowlist address.
+- **Responses omit exception text.** Provisioning retry and the health summary do not return the exception string. The detail stays in the process log.
+- The database schema stays `0038_v2_6_0_platform`. The buyer Android app stays **2.10.0**. The administrator Android app stays **2.12.0**. Details are in section 9.12 of `INSTRUCTION.md` and in `RELEASE_NOTES_V3_0_0.md`.
 
 ### What 2.13.0 adds
 
@@ -250,6 +267,7 @@ The full procedure is `INSTRUCTION.md`, section 9.9. Do not commit `.env`, token
 | `DOCUMENTATION.md` | Index of current documents and archived audits |
 | `LICENSE` | Proprietary license 1.0, RU/EN |
 | `MOBILE.md` | Android and iOS functions, session, logo and build, RU/EN |
+| `RELEASE_NOTES_V3_0_0.md` | 3.0.0-realise audit and checklist result |
 | `RELEASE_NOTES_V2_13_0.md` | 2.13.0 app downloads |
 | `RELEASE_NOTES_V2_12_0.md` | 2.12.0 broadcast, function reference and the check |
 | `RELEASE_NOTES_V2_11_0.md` | 2.11.0 documents and the safe update order |

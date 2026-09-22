@@ -125,6 +125,7 @@ class AuditLog(Base):
     actor: Mapped[str] = mapped_column(String(320), nullable=False, default="system")
     target: Mapped[str|None] = mapped_column(String(200))
     details: Mapped[str|None] = mapped_column(Text)
+    request_id: Mapped[str|None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 

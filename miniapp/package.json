@@ -1,5 +1,5 @@
 {
   "private": true,
   "scripts": {"build":"vite build"},
-  "dependencies": {"vite":"7.1.5","typescript":"5.9.2","react":"19.1.1","react-dom":"19.1.1"}
+  "dependencies": {"vite":"7.3.6","typescript":"5.9.2","react":"19.1.1","react-dom":"19.1.1"}
 }

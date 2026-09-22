@@ -1,4 +1,26 @@
-# Security / Безопасность — Remnawave VPN Shop 2.13.0
+# Security / Безопасность — Remnawave VPN Shop 3.0.0-realise
+
+## Аудит 3.0.0-realise / 3.0.0-realise audit
+
+- Общий потолок тела запроса остаётся 12 МБ. Для `POST /api/admin/apps/{id}/file` при наличии `Content-Length` потолок равен 80 МБ, как у `MAX_PACKAGE_BYTES`. Запрос без длины по-прежнему обрезается на 12 МБ, чтобы не буферизовать 80 МБ до авторизации.
+- Зависимость `manage_content` стоит раньше `UploadFile`, поэтому отказ в праве происходит до чтения пакета.
+- Клиенты с токеном бота, секретом Яндекса и токеном Remnawave создаются с `trust_env=False`. Переменные `HTTP_PROXY` и `HTTPS_PROXY` не получают URL с секретом.
+- `_client_ip` читает `X-Forwarded-For` только от loopback, частного или link-local соседа. Публичный прямой клиент не подменяет IP вебхука.
+- `POST /api/admin/payments/{id}/retry`, повтор операции выдачи и `GET /api/admin/health/summary` не кладут `str(exception)` в JSON. Текст исключения пишется в журнал.
+- Пароль считается scrypt с тем же коэффициентом и `maxmem` 64 МиБ.
+- `audit_logs.request_id` есть в модели. Суммы Decimal и даты в журнале сериализуются, а не роняют запрос.
+- Флаг функции выбирается по `FeatureFlag.key`. Пустая таблица не даёт 500 на создании платежа.
+- Vite в панелях `admin`, `miniapp` и `cabinet` — `7.3.6`. Предыдущий pin `7.1.5` попадал в предупреждения `npm audit` для dev-сервера.
+
+- The global request body ceiling stays 12 MB. `POST /api/admin/apps/{id}/file` with `Content-Length` uses the 80 MB `MAX_PACKAGE_BYTES` ceiling. A request without a length is still cut at 12 MB so an 80 MB body is not buffered before authorization.
+- The `manage_content` dependency is declared before `UploadFile`, so a missing permission fails before the package is read.
+- Clients that carry the bot token, the Yandex secret or the Remnawave token are created with `trust_env=False`. `HTTP_PROXY` and `HTTPS_PROXY` do not receive a URL that contains a secret.
+- `_client_ip` reads `X-Forwarded-For` only from a loopback, private or link-local peer. A public direct client cannot spoof a webhook IP.
+- `POST /api/admin/payments/{id}/retry`, the provisioning retry and `GET /api/admin/health/summary` do not put `str(exception)` in JSON. The exception text is written to the log.
+- Passwords use the same scrypt work factor with `maxmem` of 64 MiB.
+- `audit_logs.request_id` is mapped on the model. Decimal amounts and datetimes in the audit log are serialized and do not fail the request.
+- A feature flag is selected by `FeatureFlag.key`. An empty table does not make payment creation answer 500.
+- Vite in the `admin`, `miniapp` and `cabinet` panels is `7.3.6`. The previous pin `7.1.5` matched high `npm audit` findings for the dev server.
 
 ## Файлы приложений / App packages (2.13.0)
 

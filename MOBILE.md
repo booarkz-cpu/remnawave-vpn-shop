@@ -1,4 +1,8 @@
-# Мобильные приложения 2.13.0 / Mobile apps 2.13.0
+# Мобильные приложения 3.0.0-realise / Mobile apps 3.0.0-realise
+
+Серверная версия **3.0.0-realise** не меняет пакеты Android и проекты iOS. Покупатель остаётся **2.10.0**, администратор — **2.12.0**. Загрузка APK или IPA в панели принимает файл до 80 МБ, если браузер передаёт `Content-Length`.
+
+Server version **3.0.0-realise** does not change the Android packages or the iOS projects. The buyer app stays **2.10.0** and the administrator app stays **2.12.0**. An APK or IPA upload in the panel accepts a file up to 80 MB when the browser sends `Content-Length`.
 
 С версии **2.13.0** ссылка на скачивание приложения администратора стоит в веб-панели, а ссылка на приложение покупателя — в личном кабинете. Сами пакеты Android остаются **2.12.0** для администратора и **2.10.0** для покупателя, пока администратор не загрузит новый файл.
 

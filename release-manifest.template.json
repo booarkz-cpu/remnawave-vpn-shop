@@ -1,5 +1,8 @@
 {
-  "version": "2.13.0",
+  "version": "3.0.0-realise",
+  "legacy_v2_13_0_contract": {
+    "version": "2.13.0"
+  },
   "legacy_v2_12_0_contract": {
     "version": "2.12.0"
   },
@@ -41,7 +44,8 @@
   "legacy_v2_0_2_contract": {
     "version": "2.0.2-audited"
   },
-  "artifact": "remnawave_vpn_shop_v2_13_0_full_release.zip",
+  "artifact": "remnawave_vpn_shop_v3_0_0_realise_full_release.zip",
+  "legacy_v2_13_0_artifact": "remnawave_vpn_shop_v2_13_0_full_release.zip",
   "legacy_v2_12_0_artifact": "remnawave_vpn_shop_v2_12_0_full_release.zip",
   "legacy_v2_11_0_artifact": "remnawave_vpn_shop_v2_11_0_full_release.zip",
   "legacy_v2_10_0_artifact": "remnawave_vpn_shop_v2_10_0_full_release.zip",
@@ -62,7 +66,8 @@
   "previous_migration_head_legacy_marker": "0021_v43_hardening_docs",
   "tests": null,
   "signed": false,
-  "detached_manifest": "remnawave_vpn_shop_v2_13_0_full_release_manifest.json",
+  "detached_manifest": "remnawave_vpn_shop_v3_0_0_realise_full_release_manifest.json",
+  "legacy_v2_13_0_detached_manifest": "remnawave_vpn_shop_v2_13_0_full_release_manifest.json",
   "legacy_v2_12_0_detached_manifest": "remnawave_vpn_shop_v2_12_0_full_release_manifest.json",
   "legacy_v2_11_0_detached_manifest": "remnawave_vpn_shop_v2_11_0_full_release_manifest.json",
   "legacy_v2_10_0_detached_manifest": "remnawave_vpn_shop_v2_10_0_full_release_manifest.json",
@@ -72,7 +77,8 @@
   "legacy_v2_6_0_detached_manifest": "remnawave_vpn_shop_v2_6_0_full_release_manifest.json",
   "legacy_v2_5_0_detached_manifest": "remnawave_vpn_shop_v2_5_0_full_release_manifest.json",
   "note": "Template only. The exact release manifest is shipped as a detached file next to the ZIP because embedding the ZIP SHA inside the ZIP is self-referential.",
-  "previous_release": "2.12.0",
+  "previous_release": "2.13.0",
+  "previous_release_v2_12_0": "2.12.0",
   "previous_release_v2_11_0": "2.11.0",
   "previous_release_v2_10_0": "2.10.0",
   "previous_release_v2_9_0": "2.9.0",

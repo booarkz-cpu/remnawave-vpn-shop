@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.0.0-realise
+
+Загрузка APK или IPA на карточку принимает файл до 80 МБ при `Content-Length`. Сессия без `manage_content` получает отказ до чтения файла.
+
+An APK or IPA upload accepts a file up to 80 MB when `Content-Length` is set. A session without `manage_content` is rejected before the file is read.
+
 ## Скачивание / Downloads
 
 Вкладка **Приложения** загружает APK и IPA, меняет тексты карточек и показывает ссылку на приложение администратора. Кабинет покупателя получает ссылку только на включённые карточки покупателя.

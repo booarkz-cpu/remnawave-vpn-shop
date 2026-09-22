@@ -29,7 +29,7 @@ def upgrade():
     op.create_index("ix_financial_ledger_created_at", "financial_ledger", ["created_at"])
     op.create_check_constraint("ck_financial_ledger_direction", "financial_ledger", "direction IN ('credit','debit')")
     op.create_check_constraint("ck_financial_ledger_amount_positive", "financial_ledger", "amount > 0")
-    op.create_column("audit_logs", sa.Column("request_id", sa.String(length=64), nullable=True))
+    op.add_column("audit_logs", sa.Column("request_id", sa.String(length=64), nullable=True))
     op.create_index("ix_audit_logs_request_id", "audit_logs", ["request_id"])
 
 

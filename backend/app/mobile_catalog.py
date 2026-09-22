@@ -283,7 +283,7 @@ async def save_apps(payload: AppsIn, db: AsyncSession = Depends(get_db), admin=D
 
 
 @router.post("/api/admin/apps/logo")
-async def upload_client_logo(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), admin=Depends(require_permission("manage_content"))):
+async def upload_client_logo(admin=Depends(require_permission("manage_content")), file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     from .main import _replace_branding_file, _store_branding_image, audit
 
     url = await _store_branding_image(file, "client-logo")
@@ -356,7 +356,7 @@ async def _write_catalog(db: AsyncSession, cards: list[dict]) -> None:
 
 
 @router.post("/api/admin/apps/{app_id}/file")
-async def upload_app_file(app_id: str, file: UploadFile = File(...), db: AsyncSession = Depends(get_db), admin=Depends(require_permission("manage_content"))):
+async def upload_app_file(app_id: str, admin=Depends(require_permission("manage_content")), file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     from .main import audit
 
     if app_id not in APP_IDS:

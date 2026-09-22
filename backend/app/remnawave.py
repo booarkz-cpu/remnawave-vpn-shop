@@ -35,6 +35,7 @@ class RemnawaveClient:
                 cls._shared_client = httpx.AsyncClient(
                     timeout=httpx.Timeout(15.0, connect=5.0),
                     limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+                    trust_env=False,
                 )
             return cls._shared_client
 
