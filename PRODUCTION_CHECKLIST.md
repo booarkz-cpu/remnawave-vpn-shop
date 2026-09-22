@@ -20,6 +20,13 @@
 - [ ] Create and verify a backup.
 - [ ] Validate and test-restore a backup in staging.
 
+## Payment smoke test without live gateways
+- [ ] Set `PAYMENTS_SANDBOX=true` and leave live gateway secrets empty.
+- [ ] Create one ordinary enabled plan.
+- [ ] Run `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh`.
+- [ ] Confirm `/api/public/servers` has no address, token or password fields.
+- [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
+
 ## Payment smoke test
 - [ ] Create one test payment.
 - [ ] Confirm provider status and webhook.

@@ -1,0 +1,206 @@
+# Модули проекта / Project modules
+
+Версия **2.5.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4.
+
+Version **2.5.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4.
+
+---
+
+## Русский
+
+### Как устроен запрос
+
+Покупатель открывает Mini App, личный кабинет или бота. Администратор открывает панель. Caddy принимает HTTPS и отдаёт статику `admin`, `miniapp` или `cabinet`, а `/api` отправляет в FastAPI. API читает и пишет PostgreSQL, ставит блокировки и лимиты в Redis, ходит в Remnawave за пользователями и узлами и в платёжного провайдера за созданием и сверкой платежа. Фоновый `worker` дожимает очередь задач. Планировщики внутри API-процесса повторяют выдачу, возвраты, автопродление, сверку и уведомления об окончании подписки.
+
+### `backend/app/main.py`
+
+Главный HTTP-процесс магазина. Здесь собраны:
+
+- версия приложения и маршруты здоровья `/health`, `/health/live`, `/health/ready`;
+- сессии покупателя и администратора, CSRF, rate limit, ограничение размера тела;
+- каталог тарифов, промокоды, пробный период, устройства;
+- создание платежа, вебхуки YooKassa / Platega / RollyPay, выдача `fulfill`, возвраты;
+- кошелёк, подарки, рефералы, поддержка, уведомления;
+- админские разделы: пользователи, платежи, бэкапы, аудит, роли, staging, мониторинг процессов;
+- подключение роутеров кабинета и конструктора.
+
+С версии 2.5.0 оплата и списание кошелька, если в теле есть `constructor_id`, берут цену и лимиты из `quote_constructor` и пишут их в снимок платежа. Якорный тариф конструктора нельзя купить, подарить или взять на пробу в обход пунктов.
+
+### `backend/app/cabinet_api.py`
+
+Отдельный контур личного кабинета, чтобы не смешивать его с Telegram-only входом.
+
+- регистрация и вход по email и паролю;
+- старт и callback VK ID;
+- публичное меню кабинета и админский CRUD вкладок;
+- тексты инструкций для Android, iOS, TV, Windows, macOS и Linux;
+- завершение sandbox-платежа `POST /api/payments/sandbox/complete`.
+
+Вид вкладки `servers` разрешён с 2.5.0: кабинет показывает статус узлов, а не произвольный HTML.
+
+### `backend/app/tariff_api.py`
+
+Конструктор тарифа и безопасный статус узлов.
+
+- хранит конструктор и пункты видов `devices`, `traffic_gb`, `days`;
+- проверяет диапазоны и требует по одному включённому пункту каждого вида, если конструктор включён;
+- синхронизирует скрытый якорный `Plan`, чтобы у платежа оставался `plan_id`;
+- `quote_constructor` считает сумму и возвращает дни, трафик и устройства выбранной комбинации;
+- `public_node` оставляет только имя, страну, статус и число пользователей онлайн;
+- маршруты: публичный список конструкторов, публичный статус серверов, статус для вошедшего пользователя, мониторинг для администратора, CRUD конструктора.
+
+Отключение конструктора не удаляет строки: новые покупки закрываются, история платежей остаётся.
+
+### `backend/app/payments.py`
+
+Адаптеры касс. `YooKassaProvider`, `PlategaProvider` и `RollyPayProvider` создают платёж, читают его статус и делают возврат. `SandboxProvider` существует только для проверки без живых шлюзов: идентификатор начинается с `sandbox-`, статус сразу `succeeded`, URL ведёт в кабинет с `?sandbox_payment=`. Проверка подписи и allowlist живых провайдеров живёт рядом с этими классами и вызывается из `main.py` до выдачи.
+
+### `backend/app/remnawave.py`
+
+Клиент панели Remnawave: пользователи, срок, лимиты трафика и устройств, список узлов, ключ подключения. Здесь же предохранитель на повторные ошибки, чтобы сбой панели не зацикливал выдачу. Модуль не решает, какие поля можно показать покупателю: это делает `tariff_api.public_node`.
+
+### `backend/app/security.py`
+
+Пароли scrypt, шифрование секретов от `APP_SECRET`, выпуск и проверка JWT, текущий администратор, роли и права, TOTP и коды восстановления. Конструктор требует право `manage_plans`. Чтение мониторинга требует `read`.
+
+### `backend/app/config.py`
+
+Все настройки из окружения: база, Redis, домены, бот, Remnawave, кассы, `PAYMENTS_SANDBOX`, `CABINET_URL`, `CABINET_DOMAIN`, VK, Яндекс, лимит пробного периода, CORS, cookie. Пустые строки касс не должны ронять процесс: sandbox как раз позволяет поднять магазин до подключения шлюза.
+
+### `backend/app/models.py`
+
+Таблицы SQLAlchemy: пользователи, тарифы, платежи со снимками, подписки, сессии, промокоды, подарки, кошелёк, журнал, аудит, меню кабинета, конструктор и его пункты, кампании, задачи, бэкапы. Платёж хранит снимок, чтобы правка тарифа после оплаты не меняла уже купленное.
+
+### `backend/app/db.py`
+
+Движок async SQLAlchemy и зависимость `get_db` для запросов. Миграции применяет Alembic, не этот файл.
+
+### `backend/app/bot.py`
+
+Telegram-бот на aiogram. Приветствие, цены, кнопка магазина, команды промокода и подарка, рассылки. Тексты есть на русском и английском. Бот не принимает деньги сам: он открывает Mini App.
+
+### `backend/app/provisioner.py`
+
+Редкое действие администратора: по SSH выложить compose узла. Соединение требует отпечаток host key. Это не мониторинг и не пользовательский статус. Секреты SSH не сохраняются как постоянные учётные данные панели.
+
+### `backend/app/totp.py`
+
+Генерация и проверка TOTP и otpauth URI для приложения-аутентификатора администратора.
+
+### `backend/worker.py`
+
+Отдельный процесс очереди. Забирает задачи `Job` (в том числе пробный период), ведёт heartbeat `WorkerState`, не даёт двум воркерам взять одну строку (`skip_locked`) и возвращает в очередь зависшие задачи. Выдача после оплаты тоже может быть дожата планировщиком API, если вызов Remnawave оборвался.
+
+### `backend/alembic/versions/`
+
+История схемы. Голова 2.5.0 — `0037_v2_5_0_tariff_constructor`: таблицы конструктора и вкладка кабинета «Серверы». Предыдущая голова 2.4.0 — `0036_v2_4_0_cabinet`.
+
+### `admin/`
+
+Панель администратора на React. Вкладки покрывают бренд, обзор, тарифы, конструктор, мониторинг Remnawave, платежи, пользователей, контент бота и Mini App, CMS кабинета, маркетинг, роли, бэкапы, безопасность, восстановление, аудит и операции. Русские подписи переводятся словарём `admin/src/i18n.tsx`, когда выбран английский.
+
+### `miniapp/`
+
+Магазин внутри Telegram. Показывает подписку, обычные тарифы, конструктор, статус серверов, кошелёк, подарки, рефералы и поддержку. Оплата использует тот же API, что и кабинет.
+
+### `cabinet/`
+
+Отдельное SPA личного кабинета. Вход: email, Telegram, VK, Яндекс. Вкладки приходят из CMS; если вкладки «Серверы» нет, клиент добавляет её сам. Покупка конструктора и обычного тарифа, пробный период, ссылка подписки и инструкции по устройствам живут здесь. Возврат `?sandbox_payment=` завершает тестовый платёж.
+
+### `deploy/` и `docker-compose.yml`
+
+Compose поднимает `db`, `redis`, `backend`, `worker`, `bot`, `admin`, `miniapp`, `cabinet` и `caddy`. Caddy выпускает сертификаты и разделяет домены API, админки, Mini App и кабинета. `install.sh` вызывает `deploy/install-vps.sh`: Docker, `.env`, миграции, UFW и Fail2Ban.
+
+### `scripts/`
+
+| Скрипт | Зачем |
+| --- | --- |
+| `sandbox-e2e.sh` | Полный прогон оплаты без живых касс и проверка, что статус узлов не содержит секретов |
+| `build-release.sh` | Проверки и ZIP релиза |
+| `integration-test.sh` | Проверка compose на хосте с Docker |
+| `preflight.sh` | Проверка окружения перед запуском |
+| `doctor.sh` | Быстрая диагностика работающего стека |
+| `security-scan.sh` | Поиск опасных настроек |
+| `update.sh` / `rollback.sh` | Обновление и откат |
+
+### `tests/`
+
+Контрактные тесты читают исходники и проверяют, что версия, миграция, кабинет, sandbox, конструктор, мониторинг и двуязычные документы на месте. Они не подменяют прогон `sandbox-e2e.sh` против живого API.
+
+---
+
+## English
+
+### Request path
+
+A buyer opens the Mini App, the cabinet or the bot. An administrator opens the panel. Caddy terminates HTTPS, serves the `admin`, `miniapp` or `cabinet` files, and forwards `/api` to FastAPI. The API uses PostgreSQL for state, Redis for locks and rate limits, Remnawave for users and nodes, and a payment provider to create and re-read payments. `worker` drains the job queue. Schedulers inside the API process retry fulfillment, refunds, auto-renew, reconciliation and expiry notices.
+
+### `backend/app/main.py`
+
+The shop HTTP process: version and health routes, buyer and admin sessions, CSRF, rate limits, body size, the plan catalog, promos, trials, devices, payment creation, YooKassa / Platega / RollyPay webhooks, `fulfill`, refunds, wallet, gifts, referrals, support, notifications, and the admin operations surface. It mounts the cabinet and tariff routers.
+
+From 2.5.0, checkout and wallet spend call `quote_constructor` when `constructor_id` is present and store that quote on the payment. The constructor anchor plan cannot be bought, gifted or trialed by its raw plan id.
+
+### `backend/app/cabinet_api.py`
+
+The user cabinet boundary: email registration and login, VK ID start and callback, the public menu, admin menu CRUD, device-guide text, and `POST /api/payments/sandbox/complete`. The menu kind `servers` is allowed so the cabinet can show node status.
+
+### `backend/app/tariff_api.py`
+
+Tariff constructor and safe node status. It stores constructors and `devices`, `traffic_gb` and `days` options, validates ranges, keeps a hidden anchor `Plan`, prices a selection in `quote_constructor`, and strips node payloads down to name, country, status and online users. Routes cover the public constructor list, public servers, the signed-in server view, admin monitoring, and constructor CRUD. Disabling a constructor closes new sales and keeps payment history.
+
+### `backend/app/payments.py`
+
+Gateway adapters. YooKassa, Platega and RollyPay create, read and refund payments. `SandboxProvider` is the gateway-free path: ids start with `sandbox-`, status is `succeeded`, and the URL returns to the cabinet with `?sandbox_payment=`.
+
+### `backend/app/remnawave.py`
+
+Remnawave panel client for users, expiry, traffic and device limits, the node list and the connection key, plus a circuit breaker. It does not decide which fields a buyer may see; `public_node` does.
+
+### `backend/app/security.py`
+
+scrypt passwords, secret encryption, JWT, the current admin, RBAC, TOTP and recovery codes. Constructor writes need `manage_plans`. Monitoring reads need `read`.
+
+### `backend/app/config.py`
+
+Environment settings: database, Redis, domains, bot, Remnawave, gateways, `PAYMENTS_SANDBOX`, cabinet URL and domain, VK, Yandex, trial cap, CORS and cookies. Empty gateway secrets must not prevent a sandbox boot.
+
+### `backend/app/models.py`
+
+SQLAlchemy tables for users, plans, snapshotted payments, subscriptions, sessions, promos, gifts, the wallet, the ledger, audit, the cabinet menu, the constructor and its options, campaigns, jobs and backups.
+
+### `backend/app/db.py`
+
+The async SQLAlchemy engine and `get_db`. Alembic owns schema changes.
+
+### `backend/app/bot.py`
+
+The aiogram Telegram bot: welcome, prices, the shop button, promo and gift commands, broadcasts. Copy exists in Russian and English. The bot does not charge cards; it opens the Mini App.
+
+### `backend/app/provisioner.py`
+
+An administrator-only SSH compose deploy for a node. The host key fingerprint is required. This is not the user-facing status page.
+
+### `backend/app/totp.py`
+
+TOTP generation, verification and the otpauth URI for the admin authenticator app.
+
+### `backend/worker.py`
+
+The queue process. It claims `Job` rows, including trials, writes `WorkerState`, uses `skip_locked`, and requeues abandoned jobs.
+
+### `backend/alembic/versions/`
+
+Schema history. The 2.5.0 head is `0037_v2_5_0_tariff_constructor`. The 2.4.0 head was `0036_v2_4_0_cabinet`.
+
+### `admin/`, `miniapp/`, `cabinet/`
+
+`admin` is the operator console, including the plan builder and Remnawave monitoring. `miniapp` is the Telegram shop with plans, the constructor and server status. `cabinet` is the standalone account with email, Telegram, VK and Yandex sign-in, CMS-driven tabs, constructor checkout, trial, the subscription link and device guides. Russian source strings are translated by each app's `i18n.tsx` when English is selected.
+
+### `deploy/`, Compose and `scripts/`
+
+Compose runs PostgreSQL, Redis, the API, the worker, the bot, three frontends and Caddy. `install.sh` delegates to `deploy/install-vps.sh`. `scripts/sandbox-e2e.sh` is the pre-release payment test without live gateways. The other scripts build a release, check Compose, preflight the host, diagnose a running stack, scan settings, update and roll back.
+
+### `tests/`
+
+Source-contract tests keep the version, migration, cabinet, sandbox, constructor, monitoring and bilingual docs wired. They do not replace `sandbox-e2e.sh` against a running API.

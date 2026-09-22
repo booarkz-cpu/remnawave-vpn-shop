@@ -141,6 +141,30 @@ class BotMenuItem(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+class TariffConstructor(Base):
+    __tablename__ = "tariff_constructors"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    base_price: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
+    plan_id: Mapped[int|None] = mapped_column(Integer, index=True)
+    remnawave_profile_id: Mapped[str|None] = mapped_column(String(255))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class TariffConstructorOption(Base):
+    __tablename__ = "tariff_constructor_options"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    constructor_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(12,2), default=0, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
 class CabinetMenuItem(Base):
     __tablename__ = "cabinet_menu_items"
     id: Mapped[int] = mapped_column(primary_key=True)

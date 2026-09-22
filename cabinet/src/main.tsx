@@ -5,7 +5,7 @@ import {DomLocalizer, LangProvider, detectLang, t, useLang} from "./i18n";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-type MenuKind = "overview" | "plans" | "trial" | "connection" | "support" | "custom";
+type MenuKind = "overview" | "plans" | "trial" | "connection" | "support" | "servers" | "custom";
 type MenuItem = {slug: string; title: string; kind: MenuKind; body?: string};
 
 const FALLBACK_MENU: MenuItem[] = [
@@ -13,6 +13,7 @@ const FALLBACK_MENU: MenuItem[] = [
   {slug: "plans", title: "Тарифы", kind: "plans"},
   {slug: "trial", title: "Пробный период", kind: "trial"},
   {slug: "connection", title: "Подключение", kind: "connection"},
+  {slug: "servers", title: "Серверы", kind: "servers"},
   {slug: "support", title: "Поддержка", kind: "support"},
 ];
 
@@ -80,6 +81,66 @@ function isHtml(body?: string) {
   return Boolean(body && /<\/?[a-z][\s\S]*>/i.test(body));
 }
 
+function defaultPick(row: any) {
+  const picked: Record<string, number> = {};
+  for (const kind of ["devices", "traffic_gb", "days"]) {
+    const opt = (row.options || []).find((o: any) => o.kind === kind && o.enabled !== false);
+    if (opt) picked[kind] = opt.id;
+  }
+  return picked;
+}
+
+function constructorTotal(row: any, selected: Record<string, number>) {
+  let sum = Number(row.base_price || 0);
+  for (const kind of ["devices", "traffic_gb", "days"]) {
+    const opt = (row.options || []).find((o: any) => o.id === selected[kind] && o.kind === kind);
+    if (opt) sum += Number(opt.price || 0);
+  }
+  return Math.round(sum * 100) / 100;
+}
+
+function serverLabel(status?: string) {
+  if (status === "online") return "Онлайн";
+  if (status === "offline") return "Офлайн";
+  if (status === "disabled") return "Отключён";
+  return "Неизвестно";
+}
+
+function ServerList({servers}: {servers: any}) {
+  const nodes = servers?.nodes || [];
+  return (
+    <div className="plan-list">
+      <p className="section-sub">
+        {servers?.ok
+          ? `Онлайн ${servers.online ?? 0} из ${servers.total ?? 0}`
+          : servers?.error || "Remnawave недоступен"}
+      </p>
+      {nodes.map((node: any, index: number) => (
+        <article className="plan-item" key={`${node.name}-${index}`}>
+          <div>
+            <h3>{node.name}</h3>
+            <p className="section-sub" style={{margin: 0}}>
+              {node.country || "—"} · {serverLabel(node.status)}
+              {typeof node.users_online === "number" ? ` · ${node.users_online}` : ""}
+            </p>
+          </div>
+        </article>
+      ))}
+      {!nodes.length && <p className="section-sub">Нет узлов</p>}
+    </div>
+  );
+}
+
+function withServers(list: MenuItem[]) {
+  if (list.some((item) => item.kind === "servers")) return list;
+  const next = list.slice();
+  const at = next.findIndex((item) => item.kind === "support");
+  const item: MenuItem = {slug: "servers", title: "Серверы", kind: "servers"};
+  if (at >= 0) next.splice(at, 0, item);
+  else next.push(item);
+  return next;
+}
+
 function App() {
   const {lang, setLang} = useLang();
   const [booting, setBooting] = useState(true);
@@ -96,6 +157,9 @@ function App() {
   const [tab, setTab] = useState("overview");
   const [dash, setDash] = useState<any>();
   const [plans, setPlans] = useState<any[]>([]);
+  const [constructors, setConstructors] = useState<any[]>([]);
+  const [pick, setPick] = useState<Record<number, Record<string, number>>>({});
+  const [servers, setServers] = useState<any>();
   const [provider, setProvider] = useState("");
   const [promo, setPromo] = useState("");
   const [connection, setConnection] = useState<any>();
@@ -133,12 +197,36 @@ function App() {
           body: x.body || "",
         }));
       if (normalized.length) {
-        setMenu(normalized);
-        setTab((prev) => (normalized.some((m) => m.slug === prev) ? prev : normalized[0].slug));
+        const menuWithServers = withServers(normalized);
+        setMenu(menuWithServers);
+        setTab((prev) => (menuWithServers.some((m) => m.slug === prev) ? prev : menuWithServers[0].slug));
         return;
       }
     } catch {}
     setMenu(FALLBACK_MENU);
+  }
+
+  async function loadConstructors() {
+    try {
+      const rows = await req("/api/tariff-constructors");
+      const list = Array.isArray(rows) ? rows : [];
+      setConstructors(list);
+      setPick((prev) => {
+        const next = {...prev};
+        for (const row of list) if (!next[row.id]) next[row.id] = defaultPick(row);
+        return next;
+      });
+    } catch {
+      setConstructors([]);
+    }
+  }
+
+  async function loadServers(authed: boolean) {
+    try {
+      setServers(await req(authed ? "/api/me/servers" : "/api/public/servers"));
+    } catch {
+      setServers({ok: false, nodes: [], error: "Remnawave недоступен"});
+    }
   }
 
   async function loadSession() {
@@ -146,6 +234,7 @@ function App() {
     setDash(dashboard);
     setPlans(Array.isArray(planList) ? planList : []);
     setAuthed(true);
+    await Promise.all([loadConstructors(), loadServers(true)]);
     try {
       const info = await req("/api/me/connection-info");
       setConnection(info);
@@ -165,6 +254,8 @@ function App() {
     (async () => {
       await loadPublic();
       await loadMenu();
+      await loadConstructors();
+      await loadServers(false);
       try {
         if (tg?.initData) {
           await req("/api/auth/telegram", {method: "POST", body: JSON.stringify({initData: tg.initData})});
@@ -234,19 +325,29 @@ function App() {
     location.href = API + path;
   }
 
-  async function buy(plan: any) {
+  async function buySelection(body: Record<string, unknown>, wallet: boolean) {
     setBusy(true);
     flash("");
     try {
-      const r = await req("/api/payments/create", {
-        method: "POST",
-        headers: {"Idempotency-Key": crypto.randomUUID()},
-        body: JSON.stringify({plan_id: plan.id, provider: provider || undefined, promo_code: promo || undefined}),
-      });
-      if (r.url) location.href = r.url;
-      else {
-        flash(t("Платёж создан"));
+      if (wallet) {
+        await req("/api/me/wallet/spend", {
+          method: "POST",
+          headers: {"Idempotency-Key": crypto.randomUUID()},
+          body: JSON.stringify(body),
+        });
+        flash(t("Оплачено с баланса"));
         await loadSession();
+      } else {
+        const r = await req("/api/payments/create", {
+          method: "POST",
+          headers: {"Idempotency-Key": crypto.randomUUID()},
+          body: JSON.stringify({...body, provider: provider || undefined}),
+        });
+        if (r.url) location.href = r.url;
+        else {
+          flash(t("Платёж создан"));
+          await loadSession();
+        }
       }
     } catch (err: any) {
       flash(err.message || t("Ошибка"), true);
@@ -255,22 +356,23 @@ function App() {
     }
   }
 
-  async function buyWallet(plan: any) {
-    setBusy(true);
-    flash("");
-    try {
-      await req("/api/me/wallet/spend", {
-        method: "POST",
-        headers: {"Idempotency-Key": crypto.randomUUID()},
-        body: JSON.stringify({plan_id: plan.id, promo_code: promo || undefined}),
-      });
-      flash(t("Оплачено с баланса"));
-      await loadSession();
-    } catch (err: any) {
-      flash(err.message || t("Ошибка"), true);
-    } finally {
-      setBusy(false);
-    }
+  function buy(plan: any) {
+    return buySelection({plan_id: plan.id, promo_code: promo || undefined}, false);
+  }
+
+  function buyWallet(plan: any) {
+    return buySelection({plan_id: plan.id, promo_code: promo || undefined}, true);
+  }
+
+  function buyConstructor(row: any, wallet: boolean) {
+    const selected = pick[row.id] || defaultPick(row);
+    return buySelection({
+      constructor_id: row.id,
+      device_option_id: selected.devices,
+      traffic_option_id: selected.traffic_gb,
+      days_option_id: selected.days,
+      promo_code: promo || undefined,
+    }, wallet);
   }
 
   async function claimTrial(planId: number) {
@@ -480,6 +582,8 @@ function App() {
                       <span className="value">{dash?.user?.referral_code || "—"}</span>
                     </div>
                   </div>
+                  <h3 className="section-title" style={{marginTop: 22, fontSize: "1.1rem"}}>Серверы</h3>
+                  <ServerList servers={servers} />
                 </>
               )}
 
@@ -526,6 +630,50 @@ function App() {
                     ))}
                     {!plans.length && <p className="section-sub">Выберите тариф</p>}
                   </div>
+                  {constructors.map((row) => {
+                    const selected = pick[row.id] || defaultPick(row);
+                    const total = constructorTotal(row, selected);
+                    return (
+                      <article className="form-card stack" key={row.id} style={{marginTop: 14}}>
+                        <h3>{row.name}</h3>
+                        <p className="section-sub">{row.description || "Соберите тариф: устройства, трафик и срок"}</p>
+                        {(["devices", "traffic_gb", "days"] as const).map((kind) => (
+                          <label className="field" key={kind}>
+                            {kind === "devices" ? "Устройства" : kind === "traffic_gb" ? "Трафик" : "Срок"}
+                            <select
+                              value={selected[kind] || ""}
+                              onChange={(e) =>
+                                setPick((prev) => ({
+                                  ...prev,
+                                  [row.id]: {...(prev[row.id] || defaultPick(row)), [kind]: Number(e.target.value)},
+                                }))
+                              }
+                            >
+                              {(row.options || [])
+                                .filter((o: any) => o.kind === kind)
+                                .map((o: any) => (
+                                  <option key={o.id} value={o.id}>
+                                    {o.label} · {o.value === 0 && kind === "traffic_gb" ? "Безлимит" : o.value}
+                                    {Number(o.price) ? ` · +${o.price}` : ""}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                        ))}
+                        <p className="price">
+                          {total} {currency}
+                        </p>
+                        <div className="btn-row">
+                          <button type="button" className="btn-primary" disabled={busy || !provider} onClick={() => buyConstructor(row, false)}>
+                            Оплатить
+                          </button>
+                          <button type="button" className="btn-ghost" disabled={busy} onClick={() => buyConstructor(row, true)}>
+                            С баланса
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </>
               )}
 
@@ -589,6 +737,14 @@ function App() {
                     ))}
                   </div>
                   <div className="platform-guide">{guideText || apiGuide}</div>
+                </>
+              )}
+
+              {activeItem?.kind === "servers" && (
+                <>
+                  <h2 className="section-title">Серверы</h2>
+                  <p className="section-sub">Статус узлов без адресов и служебных данных</p>
+                  <ServerList servers={servers} />
                 </>
               )}
 

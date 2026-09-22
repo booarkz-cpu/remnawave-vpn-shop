@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 2.4.0
+# Полная инструкция — Remnawave VPN Shop 2.5.0
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Разбор каждой функции кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`. Предыдущий полный контур кабинета описан как 2.4.0 и сохранён.
 
 ---
 
@@ -214,6 +214,62 @@ python3 -m pytest -q
 - Покупатель видит тарифы, пробный период (до `TRIAL_MAX_DAYS` дней), ссылку подписки и инструкции Android / iOS / TV / компьютер.
 - `PAYMENTS_SANDBOX=true` включает провайдер `sandbox`. Проверка без касс: `bash scripts/sandbox-e2e.sh`.
 
+## 9.3. Конструктор тарифов и статус серверов (2.5.0)
+
+### Конструктор
+
+1. Войдите в админку → **Конструктор тарифов**.
+2. Укажите название, описание, базовую цену и при необходимости `remnawave_profile_id`.
+3. Добавьте хотя бы один включённый пункт каждого вида:
+   - **Устройства** — целое от 1 до 100, своя доплата.
+   - **Трафик, ГБ** — целое от 0 до 100000. Значение 0 означает безлимит и в подписке хранится как отсутствие лимита.
+   - **Дни** — целое от 1 до 3650, своя доплата.
+4. Сохраните. API создаёт скрытый якорный тариф, чтобы у платежа оставался `plan_id`. Этот тариф не показывается в `GET /api/plans` и не продаётся напрямую, пробным периодом или подарком.
+5. Покупатель в личном кабинете (вкладка «Тарифы») и в Mini App выбирает по одному пункту каждого вида. На экране видна сумма: база + цены пунктов.
+6. Оплата идёт обычным `POST /api/payments/create` или `POST /api/me/wallet/spend` с полями `constructor_id`, `device_option_id`, `traffic_option_id`, `days_option_id` и заголовком `Idempotency-Key`.
+7. Кнопка «Отключить» не удаляет историю: конструктор и якорный тариф становятся недоступны для новой покупки. Уже оплаченные снимки срока, трафика и устройств не пересчитываются.
+
+Одинаковый `Idempotency-Key` с другой комбинацией пунктов отвечает 409.
+
+### Статус серверов
+
+- Админка → **Мониторинг Remnawave**: доступность панели, задержка, число онлайн/офлайн/отключённых узлов. Адресов и токенов нет.
+- Кабинет: вкладка **Серверы** и блок на обзоре. Без входа доступен `GET /api/public/servers`. После входа кабинет читает `GET /api/me/servers` и получает ещё флаг активности подписки.
+- Если панель Remnawave не отвечает, интерфейс показывает «Remnawave недоступен», а не текст исключения.
+
+## 9.4. Как протестировать проект до релиза без платёжных шлюзов
+
+Этот прогон не требует магазинов YooKassa, Platega и RollyPay и не открывает production gate.
+
+1. В `.env` установите `PAYMENTS_SANDBOX=true`. Боевые ключи касс можно оставить пустыми.
+2. Поднимите стек: `docker compose up -d --build`. Дождитесь `GET /health` с `"ok": true`.
+3. В админке создайте хотя бы один обычный включённый тариф (скрипт покупает его, не конструктор). Либо передайте `SANDBOX_PLAN_ID`.
+4. С хоста, который видит API:
+
+```bash
+SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh
+```
+
+Если API опубликован только через Caddy, укажите `https://<API_DOMAIN>`.
+
+Скрипт сам:
+
+- проверяет `/health`;
+- требует `payments_sandbox: true` и провайдер `sandbox` в `/api/public/config`;
+- читает публичное меню кабинета;
+- регистрирует нового пользователя `sandbox-<время>@example.test`;
+- берёт CSRF из cookie;
+- создаёт платёж `provider=sandbox` с новым `Idempotency-Key`;
+- завершает его через `POST /api/payments/sandbox/complete`;
+- открывает `/api/me/dashboard`;
+- читает `/api/public/servers` и убеждается, что в JSON нет полей адреса, hostname, token, password и private;
+- читает `/api/tariff-constructors` (пустой список допустим).
+
+5. Ручной контур кабинета: откройте `CABINET_URL`, зарегистрируйтесь, на вкладке «Тарифы» соберите конструктор, если он создан, нажмите «Оплатить» при выбранном провайдере sandbox. Возврат на кабинет с `?sandbox_payment=` завершает выдачу. Вкладка «Серверы» должна показать статус без IP.
+6. Что этот прогон не заменяет: боевой вебхук YooKassa, реальный SSH-провижининг узла и сверку суммы у живого провайдера. Если Remnawave недоступен, sandbox-платёж может быть отмечен оплаченным, а выдача останется в очереди или с ошибкой fulfillment — это видно в админке → Платежи и Центр восстановления, и это не означает, что касса подключена.
+
+Повторите `python3 -m pytest -q` на дереве исходников до выкладки. Контейнерный `scripts/integration-test.sh` нужен на хосте с Docker.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -323,7 +379,7 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 2.4.0
+# Full instruction — Remnawave VPN Shop 2.5.0
 
 This is the operator guide for installing the shop, turning payments on, and running the admin panel. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
@@ -523,6 +579,51 @@ The header theme button stores `rw_theme` in the browser. The server default app
 - Sign-in: email+password, Telegram WebApp, VK ID, Yandex ID. Menu tabs and device guides are edited in Admin → User cabinet.
 - Buyers see plans, a trial capped by `TRIAL_MAX_DAYS`, the subscription URL, and Android / iOS / TV / desktop guides.
 - `PAYMENTS_SANDBOX=true` enables the `sandbox` provider. Gateway-free check: `bash scripts/sandbox-e2e.sh`.
+
+## 9.3. Tariff constructor and server status (2.5.0)
+
+### Constructor
+
+1. Open Admin → **Конструктор тарифов** (Plan builder).
+2. Set a name, description, base price and an optional `remnawave_profile_id`.
+3. Add at least one enabled option of each kind:
+   - **Devices** — integer 1–100, with its own surcharge.
+   - **Traffic, GB** — integer 0–100000. Zero means unlimited and is stored as no traffic cap.
+   - **Days** — integer 1–3650, with its own surcharge.
+4. Save. The API creates a hidden anchor plan so the payment still has a `plan_id`. That plan is omitted from `GET /api/plans` and cannot be bought, trialed or gifted directly.
+5. The buyer picks one option of each kind in the cabinet Plans tab and in the Mini App. The price shown is base plus the selected option prices.
+6. Checkout is the normal `POST /api/payments/create` or `POST /api/me/wallet/spend` with `constructor_id`, `device_option_id`, `traffic_option_id`, `days_option_id` and an `Idempotency-Key` header.
+7. Disable does not erase history. The constructor and its anchor plan stop accepting new purchases. Snapshots already stored on payments are not recomputed.
+
+The same `Idempotency-Key` with a different selection returns 409.
+
+### Server status
+
+- Admin → **Мониторинг Remnawave**: panel reachability, latency, and online/offline/disabled counts. No addresses and no tokens.
+- Cabinet: the **Серверы** tab and a block on the overview. Signed-out clients can call `GET /api/public/servers`. After sign-in the cabinet calls `GET /api/me/servers`, which adds only `subscription_active`.
+- If the Remnawave panel does not answer, the UI shows that it is unavailable and does not show the exception text.
+
+## 9.4. How to test before release without payment gateways
+
+This run does not need YooKassa, Platega or RollyPay shops and does not open the production payment gate.
+
+1. Set `PAYMENTS_SANDBOX=true` in `.env`. Live gateway secrets may stay empty.
+2. Start the stack: `docker compose up -d --build`. Wait until `GET /health` returns `"ok": true`.
+3. In the admin panel create at least one ordinary enabled plan (the script buys that plan, not a constructor). Or pass `SANDBOX_PLAN_ID`.
+4. From a host that can reach the API:
+
+```bash
+SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh
+```
+
+If the API is published only through Caddy, use `https://<API_DOMAIN>`.
+
+The script checks `/health`, requires `payments_sandbox` and the `sandbox` provider, reads the public cabinet menu, registers `sandbox-<time>@example.test`, reads the CSRF cookie, creates a `provider=sandbox` payment with a fresh `Idempotency-Key`, completes it via `POST /api/payments/sandbox/complete`, opens `/api/me/dashboard`, reads `/api/public/servers` and rejects payloads that contain address, hostname, token, password or private fields, then reads `/api/tariff-constructors` (an empty list is valid).
+
+5. Manual cabinet path: open `CABINET_URL`, register, build a constructor on Plans if one exists, and pay with the sandbox provider. The return URL `?sandbox_payment=` completes fulfillment. The Servers tab must show status without IP addresses.
+6. This run does not replace a live YooKassa webhook, real SSH node provisioning, or an amount check at a live provider. If Remnawave is down, a sandbox payment can still be marked paid while fulfillment stays queued or failed. That is visible under Admin → Payments and the Recovery center, and it does not mean a gateway is connected.
+
+Run `python3 -m pytest -q` on the source tree before release. `scripts/integration-test.sh` needs a host with Docker.
 
 ## 10. Mini App
 
