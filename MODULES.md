@@ -1,8 +1,8 @@
 # Модули проекта / Project modules
 
-Версия **2.6.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Предыдущее описание конструктора относится к **2.5.0**.
+Версия **2.7.0**. Этот документ объясняет, зачем существует каждый модуль. Построчный разбор функций API остаётся в `FUNCTIONS.md`. Установка и проверка без касс — в `INSTRUCTION.md`, раздел 9.4. Платформа 2.6.0 — в разделе 9.5. Приложения Android и iOS — в разделе 9.6 и в `MOBILE.md`. Предыдущее описание конструктора относится к **2.5.0**.
 
-Version **2.6.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The constructor description belongs to **2.5.0**.
+Version **2.7.0**. This document explains why each module exists. The function-by-function API map stays in `FUNCTIONS.md`. Install steps and the gateway-free test are in `INSTRUCTION.md`, section 9.4. The 2.6.0 platform is in section 9.5. The Android and iOS apps are in section 9.6 and in `MOBILE.md`. The constructor description belongs to **2.5.0**.
 
 ---
 
@@ -11,6 +11,10 @@ Version **2.6.0**. This document explains why each module exists. The function-b
 ### Как устроен запрос
 
 Покупатель открывает Mini App, личный кабинет или бота. Администратор открывает панель. Caddy принимает HTTPS и отдаёт статику `admin`, `miniapp` или `cabinet`, а `/api` отправляет в FastAPI. API читает и пишет PostgreSQL, ставит блокировки и лимиты в Redis, ходит в Remnawave за пользователями и узлами и в платёжного провайдера за созданием и сверкой платежа. Фоновый `worker` дожимает очередь задач. Планировщики внутри API-процесса повторяют выдачу, возвраты, автопродление, сверку и уведомления об окончании подписки.
+
+### `backend/app/mobile_auth.py`
+
+Решает, можно ли отдать JWT в теле ответа. Список клиентов: `android-user`, `android-admin`, `ios-user`, `ios-admin`. Для них `session_body` добавляет `access_token`. Для браузера тело остаётся без токена, а cookie ставит вызывающий обработчик.
 
 ### `backend/app/main.py`
 
@@ -119,6 +123,10 @@ Telegram-бот на aiogram. Приветствие, цены, кнопка м�
 
 Отдельное SPA личного кабинета. Вход: email, Telegram, VK, Яндекс. Вкладки приходят из CMS; если вкладки «Серверы» нет, клиент добавляет её сам. Покупка конструктора и обычного тарифа, пробный период, ссылка подписки и инструкции по устройствам живут здесь. Возврат `?sandbox_payment=` завершает тестовый платёж.
 
+### `mobile/`
+
+Четыре приложения версии 2.7.0. `android-user` и `ios-user` — покупатель. `android-admin` и `ios-admin` — администратор. Общие правила адреса и узла лежат в `mobile/client_rules.py`. Kotlin и Swift повторяют те же правила. Строки — `mobile/l10n/user.json` и `mobile/l10n/admin.json`. `mobile/LICENSE` указывает на корневую проприетарную лицензию. Docker Compose эти приложения не запускает.
+
 ### `deploy/` и `docker-compose.yml`
 
 Compose поднимает `db`, `redis`, `backend`, `worker`, `bot`, `admin`, `miniapp`, `cabinet` и `caddy`. Caddy выпускает сертификаты и разделяет домены API, админки, Mini App и кабинета. `install.sh` вызывает `deploy/install-vps.sh`: Docker, `.env`, миграции, UFW и Fail2Ban.
@@ -146,6 +154,10 @@ Compose поднимает `db`, `redis`, `backend`, `worker`, `bot`, `admin`, `
 ### Request path
 
 A buyer opens the Mini App, the cabinet or the bot. An administrator opens the panel. Caddy terminates HTTPS, serves the `admin`, `miniapp` or `cabinet` files, and forwards `/api` to FastAPI. The API uses PostgreSQL for state, Redis for locks and rate limits, Remnawave for users and nodes, and a payment provider to create and re-read payments. `worker` drains the job queue. Schedulers inside the API process retry fulfillment, refunds, auto-renew, reconciliation and expiry notices.
+
+### `backend/app/mobile_auth.py`
+
+Decides whether the JWT may appear in the response body. The client list is `android-user`, `android-admin`, `ios-user` and `ios-admin`. For those names `session_body` adds `access_token`. A browser response stays without the token, and the caller sets the cookie.
 
 ### `backend/app/main.py`
 
@@ -219,7 +231,11 @@ Schema history. The 2.6.0 head is `0038_v2_6_0_platform`. The 2.5.0 head was `00
 
 ### `admin/`, `miniapp/`, `cabinet/`
 
-`admin` is the operator console, including the plan builder, Remnawave monitoring, the platform desk and seven themes. `miniapp` is the Telegram shop with plans, the constructor and server status. `cabinet` is the standalone account with email, Telegram, VK and Yandex sign-in, CMS-driven tabs, constructor checkout, trial, the subscription link, device guides and a web app manifest. Russian source strings are translated by each app's `i18n.tsx` when English is selected.
+`admin` is the operator console, including the plan builder, Remnawave monitoring, the platform desk and seven themes. `miniapp` is the Telegram shop with plans, the constructor and server status. `cabinet` is the standalone account with email, Telegram, VK and Yandex sign-in, CMS-driven tabs, constructor checkout, trial, the subscription link, device guides and a web app manifest. Russian source strings are translated by each app's `i18n.tsx` when English is selected, including `aria-label` and the “Онлайн N из M” pattern.
+
+### `mobile/`
+
+Four native clients for version 2.7.0. `android-user` and `ios-user` are the buyer apps. `android-admin` and `ios-admin` are the administrator apps. Shared URL and node rules live in `mobile/client_rules.py` so tests can lock them. The Kotlin and Swift sources duplicate those rules. String catalogs are `mobile/l10n/user.json` and `mobile/l10n/admin.json`, copied into each app. `mobile/LICENSE` points at the root proprietary license. The apps are not started by Docker Compose.
 
 ### `deploy/`, Compose and `scripts/`
 

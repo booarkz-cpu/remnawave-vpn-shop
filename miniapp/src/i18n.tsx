@@ -92,6 +92,8 @@ export function translate(lang: Lang, value: string): string {
   if (balance) return `Balance: ${balance[1]}`;
   const wallet = value.match(/^Баланс кошелька: (.+)$/);
   if (wallet) return `Wallet balance: ${wallet[1]}`;
+  const online = value.match(/^Онлайн (\d+) из (\d+)$/);
+  if (online) return `Online ${online[1]} of ${online[2]}`;
   return value;
 }
 
@@ -152,6 +154,14 @@ export function DomLocalizer({children}: {children: React.ReactNode}) {
       const next = translate(lang, source);
       if (node.nodeValue !== next) node.nodeValue = next;
     }
+    root.querySelectorAll<HTMLElement>("[aria-label]").forEach((el) => {
+      const label = el.getAttribute("aria-label") || "";
+      const stored = el.dataset.i18nAria;
+      const source = sourceOf(label, stored, lang);
+      el.dataset.i18nAria = source;
+      const next = translate(lang, source);
+      if (label !== next) el.setAttribute("aria-label", next);
+    });
     root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input,textarea").forEach((el) => {
       const source = sourceOf(el.placeholder || "", el.dataset.i18nPlaceholder, lang);
       el.dataset.i18nPlaceholder = source;

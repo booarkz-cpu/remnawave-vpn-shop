@@ -1,10 +1,10 @@
-# Security / Безопасность — Remnawave VPN Shop 2.6.0
+# Security / Безопасность — Remnawave VPN Shop 2.7.0
 
 Граница доверия: браузер или Telegram → Caddy → API → PostgreSQL, Redis, Remnawave и платёжные провайдеры. PostgreSQL и Redis наружу не публикуются.
 
 Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Remnawave and the payment providers. PostgreSQL and Redis are not published to the host network.
 
-Предыдущая версия документа описывала 2.5.0 и 2.4.0. Ниже — актуальная модель 2.6.0 на двух языках.
+Предыдущая версия документа описывала 2.6.0, 2.5.0 и 2.4.0. Ниже — актуальная модель 2.7.0 на двух языках. Платформа 2.6.0 сохранена.
 
 ## Аутентификация
 
@@ -72,6 +72,15 @@ Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Rem
 - Тест SMTP отправляет письмо только на `admin.email` текущего администратора. Пароль SMTP и закрытый ключ DKIM лежат в `AppSetting` в виде `encrypt_secret`.
 - Дополнительные строки Prometheus появляются, когда модуль `metrics` включён. Сам `/metrics` по-прежнему закрыт `METRICS_TOKEN`.
 
+## Мобильные приложения 2.7.0
+
+- Веб-вход администратора и покупателя по-прежнему кладёт JWT только в HttpOnly cookie и не возвращает `access_token` в JSON.
+- Нативный клиент получает `access_token`, только если заголовок `X-Shop-Client` равен `android-user`, `android-admin`, `ios-user` или `ios-admin`. Другое значение оставляет веб-путь с cookie.
+- Приложение хранит токен локально и шлёт `Authorization: Bearer`. Cookie оно не сохраняет, поэтому заголовок `X-CSRF-Token` для этих вызовов не требуется.
+- Сессия привязана к User-Agent. Строки приложений фиксированы: `RemnawaveShop-Android-User/2.7.0`, `RemnawaveShop-Android-Admin/2.7.0`, `RemnawaveShop-iOS-User/2.7.0`, `RemnawaveShop-iOS-Admin/2.7.0`. Смена строки отзывает сессию.
+- Клиенты не следуют HTTP-редиректам и не пишут токен в журнал. Платёжный URL открывается только для https или для `localhost`, `127.0.0.1` и `10.0.2.2`.
+- Экран узлов повторно оставляет поля `name`, `country`, `status`, `users_online`. Имя с признаками хоста заменяется на `node`.
+
 ## Что это не гарантирует
 
 Gate production не заменяет внешнюю проверку провайдера. Панель не включает WebAuthn автоматически: хранилище ключей есть, криптографическая проверка assertion не притворяется включённой 2FA. Живые кассы YooKassa, Platega, RollyPay и боевой Remnawave в этом репозитории не прогоняются. Sandbox подтверждает только локальный контур оплаты.
@@ -129,6 +138,14 @@ A user with `restricted_at` receives 403 on trial, payment creation and wallet s
 An API key starts with `rw_` and is checked by hash and scope. `GET /api/v3/status` requires the `read` scope. A webhook URL must pass `validate_public_url`. The body is signed with HMAC-SHA256 in `X-Shop-Signature`. A delivery failure is stored as “delivery failed” without the exception text.
 
 The SMTP test sends only to the current administrator's `admin.email`. The SMTP password and the DKIM private key are stored with `encrypt_secret`. Extra Prometheus lines are emitted when the `metrics` module is enabled. `/metrics` itself still requires `METRICS_TOKEN`.
+
+## Mobile apps 2.7.0
+
+Web admin and buyer login still store the JWT only in an HttpOnly cookie and do not return `access_token` in JSON. A native client receives `access_token` only when `X-Shop-Client` is `android-user`, `android-admin`, `ios-user` or `ios-admin`. Any other value keeps the cookie path.
+
+The app stores the token locally and sends `Authorization: Bearer`. It does not persist cookies, so `X-CSRF-Token` is not required for those calls. The session stays bound to the User-Agent. The app strings are fixed: `RemnawaveShop-Android-User/2.7.0`, `RemnawaveShop-Android-Admin/2.7.0`, `RemnawaveShop-iOS-User/2.7.0` and `RemnawaveShop-iOS-Admin/2.7.0`. Changing the string revokes the session.
+
+Clients do not follow HTTP redirects and do not log the token. A payment URL opens only for https or for `localhost`, `127.0.0.1` and `10.0.2.2`. The node screen keeps `name`, `country`, `status` and `users_online`, and replaces a host-like name with `node`.
 
 ## Limits
 

@@ -450,6 +450,37 @@ export const EN: Record<string, string> = {
   "+ Кнопка": "+ Button",
   "Checksum Работает": "Checksum matches",
   "Checksum mismatch": "Checksum mismatch",
+  "+ Пункт": "+ Option",
+  "1 устройство": "1 device",
+  "PNG / JPG / WEBP · до 2 МБ": "PNG / JPG / WEBP · up to 2 MB",
+  "PNG / JPG / WEBP · до 512 КБ": "PNG / JPG / WEBP · up to 512 KB",
+  "Базовая цена": "Base price",
+  "Вкладки кабинета": "Cabinet tabs",
+  "Добавить вкладку": "Add tab",
+  "Доступность": "Availability",
+  "Значение": "Value",
+  "Изменить": "Edit",
+  "Инструкции по устройствам": "Device guides",
+  "Код 2FA": "2FA code",
+  "ЛИЧНЫЙ КАБИНЕТ · CMS": "USER CABINET · CMS",
+  "Меню и инструкции устройств.": "Menu and device guides.",
+  "Отключить": "Disable",
+  "Отмена": "Cancel",
+  "Подключение": "Connection",
+  "Подпись": "Label",
+  "Пробный период": "Trial",
+  "Произвольная": "Custom",
+  "Профиль Remnawave": "Remnawave profile",
+  "Пункт": "Option",
+  "Сохранить безопасную конфигурацию": "Save the safe configuration",
+  "Статус узлов. Адреса, токены и сырой ответ панели не показываются.": "Node status. Addresses, tokens and the raw panel response are not shown.",
+  "Страна": "Country",
+  "Тексты показываются во вкладке «Подключение» личного кабинета.": "These texts appear on the cabinet Connection tab.",
+  "Текущая версия:": "Current version:",
+  "Убрать": "Remove",
+  "Узлы": "Nodes",
+  "Цена": "Price",
+  "вкл": "on",
 };
 
 let activeLang: Lang = "ru";
@@ -531,6 +562,14 @@ export function DomLocalizer({children}: {children: React.ReactNode}) {
       el.dataset.i18nPlaceholder = source;
       const next = translate(lang, source);
       if (el.placeholder !== next) el.placeholder = next;
+    });
+    root.querySelectorAll<HTMLElement>("[aria-label]").forEach((el) => {
+      const label = el.getAttribute("aria-label") || "";
+      const stored = el.dataset.i18nAria;
+      const source = sourceOf(label, stored, lang);
+      el.dataset.i18nAria = source;
+      const next = translate(lang, source);
+      if (label !== next) el.setAttribute("aria-label", next);
     });
     root.querySelectorAll<HTMLElement>("[title]").forEach((el) => {
       const title = el.getAttribute("title") || "";

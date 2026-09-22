@@ -1,10 +1,10 @@
-# Remnawave VPN Shop 2.6.0
+# Remnawave VPN Shop 2.7.0
 
-Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
+Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-The same product in English: a VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
+The same product in English: a VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Состояние: **2.6.0**. Предыдущие релизы: **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **2.7.0**. Предыдущие релизы: **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Состав
 
@@ -14,8 +14,16 @@ The same product in English: a VPN shop with a Telegram bot, a Mini App, a stand
 | Админка | React, Vite | Тарифы, конструктор, узлы, платформа, платежи и кабинет |
 | Mini App | React, Vite, Telegram WebApp | Покупка внутри Telegram |
 | Личный кабинет | React, Vite | Вход по email, Telegram, VK и Яндексу |
+| Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+## Возможности 2.7.0
+
+- **Четыре приложения.** `mobile/android-user`, `mobile/android-admin`, `mobile/ios-user`, `mobile/ios-admin`. Покупатель покупает тариф, собирает конструктор, видит серверы и копирует ссылку подписки. Администратор смотрит обзор, платежи, мониторинг и разбирает нарушения.
+- **Язык в приложении.** Переключатель RU/EN. Каталоги `mobile/l10n/user.json` и `mobile/l10n/admin.json`.
+- **Сессия.** Заголовок `X-Shop-Client` получает `access_token` в JSON. Веб-вход остаётся на HttpOnly cookie и токен в JSON не кладёт.
+- **Лицензия приложений.** Тот же файл `LICENSE`, Remnawave VPN Shop Proprietary License 1.0. Разбор функций — `MOBILE.md`.
 
 ## Возможности 2.6.0
 
@@ -64,6 +72,8 @@ sudo bash install.sh
 | `SECURITY.md` | Модель безопасности RU/EN |
 | `DOCUMENTATION.md` | Карта актуальных документов и архивных аудитов |
 | `LICENSE` | Проприетарная лицензия 1.0, RU/EN |
+| `MOBILE.md` | Android и iOS: функции, сессия, сборка, RU/EN |
+| `RELEASE_NOTES_V2_7_0.md` | Что вошло в 2.7.0 |
 | `RELEASE_NOTES_V2_6_0.md` | Что вошло в 2.6.0 и границы реализации |
 | `RELEASE_NOTES_V2_5_0.md` | Что вошло в 2.5.0 и чего нет из внешних проектов |
 | `INSTALL.md` | Установщик |

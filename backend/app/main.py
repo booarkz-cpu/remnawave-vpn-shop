@@ -24,7 +24,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.6.0"
+APP_VERSION = "2.7.0"
+# Historical compatibility marker: APP_VERSION = "2.6.0"
 # Historical compatibility marker: APP_VERSION = "2.5.0"
 # Historical compatibility marker: APP_VERSION = "2.4.0"
 # Historical compatibility marker: APP_VERSION = "2.3.0"
@@ -829,9 +830,13 @@ async def admin_login(payload:LoginIn, request:Request, response:Response, db:As
     db.add(AdminSession(admin_id=admin.id,jti_hash=hashlib.sha256(jti.encode()).hexdigest(),ip=_client_ip(request),user_agent=(request.headers.get("user-agent") or "")[:512],expires_at=expires))
     token=issue_token(admin,admin.mfa_enabled,30,jti=jti)
     await db.commit()
+    from .mobile_auth import mobile_client_name, session_body
+    body={"mfa_enabled":bool(admin.mfa_enabled),"role":admin.role,"email":admin.email}
+    if mobile_client_name(request):
+        return session_body(request, token, body)
     response.set_cookie("rw_admin",token,httponly=True,secure=settings.cookie_secure,samesite=settings.cookie_samesite,max_age=1800)
     _set_auth_cookies(response,token)
-    return {"mfa_enabled":bool(admin.mfa_enabled),"role":admin.role,"email":admin.email}
+    return body
 
 @app.post("/api/admin/auth/mfa/setup")
 async def mfa_setup(db:AsyncSession=Depends(get_db), admin=Depends(require_permission("manage_own_mfa"))):
@@ -2214,16 +2219,29 @@ async def connection_qr(request:Request,db:AsyncSession=Depends(get_db)):
 async def connection_info(request:Request,db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db); sub=(await db.execute(select(Subscription).where(Subscription.user_id==user.id))).scalar_one_or_none()
     guides={}
-    for key in ("android","ios","tv","windows","macos","linux"):
-        row=(await db.execute(select(AppSetting).where(AppSetting.key==f"guide_{key}"))).scalar_one_or_none()
-        guides[key]=row.value if row and row.value else {
+    accept=(request.headers.get("accept-language") or "").lower()
+    guide_lang="en" if accept.startswith("en") else "ru"
+    defaults={
+        "ru":{
             "android":"Android: установите v2RayTun / Happ / Streisand, вставьте ссылку подписки и подключитесь.",
             "ios":"iOS: установите Streisand или Happ из App Store, импортируйте ссылку подписки и включите VPN.",
             "tv":"TV: откройте VPN-клиент на телевизоре, добавьте подписку по ссылке или через QR с телефона.",
             "windows":"Windows: установите Hiddify / v2rayN, импортируйте ссылку подписки и запустите соединение.",
             "macos":"macOS: установите Hiddify / Streisand, импортируйте ссылку подписки и подключитесь.",
             "linux":"Linux: используйте Hiddify / Nekoray, импортируйте URI подписки и активируйте профиль.",
-        }[key]
+        },
+        "en":{
+            "android":"Android: install v2RayTun, Happ or Streisand, import the subscription link and connect.",
+            "ios":"iOS: install Streisand or Happ from the App Store, import the subscription link and turn the VPN on.",
+            "tv":"TV: open the VPN client on the television, add the subscription by link or by a phone QR code.",
+            "windows":"Windows: install Hiddify or v2rayN, import the subscription link and start the connection.",
+            "macos":"macOS: install Hiddify or Streisand, import the subscription link and connect.",
+            "linux":"Linux: use Hiddify or Nekoray, import the subscription URI and enable the profile.",
+        },
+    }[guide_lang]
+    for key in ("android","ios","tv","windows","macos","linux"):
+        row=(await db.execute(select(AppSetting).where(AppSetting.key==f"guide_{key}"))).scalar_one_or_none()
+        guides[key]=row.value if row and row.value else defaults[key]
     return Response(content=json.dumps({"subscription_url":sub.subscription_url if sub else None,"expires_at":sub.expires_at.isoformat() if sub and sub.expires_at else None,"platforms":guides},ensure_ascii=False),media_type="application/json",headers={"Cache-Control":"private, no-store"})
 
 @app.put("/api/me/auto-renew")
