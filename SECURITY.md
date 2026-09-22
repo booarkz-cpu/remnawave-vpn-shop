@@ -1,10 +1,10 @@
-# Security / Безопасность — Remnawave VPN Shop 2.9.0
+# Security / Безопасность — Remnawave VPN Shop 2.10.0
 
 Граница доверия: браузер или Telegram → Caddy → API → PostgreSQL, Redis, Remnawave и платёжные провайдеры. PostgreSQL и Redis наружу не публикуются.
 
 Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Remnawave and the payment providers. PostgreSQL and Redis are not published to the host network.
 
-Предыдущая версия документа описывала 2.6.0, 2.5.0 и 2.4.0. Ниже — актуальная модель 2.7.0 на двух языках. Платформа 2.6.0 сохранена.
+Предыдущая версия документа описывала 2.9.0, 2.6.0, 2.5.0 и 2.4.0. Ниже — актуальная модель 2.10.0 на двух языках. Платформа 2.6.0 сохранена.
 
 ## Аутентификация
 
@@ -80,6 +80,16 @@ Trust boundary: browser or Telegram → Caddy → API → PostgreSQL, Redis, Rem
 - Сессия привязана к User-Agent. Строки приложений фиксированы: `RemnawaveShop-Android-User/2.9.0`, `RemnawaveShop-Android-Admin/2.9.0`, `RemnawaveShop-iOS-User/2.9.0`, `RemnawaveShop-iOS-Admin/2.9.0`. Смена строки отзывает сессию. Строки **2.8.0** остаются в истории релизов и для новой сессии не подходят.
 - Клиенты не следуют HTTP-редиректам и не пишут токен в журнал. Платёжный URL открывается только для https или для `localhost`, `127.0.0.1` и `10.0.2.2`.
 - Экран узлов повторно оставляет поля `name`, `country`, `status`, `users_online`. Имя с признаками хоста заменяется на `node`.
+
+## Приложения 2.10.0
+
+- Запрос с известным `X-Shop-Client` при `MOBILE_REQUIRE_PROOF=true` должен содержать `X-Shop-Time` и `X-Shop-Proof`. Сообщение: `{client}\n{unix}\n{METHOD}\n{path}` без query. HMAC-SHA256, окно 300 секунд, сравнение через `hmac.compare_digest`. Ошибка — 401 «Подпись клиента не принята».
+- Без заголовка клиента веб-вход на cookie не меняется.
+- Ключ по умолчанию записан в исходниках и в APK. Это останавливает случайную подделку заголовка. Извлечённый ключ оператор меняет через `MOBILE_CLIENT_KEY` и пересборку приложений. `MOBILE_REQUIRE_PROOF=false` принимает приложения 2.9.0.
+- User-Agent 2.10.0: `RemnawaveShop-Android-User/2.10.0`, `RemnawaveShop-Android-Admin/2.10.0`, `RemnawaveShop-iOS-User/2.10.0`, `RemnawaveShop-iOS-Admin/2.10.0`. Смена строки начинает новую сессию. Строки 2.9.0 остаются в истории.
+- `GET /api/me/devices` не возвращает `device_key` и `last_ip`. Карточка платежа администратора не возвращает `fulfillment_error`, `checkout_url` и `provider_payment_id`.
+- Сохранённый токен в приложении закрыт биометрией или PIN. Устройство без этого способа открывается сразу, чтобы телефон не остался заблокированным.
+- `GET /api/admin/github-update` только читает метаданные релиза. API не скачивает и не распаковывает архив. Скрипт на хосте сверяет SHA-256, не затирает `.env` и вызывает `scripts/update.sh`.
 
 ## Пакеты Android 2.9.0
 
@@ -159,6 +169,18 @@ Web admin and buyer login still store the JWT only in an HttpOnly cookie and do 
 The app stores the token locally and sends `Authorization: Bearer`. It does not persist cookies, so `X-CSRF-Token` is not required for those calls. The session stays bound to the User-Agent. The app strings are fixed: `RemnawaveShop-Android-User/2.9.0`, `RemnawaveShop-Android-Admin/2.9.0`, `RemnawaveShop-iOS-User/2.9.0` and `RemnawaveShop-iOS-Admin/2.9.0`. Changing the string revokes the session. The **2.8.0** strings belong to the previous release.
 
 Clients do not follow HTTP redirects and do not log the token. A payment URL opens only for https or for `localhost`, `127.0.0.1` and `10.0.2.2`. The node screen keeps `name`, `country`, `status` and `users_online`, and replaces a host-like name with `node`.
+
+## Apps 2.10.0
+
+A request that names a known `X-Shop-Client` while `MOBILE_REQUIRE_PROOF=true` must send `X-Shop-Time` and `X-Shop-Proof`. The HMAC-SHA256 message is `{client}\n{unix}\n{METHOD}\n{path}` with no query. The window is 300 seconds and the compare uses `hmac.compare_digest`. Failure is HTTP 401. A browser request without the client header keeps the cookie session.
+
+The default key is in the source and in the APK. It stops a casual header spoof. An operator who sets `MOBILE_CLIENT_KEY` rebuilds the apps. `MOBILE_REQUIRE_PROOF=false` keeps the 2.9.0 apps working.
+
+The 2.10.0 User-Agent strings are `RemnawaveShop-Android-User/2.10.0`, `RemnawaveShop-Android-Admin/2.10.0`, `RemnawaveShop-iOS-User/2.10.0` and `RemnawaveShop-iOS-Admin/2.10.0`. A changed string starts a new session. The 2.9.0 strings stay in the history.
+
+`GET /api/me/devices` omits `device_key` and `last_ip`. The admin payment card omits `fulfillment_error`, `checkout_url` and `provider_payment_id`. A saved token is locked with biometrics or the device PIN. A device that cannot authenticate opens immediately.
+
+`GET /api/admin/github-update` reads release metadata only. The API does not download or extract the archive. The host script checks SHA-256, keeps `.env` and runs `scripts/update.sh`.
 
 ## Android packages 2.9.0
 

@@ -1,8 +1,10 @@
 package shop.remnawave.admin
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,9 +41,14 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
+import java.util.concurrent.Executors
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlin.concurrent.thread
 
-class MainActivity : ComponentActivity() {
+private const val mobileClientKey = "b7e1c4a09f6d42e8a1c35b77d0e94f12"
+
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { MaterialTheme(colorScheme = shopColors()) { AdminApp() } }
@@ -58,6 +65,32 @@ private fun shopColors() = darkColorScheme(
 )
 
 private val localHttpHosts = setOf("localhost", "127.0.0.1", "10.0.2.2")
+
+fun shopProof(client: String, method: String, path: String, nowSeconds: Long): Pair<String, String> {
+    val stamp = nowSeconds.toString()
+    val message = "$client\n$stamp\n${method.uppercase()}\n$path"
+    val mac = Mac.getInstance("HmacSHA256")
+    mac.init(SecretKeySpec(mobileClientKey.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+    val hex = mac.doFinal(message.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    return stamp to hex
+}
+
+fun promptUnlock(activity: FragmentActivity, title: String, onResult: (Boolean) -> Unit) {
+    val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    try {
+        if (BiometricManager.from(activity).canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
+            onResult(true)
+            return
+        }
+        val prompt = BiometricPrompt(activity, Executors.newSingleThreadExecutor(), object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { activity.runOnUiThread { onResult(true) } }
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) { activity.runOnUiThread { onResult(false) } }
+        })
+        prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle(title).setAllowedAuthenticators(authenticators).build())
+    } catch (_: Exception) {
+        onResult(true)
+    }
+}
 
 fun normalizeBase(raw: String): String {
     val value = raw.trim().trimEnd('/')
@@ -110,8 +143,12 @@ class ShopApi(private val base: String, private val token: String, private val l
             readTimeout = 15000
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Language", lang)
-            setRequestProperty("User-Agent", "RemnawaveShop-Android-Admin/2.9.0")
+            setRequestProperty("User-Agent", "RemnawaveShop-Android-Admin/2.10.0")
+            // Historical compatibility marker: RemnawaveShop-Android-Admin/2.9.0
             setRequestProperty("X-Shop-Client", "android-admin")
+            val proof = shopProof("android-admin", method, path, System.currentTimeMillis() / 1000)
+            setRequestProperty("X-Shop-Time", proof.first)
+            setRequestProperty("X-Shop-Proof", proof.second)
             if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
             if (body != null) {
                 doOutput = true
@@ -143,11 +180,13 @@ private fun detailOf(payload: String, status: Int): String {
 @Composable
 private fun AdminApp() {
     val context = LocalContext.current
-    val activity = context as ComponentActivity
+    val activity = context as FragmentActivity
     val prefs = remember { context.getSharedPreferences("shop_admin", 0) }
     var lang by remember { mutableStateOf(prefs.getString("lang", "ru") ?: "ru") }
     var base by remember { mutableStateOf(prefs.getString("base", "") ?: "") }
     var token by remember { mutableStateOf(prefs.getString("token", "") ?: "") }
+    var unlocked by remember { mutableStateOf(token.isBlank()) }
+    var paymentDetail by remember { mutableStateOf(JSONObject()) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
@@ -199,8 +238,11 @@ private fun AdminApp() {
             }
         }
     }
-    LaunchedEffect(token, lang) {
-        if (token.isNotBlank()) refresh()
+    LaunchedEffect(token) {
+        if (token.isNotBlank() && !unlocked) promptUnlock(activity, t("unlock")) { unlocked = it }
+    }
+    LaunchedEffect(token, lang, unlocked) {
+        if (token.isNotBlank() && unlocked) refresh()
     }
     LaunchedEffect(base) {
         val normalized = try { normalizeBase(base) } catch (_: Exception) { return@LaunchedEffect }
@@ -244,11 +286,15 @@ private fun AdminApp() {
                         activity.runOnUiThread {
                             base = normalized
                             token = issued
+                            unlocked = true
                             prefs.edit().putString("base", normalized).putString("token", issued).putString("lang", lang).apply()
                             notice = "${t("role")}: ${response.optString("role")}"
                         }
                     }
                 }, enabled = !busy) { Text(t("sign_in")) }
+            } else if (!unlocked) {
+                Button(onClick = { promptUnlock(activity, t("unlock")) { unlocked = it } }) { Text(t("unlock")) }
+                TextButton(onClick = { prefs.edit().remove("token").apply(); token = ""; unlocked = true }) { Text(t("sign_out")) }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("overview", "plans", "payments", "monitoring", "platform", "support").forEach { key ->
@@ -267,6 +313,13 @@ private fun AdminApp() {
                         for (index in 0 until plans.length()) {
                             val plan = plans.getJSONObject(index)
                             Text("${plan.optString("name")} · ${plan.opt("price")} · ${if (plan.optBoolean("enabled")) t("enabled") else t("disabled")}")
+                            TextButton(onClick = {
+                                val enabled = !plan.optBoolean("enabled")
+                                work {
+                                    ShopApi(base, token, lang).post("/api/admin/plans/${plan.optInt("id")}/enabled", JSONObject().put("enabled", enabled))
+                                    activity.runOnUiThread { notice = t("plan_saved") }
+                                }
+                            }) { Text(if (plan.optBoolean("enabled")) t("disable_plan") else t("enable_plan")) }
                         }
                     }
                     "payments" -> {
@@ -274,7 +327,14 @@ private fun AdminApp() {
                         for (index in 0 until payments.length()) {
                             val payment = payments.getJSONObject(index)
                             Text("#${payment.optInt("id")} · ${payment.opt("amount")} ${payment.optString("currency")} · ${payment.optString("status")}")
+                            TextButton(onClick = {
+                                work {
+                                    val detail = ShopApi(base, token, lang).get("/api/admin/payments/${payment.optInt("id")}") as JSONObject
+                                    activity.runOnUiThread { paymentDetail = detail }
+                                }
+                            }) { Text(t("payment_detail")) }
                         }
+                        if (paymentDetail.length() > 0) Text("#${paymentDetail.optInt("id")} · ${paymentDetail.optString("order_id")} · ${paymentDetail.optString("purpose")} · ${paymentDetail.optString("fulfillment_status")}")
                     }
                     "monitoring" -> {
                         if (monitoring.optString("error").isNotBlank()) Text(t("panel_down"))
@@ -311,7 +371,7 @@ private fun AdminApp() {
                         val agents = platform.optJSONArray("agents") ?: JSONArray()
                         for (index in 0 until agents.length()) {
                             val agent = agents.getJSONObject(index)
-                            Text("${agent.optString("name")} · CPU ${agent.optString("cpu")}")
+                            Text("${agent.optString("name")} · CPU ${agent.optString("cpu")} · ${if (agent.optBoolean("stale") || agent.optString("last_seen_at").isBlank()) t("stale") else t("online")}")
                         }
                         Text(t("countries"))
                         val countries = platform.optJSONArray("countries") ?: JSONArray()

@@ -27,6 +27,14 @@
 - [ ] Confirm `/api/public/servers` has no address, token or password fields.
 - [ ] Optionally create a tariff constructor and buy one combination from the cabinet with provider `sandbox`.
 
+## Android APK 2.10.0
+- [ ] Download `remnawave_vpn_shop_android_user_2_10_0.apk` and `remnawave_vpn_shop_android_admin_2_10_0.apk` from the GitHub release and check the `.sha256` files.
+- [ ] Compare the signing certificate SHA-256 with `RELEASE_NOTES_V2_10_0.md`. Uninstall a 2.9.0 debug APK once before installing 2.10.0.
+- [ ] Sign in and confirm the session uses User-Agent `RemnawaveShop-Android-User/2.10.0` or `RemnawaveShop-Android-Admin/2.10.0`. A saved token asks for biometrics or the device PIN.
+- [ ] Confirm `GET /api/me/devices` has no `device_key` and no `last_ip`.
+- [ ] On the host, run `sudo bash /opt/vpn-shop/scripts/update-from-github.sh` only after reading the command in the admin releases tab. Leave cron off unless an administrator chooses it.
+- [ ] Open the iOS projects in Xcode on macOS when a device build is required. The release does not include an IPA.
+
 ## Android APK 2.9.0
 - [ ] Download `remnawave_vpn_shop_android_user_2_9_0.apk` and `remnawave_vpn_shop_android_admin_2_9_0.apk` from the GitHub release and check the `.sha256` files.
 - [ ] Install with `adb install -r` or by opening the APK after allowing installs from that source.

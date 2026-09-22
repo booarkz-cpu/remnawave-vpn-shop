@@ -1,3 +1,4 @@
+import CryptoKit
 import SwiftUI
 
 @main
@@ -10,6 +11,23 @@ struct VpnShopUserApp: App {
 }
 
 let localHttpHosts: Set<String> = ["localhost", "127.0.0.1", "10.0.2.2"]
+let mobileClientKey = "b7e1c4a09f6d42e8a1c35b77d0e94f12"
+
+func shopProof(_ client: String, _ method: String, _ path: String, _ now: Int) -> (String, String) {
+    let stamp = String(now)
+    let message = "\(client)\n\(stamp)\n\(method.uppercased())\n\(path)"
+    let key = SymmetricKey(data: Data(mobileClientKey.utf8))
+    let code = HMAC<SHA256>.authenticationCode(for: Data(message.utf8), using: key)
+    return (stamp, code.map { String(format: "%02x", $0) }.joined())
+}
+
+func subscriptionApps(_ url: String) -> [(String, String)] {
+    guard url.hasPrefix("https://"), !url.contains(where: { $0.isWhitespace }) else { return [] }
+    var allowed = CharacterSet.alphanumerics
+    allowed.insert(charactersIn: "-._~")
+    let encoded = url.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+    return [("Happ", "happ://add/\(encoded)"), ("v2rayNG", "v2rayng://install-sub?url=\(encoded)"), ("Streisand", "streisand://import/\(encoded)")]
+}
 
 func normalizeBase(_ raw: String) throws -> String {
     let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -27,6 +45,12 @@ func jsonInt(_ value: Any?) -> Int? {
     if let number = value as? NSNumber { return number.intValue }
     if let text = value as? String { return Int(text) }
     return nil
+}
+
+func jsonBool(_ value: Any?) -> Bool {
+    if let flag = value as? Bool { return flag }
+    if let number = value as? NSNumber { return number.boolValue }
+    return false
 }
 
 func jsonText(_ value: Any?) -> String {
@@ -74,8 +98,12 @@ final class ShopClient: NSObject, URLSessionTaskDelegate {
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(lang, forHTTPHeaderField: "Accept-Language")
-        request.setValue("RemnawaveShop-iOS-User/2.9.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("RemnawaveShop-iOS-User/2.10.0", forHTTPHeaderField: "User-Agent")
+        // Historical compatibility marker: RemnawaveShop-iOS-User/2.9.0
         request.setValue("ios-user", forHTTPHeaderField: "X-Shop-Client")
+        let proof = shopProof("ios-user", method, path, Int(Date().timeIntervalSince1970))
+        request.setValue(proof.0, forHTTPHeaderField: "X-Shop-Time")
+        request.setValue(proof.1, forHTTPHeaderField: "X-Shop-Proof")
         if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         if let idempotency { request.setValue(idempotency, forHTTPHeaderField: "Idempotency-Key") }
         if let body {

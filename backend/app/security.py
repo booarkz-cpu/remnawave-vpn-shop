@@ -85,6 +85,8 @@ async def revoke_all_admin_sessions(db: AsyncSession, admin_id: int):
     await db.execute(__import__("sqlalchemy").update(AdminSession).where(AdminSession.admin_id==admin_id, AdminSession.revoked_at.is_(None)).values(revoked_at=datetime.utcnow()))
 
 async def current_admin(request: Request, credentials: HTTPAuthorizationCredentials = Depends(bearer), db: AsyncSession = Depends(get_db)):
+    from .mobile_auth import require_mobile_proof
+    require_mobile_proof(request)
     token=credentials.credentials if credentials else request.cookies.get("rw_admin")
     if not token:
         raise HTTPException(401, "Admin authentication required")

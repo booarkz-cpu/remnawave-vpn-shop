@@ -173,6 +173,10 @@ class Settings(BaseSettings):
     )
     trial_max_days: int = Field(default=3, alias="TRIAL_MAX_DAYS", ge=1, le=30)
     payments_sandbox: bool = Field(default=False, alias="PAYMENTS_SANDBOX")
+    mobile_client_key: str = Field(
+        default="b7e1c4a09f6d42e8a1c35b77d0e94f12", alias="MOBILE_CLIENT_KEY"
+    )
+    mobile_require_proof: bool = Field(default=True, alias="MOBILE_REQUIRE_PROOF")
     fulfillment_max_attempts: int = Field(
         default=8, alias="FULFILLMENT_MAX_ATTEMPTS"
     )

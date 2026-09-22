@@ -1,3 +1,4 @@
+import LocalAuthentication
 import SwiftUI
 import UIKit
 
@@ -17,6 +18,11 @@ struct UserRootView: View {
     @State private var connection: [String: Any] = [:]
     @State private var config: [String: Any] = [:]
     @State private var promo = ""
+    @State private var devices: [[String: Any]] = []
+    @State private var traffic: [String: Any] = [:]
+    @State private var giftCode = ""
+    @State private var topupAmount = "100"
+    @State private var unlocked = false
     @State private var subject = ""
     @State private var message = ""
     @State private var logo: UIImage?
@@ -35,18 +41,19 @@ struct UserRootView: View {
                 }
                 Text(t("tagline")).foregroundStyle(.secondary)
                 if !notice.isEmpty { Text(notice).foregroundStyle(.orange) }
-                if token.isEmpty { auth } else { home }
+                if token.isEmpty { auth } else if !unlocked { lock } else { home }
             }
             .padding()
         }
         .background(Color(red: 0.04, green: 0.06, blue: 0.08))
         .preferredColorScheme(.dark)
         .onAppear {
-            if !token.isEmpty { refresh() }
-            else { loadPublicLogo() }
+            if token.isEmpty { loadPublicLogo() }
+            else if !unlocked { unlockSavedSession() }
         }
-        .onChange(of: token) { value in if !value.isEmpty { refresh() } }
-        .onChange(of: lang) { _ in if !token.isEmpty { refresh() } }
+        .onChange(of: token) { value in if !value.isEmpty && unlocked { refresh() } }
+        .onChange(of: unlocked) { value in if value && !token.isEmpty { refresh() } }
+        .onChange(of: lang) { _ in if !token.isEmpty && unlocked { refresh() } }
     }
 
     private var auth: some View {
@@ -59,11 +66,18 @@ struct UserRootView: View {
         }
     }
 
+    private var lock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(t("unlock")) { unlockSavedSession() }.buttonStyle(.borderedProminent)
+            Button(t("sign_out")) { token = ""; unlocked = true }
+        }
+    }
+
     private var home: some View {
         VStack(alignment: .leading, spacing: 10) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack {
-                    ForEach(["overview", "plans", "builder", "servers", "connection", "support"], id: \.self) { key in
+                    ForEach(["overview", "plans", "builder", "servers", "connection", "devices", "support"], id: \.self) { key in
                         Button(t(key)) { tab = key }.buttonStyle(.bordered).tint(tab == key ? Color(red: 0, green: 0.90, blue: 0.75) : .gray)
                     }
                 }
@@ -85,6 +99,12 @@ struct UserRootView: View {
             } else {
                 Text(t("active"))
             }
+            Text("\(t("traffic_used")): \(jsonBool(traffic["available"]) ? jsonText(traffic["traffic_used_bytes"]) : t("usage_unavailable"))")
+            Text("\(t("traffic_limit")): \(jsonText(traffic["traffic_limit_bytes"]).isEmpty ? t("unlimited") : jsonText(traffic["traffic_limit_bytes"]))")
+            field(t("topup_amount"), text: $topupAmount)
+            Button(t("topup")) { topUp() }.disabled(busy)
+            field(t("gift_code"), text: $giftCode)
+            Button(t("redeem")) { redeemGift() }.disabled(busy)
         case "plans":
             field(t("promo"), text: $promo)
             ForEach(Array(plans.enumerated()), id: \.offset) { _, plan in
@@ -113,6 +133,11 @@ struct UserRootView: View {
                     UIPasteboard.general.string = url
                     notice = t("copied")
                 }
+                ForEach(subscriptionApps(url), id: \.0) { item in
+                    Button(item.0) {
+                        if let target = URL(string: item.1) { UIApplication.shared.open(target) }
+                    }
+                }
             }
             Text(t("guides"))
             let platforms = connection["platforms"] as? [String: Any] ?? [:]
@@ -120,6 +145,14 @@ struct UserRootView: View {
                 Text("\(key): \(jsonText(platforms[key]))")
             }
             Button(t("trial")) { startTrial() }
+        case "devices":
+            if devices.isEmpty { Text(t("no_devices")) }
+            ForEach(Array(devices.enumerated()), id: \.offset) { _, device in
+                Text("\(jsonText(device["name"])) · \(jsonText(device["platform"])) · \(jsonText(device["status"]))")
+                if jsonText(device["status"]) == "active" {
+                    Button(t("revoke")) { revokeDevice(device) }
+                }
+            }
         default:
             field(t("subject"), text: $subject)
             field(t("message"), text: $message)
@@ -139,7 +172,7 @@ struct UserRootView: View {
             let response = try ShopClient(base: normalized, token: "", lang: lang).call("POST", path, body: ["email": email, "password": password]) as? [String: Any]
             let issued = response?["access_token"] as? String ?? ""
             if issued.isEmpty { throw URLError(.userAuthenticationRequired) }
-            DispatchQueue.main.async { base = normalized; token = issued }
+            DispatchQueue.main.async { base = normalized; token = issued; unlocked = true }
         }
     }
 
@@ -167,6 +200,8 @@ struct UserRootView: View {
             let nextServers = try api.call("GET", "/api/me/servers") as? [String: Any] ?? [:]
             let nextConnection = try api.call("GET", "/api/me/connection-info") as? [String: Any] ?? [:]
             let nextConfig = try api.call("GET", "/api/public/config") as? [String: Any] ?? [:]
+            let nextTraffic = try api.call("GET", "/api/me/traffic") as? [String: Any] ?? [:]
+            let nextDevices = try api.call("GET", "/api/me/devices") as? [[String: Any]] ?? []
             let nextLogo = logoImage(api, "/api/public/apps")
             DispatchQueue.main.async {
                 dashboard = nextDashboard
@@ -175,8 +210,49 @@ struct UserRootView: View {
                 servers = nextServers
                 connection = nextConnection
                 config = nextConfig
+                traffic = nextTraffic
+                devices = nextDevices
                 logo = nextLogo
             }
+        }
+    }
+
+    private func unlockSavedSession() {
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            unlocked = true
+            refresh()
+            return
+        }
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: t("unlock")) { ok, _ in
+            DispatchQueue.main.async {
+                if ok { unlocked = true; refresh() }
+            }
+        }
+    }
+
+    private func topUp() {
+        work {
+            let response = try ShopClient(base: base, token: token, lang: lang).call("POST", "/api/me/wallet/topup", body: ["amount": topupAmount, "provider": providerName()], idempotency: UUID().uuidString) as? [String: Any]
+            DispatchQueue.main.async { notice = t("topup_ok"); openPayment(response?["url"] as? String ?? "") }
+        }
+    }
+
+    private func redeemGift() {
+        let code = giftCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !code.isEmpty else { return }
+        work {
+            _ = try ShopClient(base: base, token: token, lang: lang).call("POST", "/api/me/gifts/redeem", body: ["code": code])
+            DispatchQueue.main.async { notice = t("gift_ok"); giftCode = "" }
+        }
+    }
+
+    private func revokeDevice(_ device: [String: Any]) {
+        guard let id = jsonInt(device["id"]) else { return }
+        work {
+            _ = try ShopClient(base: base, token: token, lang: lang).call("POST", "/api/me/devices/\(id)/revoke", body: [:])
+            DispatchQueue.main.async { notice = t("device_revoked") }
         }
     }
 

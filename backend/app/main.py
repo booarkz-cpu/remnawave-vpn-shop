@@ -26,7 +26,8 @@ from .security import (hash_password, verify_password, encrypt_secret, issue_tok
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "2.9.0"
+APP_VERSION = "2.10.0"
+# Historical compatibility marker: APP_VERSION = "2.9.0"
 # Historical compatibility marker: APP_VERSION = "2.8.0"
 # Historical compatibility marker: APP_VERSION = "2.7.0"
 # Historical compatibility marker: APP_VERSION = "2.6.0"
@@ -515,6 +516,8 @@ async def create_user_session(db:AsyncSession,user:User,request:Request,ttl_minu
     return issue_user_token(user,ttl_minutes,jti)
 
 async def user_from_token(request:Request, db:AsyncSession):
+    from .mobile_auth import require_mobile_proof
+    require_mobile_proof(request)
     auth=request.headers.get("Authorization","")
     token=auth[7:] if auth.startswith("Bearer ") else request.cookies.get("rw_user")
     if not token: raise HTTPException(401,"User authentication required")
@@ -654,7 +657,7 @@ async def promo_discount(db, code:str|None, plan_id:int, price, user_id:int|None
 async def my_devices(request: Request, db: AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db)
     rows=(await db.execute(select(UserDevice).where(UserDevice.user_id==user.id).order_by(UserDevice.created_at.desc()))).scalars().all()
-    return [{"id":x.id,"device_key":x.device_key,"name":x.name,"platform":x.platform,"last_ip":x.last_ip,"last_seen_at":x.last_seen_at,"status":x.status,"created_at":x.created_at} for x in rows]
+    return [{"id":x.id,"name":x.name,"platform":x.platform,"last_seen_at":x.last_seen_at,"status":x.status,"created_at":x.created_at} for x in rows]
 
 class DeviceRegisterIn(BaseModel):
     device_key: str = Field(min_length=16, max_length=128)
@@ -812,6 +815,8 @@ async def admin_telegram_login(payload:dict,request:Request,response:Response,db
 
 @app.post("/api/admin/auth/login")
 async def admin_login(payload:LoginIn, request:Request, response:Response, db:AsyncSession=Depends(get_db)):
+    from .mobile_auth import require_mobile_proof
+    require_mobile_proof(request)
     # Behind Caddy, request.client is the proxy container. Use the trusted
     # proxy-normalized client IP so one remote address cannot throttle every
     # administrator through the shared reverse-proxy address.
@@ -1314,7 +1319,9 @@ async def fulfill(payment_id:int, db:AsyncSession, existing_user_lock_token: str
             user.wallet_balance=(Decimal(str(user.wallet_balance or 0))+amount).quantize(Decimal("0.01"))
             await record_financial_event(db,operation_key=f"wallet-topup:{payment.id}",user_id=user.id,payment_id=payment.id,kind="wallet_topup",direction="credit",amount=amount,currency=payment.currency,metadata={"order_id":payment.order_id})
             payment.fulfillment_status="completed"; payment.fulfillment_terminal=True; payment.fulfillment_attempts=(payment.fulfillment_attempts or 0)+1
-            await audit(db,"wallet.topup",f"user:{user.id}",str(payment.id),{"amount":str(amount)}); await db.commit(); return
+            await audit(db,"wallet.topup",f"user:{user.id}",str(payment.id),{"amount":str(amount)}); await db.commit()
+            await notify_user_telegram(user.telegram_id, f"Баланс пополнен на {amount} {payment.currency}. Wallet topped up by {amount} {payment.currency}.")
+            return
         payment.fulfillment_status="processing"; payment.fulfillment_attempts=(payment.fulfillment_attempts or 0)+1; payment.fulfillment_error=None
         job=(await db.execute(select(Job).where(Job.job_key==f"fulfillment:{payment.id}").with_for_update())).scalar_one_or_none()
         if not job:
@@ -1428,6 +1435,7 @@ async def fulfill(payment_id:int, db:AsyncSession, existing_user_lock_token: str
         await enqueue_notification(db,user_id=user.id,channel="in_app",kind="payment_success",title="Оплата подтверждена",body=f"Заказ {payment.order_id} оплачен. Подписка готовится или уже активирована.",dedupe_key=f"payment:{payment.id}:success")
         await enqueue_notification(db,user_id=user.id,channel="in_app",kind="subscription_ready",title="Подписка активирована",body="Ваша VPN-подписка активирована. Откройте раздел подключения, чтобы получить ссылку.",dedupe_key=f"payment:{payment.id}:ready")
         await db.commit()
+        await notify_user_telegram(user.telegram_id, "Оплата подтверждена. Подписка активирована. Откройте раздел «Подключение».\nPayment confirmed. The subscription is active. Open Connection.")
     except Exception as exc:
         try:
             await db.rollback(); payment=(await db.execute(select(Payment).where(Payment.id==payment_id))).scalar_one_or_none()
@@ -1884,6 +1892,21 @@ async def subscription_lifecycle_scheduler():
             logger.warning("Subscription lifecycle scheduler failed: %s", exc)
         await asyncio.sleep(300)
 
+async def notify_user_telegram(chat_id, text: str) -> None:
+    if not chat_id or not settings.bot_token:
+        return
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+            response = await client.post(
+                f"https://api.telegram.org/bot{settings.bot_token}/sendMessage",
+                json={"chat_id": chat_id, "text": text[:1000]},
+            )
+            if response.status_code >= 400:
+                logger.warning("Telegram notify failed: HTTP %s", response.status_code)
+    except Exception as exc:
+        logger.warning("Telegram notify failed: %s", exc)
+
 async def expiry_notification_scheduler():
     # Notifications are sent at most once per day via Redis markers.
     while True:
@@ -1902,7 +1925,7 @@ async def expiry_notification_scheduler():
                             try:
                                 resp=await client.post(
                                     f"https://api.telegram.org/bot{settings.bot_token}/sendMessage",
-                                    json={"chat_id":u.telegram_id,"text":f"⚠️ Ваша VPN-подписка истекает {sub.expires_at:%d.%m.%Y}. Откройте магазин для продления."},
+                                    json={"chat_id":u.telegram_id,"text":f"⚠️ Ваша VPN-подписка истекает {sub.expires_at:%d.%m.%Y}. Откройте магазин для продления.\nYour VPN subscription expires on {sub.expires_at:%d.%m.%Y}. Open the shop to renew."},
                                 )
                                 if resp.status_code >= 400:
                                     raise RuntimeError(f"Telegram notification failed: HTTP {resp.status_code}")
@@ -1961,7 +1984,9 @@ def _money(value) -> Decimal:
 async def wallet_topup(payload:dict, request:Request, db:AsyncSession=Depends(get_db)):
     if await maintenance_enabled(db): raise HTTPException(503,"Service is in maintenance mode")
     if not await feature_enabled(db, "payments", True): raise HTTPException(503,"Платежи отключены администратором")
-    if await setting_value(db,PRODUCTION_PAYMENTS_GATE_KEY,"0") != "1":
+    requested_provider=str(payload.get("provider") or "").lower()
+    sandbox_requested=requested_provider=="sandbox" and settings.payments_sandbox
+    if await setting_value(db,PRODUCTION_PAYMENTS_GATE_KEY,"0") != "1" and not sandbox_requested:
         raise HTTPException(503,"Реальные платежи временно заблокированы: требуется успешный staging E2E")
     user=await user_from_token(request,db)
     idem=request.headers.get("Idempotency-Key")
@@ -1981,7 +2006,7 @@ async def wallet_topup(payload:dict, request:Request, db:AsyncSession=Depends(ge
     provider_order=await _payment_provider_order(db,payload.get("provider"))
     if not provider_order: raise HTTPException(503,"Нет доступных платёжных провайдеров")
     candidate=provider_order[0]
-    provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider()}[candidate]
+    provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider(),"sandbox":SandboxProvider()}[candidate]
     order_id=f"topup-{user.id}-{hashlib.sha256(idem.encode()).hexdigest()[:24]}"
     row=Payment(user_id=user.id,plan_id=0,provider=candidate,order_id=order_id,amount=amount,original_amount=amount,discount_amount=Decimal("0.00"),currency=settings.default_currency,status="creating",fulfillment_status="pending",idempotency_key=idem,purpose="topup",bonus_days=0)
     db.add(row); await db.commit(); await db.refresh(row)
@@ -2794,12 +2819,14 @@ async def retry_payment(payment_id:int,db:AsyncSession=Depends(get_db),admin=Dep
 @app.get("/api/me/traffic")
 async def my_traffic(request:Request,db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db); sub=(await db.execute(select(Subscription).where(Subscription.user_id==user.id))).scalar_one_or_none()
-    if not sub or not sub.remnawave_uuid: return {"available":False,"traffic_used_bytes":None,"traffic_limit_bytes":None,"devices":None}
+    limit_bytes=int(sub.traffic_limit_gb_snapshot)*1024**3 if sub and sub.traffic_limit_gb_snapshot else None
+    if not sub or not sub.remnawave_uuid: return {"available":False,"traffic_used_bytes":None,"traffic_limit_bytes":limit_bytes,"devices":None}
     try:
         data=await RemnawaveClient().get_user(sub.remnawave_uuid)
-        return {"available":True,"traffic_used_bytes":data.get("trafficUsedBytes") or data.get("usedTrafficBytes"),"traffic_limit_bytes":data.get("trafficLimitBytes"),"devices":data.get("devices") or data.get("deviceCount"),"status":data.get("status"),"expires_at":data.get("expireAt") or data.get("expiresAt")}
+        remote_limit=data.get("trafficLimitBytes")
+        return {"available":True,"traffic_used_bytes":data.get("trafficUsedBytes") or data.get("usedTrafficBytes"),"traffic_limit_bytes":remote_limit if remote_limit is not None else limit_bytes,"devices":data.get("devices") or data.get("deviceCount"),"status":data.get("status"),"expires_at":data.get("expireAt") or data.get("expiresAt")}
     except Exception:
-        return {"available":False,"traffic_used_bytes":None,"traffic_limit_bytes":None,"devices":None}
+        return {"available":False,"traffic_used_bytes":None,"traffic_limit_bytes":limit_bytes,"devices":None}
 
 @app.get("/api/me/privacy/export")
 async def privacy_export(request:Request,db:AsyncSession=Depends(get_db)):
@@ -3045,6 +3072,18 @@ async def admin_list_plans(db:AsyncSession=Depends(get_db),admin=Depends(require
 async def create_plan(payload:PlanIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_plans"))):
     p=Plan(**payload.model_dump()); db.add(p); await audit(db,"plan.created",admin.email,str(p.id),payload.model_dump()); await db.commit(); await db.refresh(p); return {"id":p.id}
 
+class PlanEnabledIn(BaseModel):
+    enabled: bool
+
+@app.post("/api/admin/plans/{plan_id}/enabled")
+async def admin_set_plan_enabled(plan_id:int,payload:PlanEnabledIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_plans"))):
+    p=await db.get(Plan,plan_id)
+    if not p: raise HTTPException(404,"Plan not found")
+    p.enabled=payload.enabled
+    await audit(db,"plan.enabled",admin.email,str(plan_id),{"enabled":payload.enabled})
+    await db.commit()
+    return {"ok":True,"id":plan_id,"enabled":p.enabled}
+
 @app.put("/api/admin/plans/{plan_id}")
 async def admin_update_plan(plan_id:int,payload:PlanIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_plans"))):
     p=await db.get(Plan,plan_id)
@@ -3063,11 +3102,22 @@ async def admin_delete_plan(plan_id:int,db:AsyncSession=Depends(get_db),admin=De
         raise HTTPException(409,"Тариф уже используется платежами, подписками или пробными периодами; отключите его вместо удаления")
     await db.delete(p); await audit(db,"plan.deleted",admin.email,str(plan_id)); await db.commit(); return {"ok":True}
 
+@app.get("/api/admin/payments/{payment_id}")
+async def admin_payment_detail(payment_id:int,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
+    row=await db.get(Payment,payment_id)
+    if not row: raise HTTPException(404,"Payment not found")
+    return {"id":row.id,"user_id":row.user_id,"plan_id":row.plan_id,"provider":row.provider,"purpose":row.purpose or "subscription","order_id":row.order_id,"amount":float(row.amount),"currency":row.currency,"status":row.status,"fulfillment_status":row.fulfillment_status,"created_at":str(row.created_at),"paid_at":str(row.paid_at) if row.paid_at else None}
+
+@app.get("/api/admin/github-update")
+async def admin_github_update(admin=Depends(require_permission("ops.releases"))):
+    from .github_update import fetch_latest_release, release_status
+    return release_status(APP_VERSION, await fetch_latest_release())
+
 @app.get("/api/admin/payments")
 async def admin_payments(page:int=1,page_size:int=50,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
     page=max(1,page); page_size=max(1,min(page_size,100)); offset=(page-1)*page_size
     rows=(await db.execute(select(Payment).order_by(Payment.id.desc()).offset(offset).limit(page_size))).scalars().all()
-    return [{"id":x.id,"provider":x.provider,"status":x.status,"fulfillment_status":x.fulfillment_status,"fulfillment_attempts":x.fulfillment_attempts,"fulfillment_error":x.fulfillment_error,"amount":float(x.amount),"currency":x.currency,"created_at":str(x.created_at),"paid_at":str(x.paid_at) if x.paid_at else None} for x in rows]
+    return [{"id":x.id,"provider":x.provider,"status":x.status,"fulfillment_status":x.fulfillment_status,"fulfillment_attempts":x.fulfillment_attempts,"amount":float(x.amount),"currency":x.currency,"created_at":str(x.created_at),"paid_at":str(x.paid_at) if x.paid_at else None} for x in rows]
 
 @app.get("/api/admin/audit")
 async def admin_audit(page:int=1,page_size:int=50,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):

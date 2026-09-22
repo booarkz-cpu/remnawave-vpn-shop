@@ -1,3 +1,4 @@
+import LocalAuthentication
 import SwiftUI
 import UIKit
 
@@ -18,6 +19,8 @@ struct AdminRootView: View {
     @State private var platform: [String: Any] = [:]
     @State private var tickets: [[String: Any]] = []
     @State private var reply = ""
+    @State private var unlocked = false
+    @State private var paymentDetail: [String: Any] = [:]
     @State private var logo: UIImage?
 
     private func t(_ key: String) -> String { loadStrings(lang)[key] ?? key }
@@ -33,17 +36,18 @@ struct AdminRootView: View {
                 }
                 Text(t("tagline")).foregroundStyle(.secondary)
                 if !notice.isEmpty { Text(notice).foregroundStyle(.orange) }
-                if token.isEmpty { auth } else { home }
+                if token.isEmpty { auth } else if !unlocked { lock } else { home }
             }.padding()
         }
         .background(Color(red: 0.04, green: 0.06, blue: 0.08))
         .preferredColorScheme(.dark)
         .onAppear {
-            if !token.isEmpty { refresh() }
-            else { loadPublicLogo() }
+            if token.isEmpty { loadPublicLogo() }
+            else if !unlocked { unlockSavedSession() }
         }
-        .onChange(of: token) { value in if !value.isEmpty { refresh() } }
-        .onChange(of: lang) { _ in if !token.isEmpty { refresh() } }
+        .onChange(of: token) { value in if !value.isEmpty && unlocked { refresh() } }
+        .onChange(of: unlocked) { value in if value && !token.isEmpty { refresh() } }
+        .onChange(of: lang) { _ in if !token.isEmpty && unlocked { refresh() } }
     }
 
     private var auth: some View {
@@ -53,6 +57,13 @@ struct AdminRootView: View {
             SecureField(t("password"), text: $password).textFieldStyle(.roundedBorder)
             TextField(t("otp"), text: $otp).textFieldStyle(.roundedBorder)
             Button(t("sign_in")) { signIn() }.disabled(busy)
+        }
+    }
+
+    private var lock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(t("unlock")) { unlockSavedSession() }.buttonStyle(.borderedProminent)
+            Button(t("sign_out")) { token = ""; unlocked = true }
         }
     }
 
@@ -79,11 +90,16 @@ struct AdminRootView: View {
             if plans.isEmpty { Text(t("no_data")) }
             ForEach(Array(plans.enumerated()), id: \.offset) { _, plan in
                 Text("\(plan["name"] as? String ?? "") · \(plan["price"] ?? "") · \(jsonBool(plan["enabled"]) ? t("enabled") : t("disabled"))")
+                Button(jsonBool(plan["enabled"]) ? t("disable_plan") : t("enable_plan")) { setPlan(plan, enabled: !jsonBool(plan["enabled"])) }
             }
         case "payments":
             if payments.isEmpty { Text(t("no_data")) }
             ForEach(Array(payments.enumerated()), id: \.offset) { _, payment in
                 Text("#\(payment["id"] ?? "") · \(payment["amount"] ?? "") \(payment["currency"] as? String ?? "") · \(payment["status"] as? String ?? "")")
+                Button(t("payment_detail")) { loadPayment(payment) }
+            }
+            if !paymentDetail.isEmpty {
+                Text("#\(paymentDetail["id"] ?? "") · \(jsonText(paymentDetail["order_id"])) · \(jsonText(paymentDetail["purpose"])) · \(jsonText(paymentDetail["fulfillment_status"]))")
             }
         case "monitoring":
             if (monitoring["error"] as? String)?.isEmpty == false { Text(t("panel_down")) }
@@ -107,7 +123,7 @@ struct AdminRootView: View {
             Text(t("agents"))
             let agents = platform["agents"] as? [[String: Any]] ?? []
             ForEach(Array(agents.enumerated()), id: \.offset) { _, agent in
-                Text("\(agent["name"] as? String ?? "") · CPU \(agent["cpu"] ?? "")")
+                Text("\(agent["name"] as? String ?? "") · CPU \(agent["cpu"] ?? "") · \(jsonBool(agent["stale"]) ? t("stale") : t("online"))")
             }
             Text(t("countries"))
             let countries = platform["countries"] as? [[String: Any]] ?? []
@@ -138,6 +154,7 @@ struct AdminRootView: View {
             DispatchQueue.main.async {
                 base = normalized
                 token = issued
+                unlocked = true
                 notice = "\(t("role")): \(response?["role"] as? String ?? "")"
             }
         }
@@ -177,6 +194,37 @@ struct AdminRootView: View {
                 tickets = nextTickets
                 logo = nextLogo
             }
+        }
+    }
+
+    private func unlockSavedSession() {
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            unlocked = true
+            refresh()
+            return
+        }
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: t("unlock")) { ok, _ in
+            DispatchQueue.main.async {
+                if ok { unlocked = true; refresh() }
+            }
+        }
+    }
+
+    private func setPlan(_ plan: [String: Any], enabled: Bool) {
+        guard let id = jsonInt(plan["id"]) else { return }
+        work {
+            _ = try ShopClient(base: base, token: token, lang: lang).call("POST", "/api/admin/plans/\(id)/enabled", body: ["enabled": enabled])
+            DispatchQueue.main.async { notice = t("plan_saved") }
+        }
+    }
+
+    private func loadPayment(_ payment: [String: Any]) {
+        guard let id = jsonInt(payment["id"]) else { return }
+        work {
+            let detail = try ShopClient(base: base, token: token, lang: lang).call("GET", "/api/admin/payments/\(id)") as? [String: Any] ?? [:]
+            DispatchQueue.main.async { paymentDetail = detail }
         }
     }
 
