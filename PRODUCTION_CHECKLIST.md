@@ -1,6 +1,12 @@
-# Production checklist 3.1.2
+# Production checklist 3.1.3
 
 ## Русский
+
+Версия **3.1.3** чинит установку через `curl | bash`: вопросы читаются с терминала SSH. В **3.1.2** первый вопрос завершался `installation failed at line 34`. Схема и APK те же, что у **3.1.2**, **3.1.1**, **3.1.0** и **3.0.1**. Пошаговая установка — `INSTALL_STEPS.md`, установщик — раздел 9.17 `INSTRUCTION.md`. Production gate по-прежнему требует `FULL_E2E_PASS` (раздел 9.15). Записи прогонов 3.1.2, 3.1.1 и 3.1.0 ниже остаются фактами тех хостов. Docker, `scripts/doctor.sh`, живые кассы, firewall, S3, SMTP, Xcode и установка на телефон для 3.1.3 не запускались.
+
+### Прогон 3.1.3 на этом хосте
+
+23 сентября 2026. `MEDIA_DIR=/tmp/media python3 -m pytest -q` завершился с кодом 0: 347 тестов. `bash -n` прошёл для `install.sh` и `deploy/install-vps.sh`. Отдельный прогон `prompt` через канал и pty получил ответ `vpn.example.com` и не напечатал `installation failed at line 34`. Живой VPS, Docker и кассы в этом прогоне не запускались.
 
 Версия **3.1.2** закрывает утечки учётных данных VPN и текста исключений в ответах панели. Схема и APK те же, что у **3.1.1**, **3.1.0**, **3.0.1** и **3.0.0-realise**. Пошаговая установка — `INSTALL_STEPS.md`, панель — раздел 9.16 `INSTRUCTION.md`. Production gate по-прежнему требует `FULL_E2E_PASS` (раздел 9.15). Записи прогонов 3.1.1 и 3.1.0 ниже остаются фактами тех хостов и не отмечают заново пункты, которые на живом VPS не запускались. Docker, `scripts/doctor.sh`, живые кассы, firewall, S3, SMTP, Xcode и установка на телефон для 3.1.2 не запускались.
 
@@ -165,6 +171,12 @@
 - [ ] Файрвол, S3, SMTP, живые кассы, Xcode, телефон, резервная копия и восстановление не выполнялись. Повтор зрителя на рассылке в этом прогоне не делался.
 
 ## English
+
+Version **3.1.3** fixes a `curl | bash` install: questions are read from the SSH terminal. In **3.1.2** the first question ended with `installation failed at line 34`. The schema and the APKs stay the same as **3.1.2**, **3.1.1**, **3.1.0**, and **3.0.1**. The step-by-step install is `INSTALL_STEPS.md` and the installer fix is section 9.17 of `INSTRUCTION.md`. The production gate still requires `FULL_E2E_PASS` (section 9.15). The 3.1.2, 3.1.1, and 3.1.0 run records below stay facts of those hosts. Docker, `scripts/doctor.sh`, live gateways, the firewall, S3, SMTP, Xcode, and a phone install were not run for 3.1.3.
+
+### 3.1.3 build-host run
+
+23 September 2026. `MEDIA_DIR=/tmp/media python3 -m pytest -q` exited 0: 347 tests. `bash -n` passed for `install.sh` and `deploy/install-vps.sh`. A separate `prompt` run through a pipe and a pty accepted `vpn.example.com` and did not print `installation failed at line 34`. A live VPS, Docker, and cashiers were not started in this run.
 
 Version **3.1.2** closes leaks of VPN credentials and exception text in panel responses. The schema and the APKs stay the same as **3.1.1**, **3.1.0**, **3.0.1**, and **3.0.0-realise**. The step-by-step install is `INSTALL_STEPS.md` and the panel changes are section 9.16 of `INSTRUCTION.md`. The production gate still requires `FULL_E2E_PASS` (section 9.15). The 3.1.1 and 3.1.0 run records below stay facts of those hosts and do not mark live-VPS items done again. Docker, `scripts/doctor.sh`, live gateways, the firewall, S3, SMTP, Xcode, and a phone install were not run for 3.1.2.
 

@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 3.1.2
+# Полная инструкция — Remnawave VPN Shop 3.1.3
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.2**. Разделы 9.3–9.15 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.3**. Разделы 9.3–9.16 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
 ---
 
@@ -461,6 +461,14 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 5. Диагностика, задания, копии, провайдеры, выплаты, мониторы и операции восстановления в поле ошибки отвечают `unavailable`. Восстановление не возвращает stderr. Журнал аудита в JSON прячет ключи `error`, `token`, `secret`, `password` и `authorization`. Причина возврата не содержит хвост с текстом исключения.
 6. Production gate не ослаблен. Порядок включения реальных платежей остаётся в разделе 9.15. Строка `FULL_E2E_PASS` по-прежнему обязательна.
 
+## 9.17. Релиз 3.1.3
+
+1. Версия API — `3.1.3`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA нет: покупатель **2.10.0**, администратор Android **2.12.0**.
+2. Команда `curl -fsSL https://raw.githubusercontent.com/booarkz-cpu/remnawave-vpn-shop/main/install.sh | sudo bash` снова задаёт вопросы. Канал занят текстом скрипта, ответы читаются с `/dev/tty`. В **3.1.2** первый вопрос завершался `ERROR: installation failed at line 34`.
+3. Секретные поля по-прежнему скрыты. Без терминала установщик пишет «Нет терминала для вопросов установщика» и просит `INSTALL_NONINTERACTIVE=1`.
+4. Обновление уже установленной копии: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` не затирается. Повторная установка в занятый `/opt/vpn-shop` по-прежнему останавливается.
+5. Production gate не ослаблен. Строка `FULL_E2E_PASS` по-прежнему обязательна. Порядок — раздел 9.15.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -571,9 +579,9 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 3.1.2
+# Full instruction — Remnawave VPN Shop 3.1.3
 
-This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.2**. Sections 9.3–9.15 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
+This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.3**. Sections 9.3–9.16 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
 ## 1. What it is
 
@@ -1005,6 +1013,14 @@ Role `admin` has `staging_e2e.manage` and `security.manage`. Roles `viewer` and 
 4. Remnawave user lists, the stream, and the user card omit the subscription URL and protocol passwords. Overview shows only the total. The user id is a string, including a UUID. An invalid id answers 400 «Некорректный идентификатор пользователя Remnawave».
 5. Diagnostics, jobs, backups, providers, payouts, monitors, and recovery operations answer `unavailable` in the error field. Restore does not return stderr. The audit log hides JSON keys `error`, `token`, `secret`, `password`, and `authorization`. A refund reason does not include the exception tail.
 6. The production gate is unchanged. The order for live payments stays in section 9.15. The line `FULL_E2E_PASS` is still required.
+
+## 9.17. Release 3.1.3
+
+1. The API version is `3.1.3`. The schema stays `0038_v2_6_0_platform`. There is no new APK and no IPA: the buyer app stays **2.10.0** and the Android administrator app stays **2.12.0**.
+2. `curl -fsSL https://raw.githubusercontent.com/booarkz-cpu/remnawave-vpn-shop/main/install.sh | sudo bash` asks questions again. The pipe is occupied by the script text, and answers are read from `/dev/tty`. In **3.1.2** the first question ended with `ERROR: installation failed at line 34`.
+3. Secret fields stay hidden. Without a terminal the installer prints «Нет терминала для вопросов установщика» and asks for `INSTALL_NONINTERACTIVE=1`.
+4. Update an installed copy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` is kept. A second install into an occupied `/opt/vpn-shop` still stops.
+5. The production gate is unchanged. The line `FULL_E2E_PASS` is still required. The order is section 9.15.
 
 ## 10. Mini App
 

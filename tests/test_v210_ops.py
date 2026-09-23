@@ -75,7 +75,8 @@ def test_routes_and_release_scripts():
 def test_github_fetcher_rejects_zip_slip(tmp_path):
     module = _fetch_module()
     assert module.version_tuple("v2.10.0") > module.version_tuple("2.9.0")
-    assert module.current_version(ROOT) == "3.1.2"
+    assert module.current_version(ROOT) == "3.1.3"
+    assert module.version_tuple("3.1.3") > module.version_tuple("3.1.2")
     assert module.version_tuple("3.1.2") > module.version_tuple("3.1.1")
     assert module.version_tuple("3.1.1") > module.version_tuple("3.1.0")
     assert module.version_tuple("3.1.0") > module.version_tuple("3.0.1")

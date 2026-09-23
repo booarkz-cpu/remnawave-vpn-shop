@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.1.3
+
+Установщик 3.1.3 не меняет панель. Команда `curl | bash` на сервере снова задаёт вопросы с терминала SSH.
+
+Installer 3.1.3 does not change the panel. `curl | bash` on the server asks questions from the SSH terminal again.
+
 ## 3.1.2
 
 Обзор показывает только общее число пользователей Remnawave. Карточка пользователя не содержит ссылку подписки и пароли протоколов. Подписка и ключи открываются ролям с правом `users.keys`. Поля ошибок в заданиях, копиях и состоянии показывают `unavailable`. Журнал аудита не отдаёт текст исключения из JSON.
