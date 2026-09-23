@@ -120,8 +120,11 @@ def main() -> None:
         raise SystemExit(0)
     assets = {item.get("name"): item.get("browser_download_url") for item in payload.get("assets") or []}
     zip_name = next((name for name in assets if str(name).endswith(".zip") and "full_release" in str(name)), "")
-    sha_name = zip_name + ".sha256" if zip_name else ""
-    if not zip_name or sha_name not in assets:
+    sha_candidates = []
+    if zip_name:
+        sha_candidates = [zip_name + ".sha256", zip_name.removesuffix(".zip") + ".sha256"]
+    sha_name = next((name for name in sha_candidates if name in assets), "")
+    if not zip_name or not sha_name:
         fail("В релизе нет zip и sha256")
     blob = download(str(assets[zip_name]))
     digest_line = download(str(assets[sha_name])).decode().strip().split()[0].lower()

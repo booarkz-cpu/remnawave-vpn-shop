@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.1.6
+
+Контейнер панели отвечает на HTTP. `https://admin.<домен>` больше не остаётся на 502 из-за read-only корня nginx.
+
+The panel container answers HTTP. `https://admin.<domain>` no longer stays on 502 because of the nginx read-only root.
+
 ## 3.1.5
 
 Панель 3.1.5 не меняет экраны. Контейнер nginx больше не падает на `Read-only file system`, поэтому `https://admin.<домен>` открывается после установки.

@@ -5,7 +5,8 @@ cd "$ROOT"
 # Historical release: VERSION="39.0.0-production" artifact=remnawave_vpn_shop_v39_production.zip migration=0017_v39_staging_isolation
 # Previous release contract: VERSION="1.0.1-realise" artifact=remnawave_vpn_shop_v1_0_1_realise_deep_audited_fixed.zip
 # Legacy regression markers: VERSION="1.0.0-realise" artifact=remnawave_vpn_shop_v1_0_0_realise_deep_audited_fixed.zip
-VERSION="3.1.5"
+VERSION="3.1.6"
+# Historical compatibility marker: VERSION="3.1.5"
 # Historical compatibility marker: VERSION="3.1.4"
 # Historical compatibility marker: VERSION="3.1.3"
 # Historical compatibility marker: VERSION="3.1.2"
@@ -44,7 +45,8 @@ VERSION="3.1.5"
 # Historical compatibility marker: 0032_v2_0_0_product_features
 # VERSION="43.1.0-production" legacy regression marker
 # migration_head="0021_v43_hardening_docs" legacy regression marker
-ARTIFACT="remnawave_vpn_shop_v3_1_5_full_release.zip"
+ARTIFACT="remnawave_vpn_shop_v3_1_6_full_release.zip"
+# Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v3_1_5_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v3_1_4_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v3_1_3_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v3_1_2_full_release.zip"
@@ -72,7 +74,7 @@ python - <<'PY'
 import yaml
 with open("docker-compose.yml") as f: yaml.safe_load(f)
 PY
-rm -f "$ARTIFACT" "${ARTIFACT%.zip}.sha256" "${ARTIFACT%.zip}_manifest.json"
+rm -f "$ARTIFACT" "${ARTIFACT}.sha256" "${ARTIFACT%.zip}.sha256" "${ARTIFACT%.zip}_manifest.json"
 # The archive cannot safely contain its own final SHA256 manifest (that would be self-referential).
 # Normalize a template first; the exact detached manifest is generated only after the ZIP is complete.
 if [[ -n "${RELEASE_MANIFEST_SOURCE:-}" ]]; then
@@ -106,7 +108,7 @@ m['detached_manifest']=out
 m['note']='Detached manifest. The ZIP intentionally does not contain its own final SHA256 manifest; use this exact detached manifest to verify the artifact.'
 json.dump(m,open(out,'w'),ensure_ascii=False,indent=2); open(out,'a').write('\n')
 PY
-sha256sum "$ARTIFACT" > "${ARTIFACT%.zip}.sha256"
+sha256sum "$ARTIFACT" | tee "${ARTIFACT}.sha256" > "${ARTIFACT%.zip}.sha256"
 echo "Release: $ARTIFACT"
 echo "SHA256:  $SHA"
 echo "Tests:   $TESTS"

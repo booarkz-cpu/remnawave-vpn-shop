@@ -1,4 +1,9 @@
-# Security / Безопасность — Remnawave VPN Shop 3.1.5
+# Security / Безопасность — Remnawave VPN Shop 3.1.6
+
+## Аудит 3.1.6 / 3.1.6 audit
+
+- Админка, Mini App и кабинет остаются с `read_only: true`. nginx пишет только в tmpfs `/tmp/nginx`. Конфиг смонтирован только для чтения. Caddy не публикует домен, пока `GET /` панели не ответил.
+- The admin UI, Mini App, and cabinet stay `read_only: true`. nginx writes only on the `/tmp/nginx` tmpfs. The config is mounted read-only. Caddy does not publish the domain until the panel's `GET /` has answered.
 
 ## Аудит 3.1.5 / 3.1.5 audit
 
