@@ -1,8 +1,8 @@
-# Remnawave VPN Shop 3.0.1
+# Remnawave VPN Shop 3.1.0
 
 Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-Состояние: **3.0.1**. Предыдущие релизы: **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **3.1.0**. Предыдущие релизы: **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Русский
 
@@ -17,6 +17,40 @@
 | Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+### Возможности 3.1.0
+
+- **Публичный список тарифов** больше не отдаёт `remnawave_profile_id`. Идентификатор профиля остаётся в панели администратора и в снимке платежа.
+- **Статус автопродления** для покупателя при ошибке отвечает фразой «Автопродление не выполнено». Текст исключения остаётся в базе и в журнале.
+- **Контрольная сумма пакета.** Загрузка APK или IPA считает SHA-256. Кабинет и панель показывают её только вместе со ссылкой на скачивание. Имя файла на диске по-прежнему скрыто.
+- **Файл подписки.** `GET /api/me/subscription-file` отдаёт ссылку подписки текстовым файлом `remnawave-subscription.txt`. В кабинете, вкладка «Подключение», кнопка **Скачать подписку**.
+- **Справка по установке.** `GET /api/public/apps/install` возвращает карточки магазина, официальные ссылки GitHub и шаги на русском и английском.
+- Схема остаётся `0038_v2_6_0_platform`. Покупатель Android остаётся **2.10.0**, администратор — **2.12.0**. Подробности — раздел 9.14 в `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_0.md`.
+
+### Как скачать приложения для Android и iOS
+
+Пакеты проекта и файл, который загрузил администратор вашего магазина, — разные ссылки. Кабинет отдаёт загруженный файл. Ссылки ниже — сборки этого репозитория.
+
+**Android, покупатель 2.10.0**
+
+1. Скачайте APK: https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk
+2. Скачайте контрольную сумму: https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk.sha256
+3. В каталоге, где лежат оба файла, выполните `sha256sum -c remnawave_vpn_shop_android_user_2_10_0.apk.sha256`.
+4. На телефоне разрешите установку из выбранного источника и откройте APK.
+5. Если администратор магазина загрузил свой APK, в личном кабинете кнопка **Скачать** на карточке Android ведёт на `GET /api/public/apps/android-user/download`. Рядом показана контрольная сумма этого файла.
+
+**Android, администратор 2.12.0**
+
+1. Скачайте APK: https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk
+2. Скачайте контрольную сумму: https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk.sha256
+3. В том же каталоге выполните `sha256sum -c remnawave_vpn_shop_android_admin_2_12_0.apk.sha256`.
+4. В панели, вкладка **Приложения**, блок **Скачать приложение администратора** отдаёт файл, загруженный администратором: `GET /api/admin/apps/android-admin/download`. Нужна сессия с правом `read`.
+
+**iOS**
+
+Готового IPA в релизах GitHub нет. Администратор магазина может загрузить подписанный IPA. Тогда кабинет покупателя открывает `GET /api/public/apps/ios-user/download`, а панель — `GET /api/admin/apps/ios-admin/download`. Собрать и подписать пакет можно в Xcode на macOS из каталогов `mobile/ios-user` и `mobile/ios-admin`.
+
+Краткая справка без входа: `GET /api/public/apps/install`.
 
 ### Возможности 3.0.1
 
@@ -133,6 +167,7 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 | `DOCUMENTATION.md` | Карта актуальных документов и архивных аудитов |
 | `LICENSE` | Проприетарная лицензия 1.0, RU/EN |
 | `MOBILE.md` | Android и iOS: функции, сессия, логотип, сборка, RU/EN |
+| `RELEASE_NOTES_V3_1_0.md` | Аудит 3.1.0, контрольная сумма и скачивание приложений |
 | `RELEASE_NOTES_V3_0_1.md` | Аудит 3.0.1: автопродление, копия и баланс |
 | `RELEASE_NOTES_V3_0_0.md` | Аудит 3.0.0-realise и результат чеклиста |
 | `RELEASE_NOTES_V2_13_0.md` | Скачивание приложений 2.13.0 |
@@ -169,7 +204,7 @@ cd ../cabinet && npm install && npx vite build
 
 A VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Current release: **3.0.1**. Previous releases: **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
+Current release: **3.1.0**. Previous releases: **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
 
 ### What is in the tree
 
@@ -182,6 +217,40 @@ Current release: **3.0.1**. Previous releases: **3.0.0-realise**, **2.13.0**, **
 | Android and iOS | Kotlin Compose, SwiftUI | Buyer and administrator, Russian and English |
 | Edge | Docker Compose, Caddy | HTTPS and separate domains |
 | Checks | `tests/`, `scripts/sandbox-e2e.sh` | Regression and a run without live gateways |
+
+### What 3.1.0 adds
+
+- **The public plan list** no longer returns `remnawave_profile_id`. The profile id stays in the administrator panel and on the payment snapshot.
+- **Auto-renew status** for the buyer answers «Автопродление не выполнено» when a renewal failed. The exception text stays in the database and in the log.
+- **Package checksum.** An APK or IPA upload stores SHA-256. The cabinet and the panel show it only next to a download link. The stored file name stays hidden.
+- **Subscription file.** `GET /api/me/subscription-file` returns the subscription URL as `remnawave-subscription.txt`. In the cabinet Connection tab the button is **Скачать подписку** (Download subscription).
+- **Install guide.** `GET /api/public/apps/install` returns the shop cards, the official GitHub links and the steps in Russian and English.
+- The schema stays `0038_v2_6_0_platform`. The Android buyer app stays **2.10.0** and the administrator app stays **2.12.0**. Details are in section 9.14 of `INSTRUCTION.md` and in `RELEASE_NOTES_V3_1_0.md`.
+
+### How to download the Android and iOS apps
+
+The project packages and the file an administrator uploaded to your shop are different links. The cabinet serves the uploaded file. The links below are the builds from this repository.
+
+**Android buyer 2.10.0**
+
+1. Download the APK: https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk
+2. Download the checksum: https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk.sha256
+3. In the directory that holds both files, run `sha256sum -c remnawave_vpn_shop_android_user_2_10_0.apk.sha256`.
+4. On the phone, allow installation from the source you chose and open the APK.
+5. When a shop administrator has uploaded their own APK, the cabinet **Скачать** (Download) button on the Android card opens `GET /api/public/apps/android-user/download`. The checksum of that file is shown beside the button.
+
+**Android administrator 2.12.0**
+
+1. Download the APK: https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk
+2. Download the checksum: https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk.sha256
+3. In the same directory, run `sha256sum -c remnawave_vpn_shop_android_admin_2_12_0.apk.sha256`.
+4. In the panel, the Apps tab, the block **Скачать приложение администратора** (Download the administrator app) serves the file an administrator uploaded: `GET /api/admin/apps/android-admin/download`. The session needs the `read` permission.
+
+**iOS**
+
+GitHub releases do not include an IPA. A shop administrator can upload a signed IPA. The buyer cabinet then opens `GET /api/public/apps/ios-user/download`, and the panel opens `GET /api/admin/apps/ios-admin/download`. Build and sign the package in Xcode on macOS from `mobile/ios-user` and `mobile/ios-admin`.
+
+The public summary is `GET /api/public/apps/install`.
 
 ### What 3.0.1 adds
 
@@ -282,6 +351,7 @@ The full procedure is `INSTRUCTION.md`, section 9.9. Do not commit `.env`, token
 | `DOCUMENTATION.md` | Index of current documents and archived audits |
 | `LICENSE` | Proprietary license 1.0, RU/EN |
 | `MOBILE.md` | Android and iOS functions, session, logo and build, RU/EN |
+| `RELEASE_NOTES_V3_1_0.md` | 3.1.0 audit, checksum and app download steps |
 | `RELEASE_NOTES_V3_0_1.md` | 3.0.1 audit: auto-renew, backups and wallet |
 | `RELEASE_NOTES_V3_0_0.md` | 3.0.0-realise audit and checklist result |
 | `RELEASE_NOTES_V2_13_0.md` | 2.13.0 app downloads |

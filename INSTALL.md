@@ -1,8 +1,12 @@
-# Remnawave VPN Shop 3.0.1 — Установка одной командой
+# Remnawave VPN Shop 3.1.0 — Установка одной командой
 
-Версия **3.0.1** не меняет схему базы и не заменяет APK. Она чинит автопродление, проверку шифрованной копии и повторное списание с баланса. Обновление установленной копии: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+Версия **3.1.0** не меняет схему базы и не заменяет APK. Она скрывает идентификатор профиля в публичном списке тарифов, не отдаёт текст ошибки автопродления, считает SHA-256 загруженного пакета и даёт файл подписки. Исправления **3.0.1** остаются: автопродление, шифрованная копия и одно списание с баланса. Обновление установленной копии: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
 
-Version **3.0.1** does not change the database schema and does not replace the APKs. It fixes auto-renew, encrypted backup validation and a second wallet debit. Update an installed copy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+Как скачать приложения: покупатель Android **2.10.0** — https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk , администратор Android **2.12.0** — https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk . Рядом лежит файл `.sha256`, проверка — `sha256sum -c`. IPA в релизах нет: iOS собирается в Xcode из `mobile/ios-user` и `mobile/ios-admin`. Подробности — в `README.md`.
+
+Version **3.1.0** does not change the database schema and does not replace the APKs. It hides the profile id on the public plan list, withholds the auto-renew exception text, stores the SHA-256 of an uploaded package and serves a subscription file. The **3.0.1** fixes remain: auto-renew, encrypted backups and a single wallet debit. Update an installed copy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+
+How to download the apps: Android buyer **2.10.0** is https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk and Android administrator **2.12.0** is https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk . A `.sha256` file sits beside each APK; check it with `sha256sum -c`. There is no IPA in the releases: iOS is built in Xcode from `mobile/ios-user` and `mobile/ios-admin`. The full steps are in `README.md`.
 
 Файлы приложений, загруженные в панели, лежат в каталоге `app-packages` рядом с `MEDIA_DIR`. Этот каталог не публикуется как `/media`. Ссылки на скачивание описаны в разделе 9.11 `INSTRUCTION.md`.
 

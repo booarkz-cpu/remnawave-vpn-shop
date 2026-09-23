@@ -26,7 +26,8 @@ from .security import (hash_password, verify_password, encrypt_secret, decrypt_s
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "3.0.1"
+APP_VERSION = "3.1.0"
+# Historical compatibility marker: APP_VERSION = "3.0.1"
 # Historical compatibility marker: APP_VERSION = "3.0.0-realise"
 # Historical compatibility marker: APP_VERSION = "2.13.0"
 # Historical compatibility marker: APP_VERSION = "2.12.0"
@@ -800,7 +801,7 @@ async def plans(db:AsyncSession=Depends(get_db)):
         if p.id in anchor_ids: continue
         price=Decimal(str(p.price)); promo=await active_promotion(db,p.id); discount=discounted_amount(price,promo.kind,promo.value) if promo else Decimal("0.00")
         final_price=(price-discount).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP)
-        out.append({"id":p.id,"name":p.name,"price":float(price),"final_price":float(final_price),"discount":float(discount),"discount_percent":float((discount/price*Decimal("100")).quantize(Decimal("0.01"))) if price else 0,"promotion":({"id":promo.id,"name":promo.name,"kind":promo.kind,"value":float(promo.value),"description":promo.description} if promo else None),"duration_days":p.duration_days,"traffic_limit_gb":p.traffic_limit_gb,"device_limit":p.device_limit,"remnawave_profile_id":p.remnawave_profile_id})
+        out.append({"id":p.id,"name":p.name,"price":float(price),"final_price":float(final_price),"discount":float(discount),"discount_percent":float((discount/price*Decimal("100")).quantize(Decimal("0.01"))) if price else 0,"promotion":({"id":promo.id,"name":promo.name,"kind":promo.kind,"value":float(promo.value),"description":promo.description} if promo else None),"duration_days":p.duration_days,"traffic_limit_gb":p.traffic_limit_gb,"device_limit":p.device_limit})
     return out
 
 @app.get("/api/promo/validate")
@@ -2307,15 +2308,24 @@ async def apply_referral(payload:dict,request:Request,db:AsyncSession=Depends(ge
 @app.get("/api/me/auto-renew")
 async def auto_renew_status(request:Request,db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db); method=(await db.execute(select(AutoRenewMethod).where(AutoRenewMethod.user_id==user.id))).scalar_one_or_none()
-    return {"enabled":user.auto_renew_enabled,"configured":bool(method and method.enabled),"provider":method.provider if method else None,"last_attempt_at":method.last_attempt_at if method else None,"last_success_at":method.last_success_at if method else None,"last_error":method.last_error if method else None,"supported_providers":["yookassa"]}
+    last_error="Автопродление не выполнено" if method and method.last_error else None
+    return {"enabled":user.auto_renew_enabled,"configured":bool(method and method.enabled),"provider":method.provider if method else None,"last_attempt_at":method.last_attempt_at if method else None,"last_success_at":method.last_success_at if method else None,"last_error":last_error,"supported_providers":["yookassa"]}
 
 @app.get("/api/me/connection-qr")
 async def connection_qr(request:Request,db:AsyncSession=Depends(get_db)):
     user=await user_from_token(request,db); sub=(await db.execute(select(Subscription).where(Subscription.user_id==user.id))).scalar_one_or_none()
-    if not sub or not sub.subscription_url: raise HTTPException(404,"Subscription is not available")
+    url=(sub.subscription_url or "").strip() if sub else ""
+    if not url or any(ch in url for ch in "\r\n\x00"): raise HTTPException(404,"Subscription is not available")
     import io, qrcode
-    img=qrcode.make(sub.subscription_url); buf=io.BytesIO(); img.save(buf,format="PNG")
+    img=qrcode.make(url); buf=io.BytesIO(); img.save(buf,format="PNG")
     return Response(content=buf.getvalue(),media_type="image/png",headers={"Cache-Control":"private, no-store"})
+
+@app.get("/api/me/subscription-file")
+async def subscription_file(request:Request,db:AsyncSession=Depends(get_db)):
+    user=await user_from_token(request,db); sub=(await db.execute(select(Subscription).where(Subscription.user_id==user.id))).scalar_one_or_none()
+    url=(sub.subscription_url or "").strip() if sub else ""
+    if not url or any(ch in url for ch in "\r\n\x00"): raise HTTPException(404,"Subscription is not available")
+    return Response(content=(url+"\n").encode(),media_type="text/plain; charset=utf-8",headers={"Cache-Control":"private, no-store","Content-Disposition":'attachment; filename="remnawave-subscription.txt"'})
 
 @app.get("/api/me/connection-info")
 async def connection_info(request:Request,db:AsyncSession=Depends(get_db)):
@@ -2344,7 +2354,9 @@ async def connection_info(request:Request,db:AsyncSession=Depends(get_db)):
     for key in ("android","ios","tv","windows","macos","linux"):
         row=(await db.execute(select(AppSetting).where(AppSetting.key==f"guide_{key}"))).scalar_one_or_none()
         guides[key]=row.value if row and row.value else defaults[key]
-    return Response(content=json.dumps({"subscription_url":sub.subscription_url if sub else None,"expires_at":sub.expires_at.isoformat() if sub and sub.expires_at else None,"platforms":guides},ensure_ascii=False),media_type="application/json",headers={"Cache-Control":"private, no-store"})
+    raw=(sub.subscription_url or "").strip() if sub else ""
+    safe_url=raw if raw and not any(ch in raw for ch in "\r\n\x00") else None
+    return Response(content=json.dumps({"subscription_url":safe_url,"expires_at":sub.expires_at.isoformat() if sub and sub.expires_at else None,"platforms":guides},ensure_ascii=False),media_type="application/json",headers={"Cache-Control":"private, no-store"})
 
 @app.put("/api/me/auto-renew")
 async def set_auto_renew(payload:dict,request:Request,db:AsyncSession=Depends(get_db)):

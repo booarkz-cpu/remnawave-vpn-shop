@@ -1,6 +1,7 @@
 """Buyer and administrator app cards, plus the logo shown in the cabinet and the apps."""
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import json
 import pathlib
@@ -35,6 +36,7 @@ DEFAULTS: dict[str, dict] = {
         "url": "",
         "file": "",
         "file_label": "",
+        "file_sha256": "",
     },
     "ios-user": {
         "id": "ios-user",
@@ -48,6 +50,7 @@ DEFAULTS: dict[str, dict] = {
         "url": "",
         "file": "",
         "file_label": "",
+        "file_sha256": "",
     },
     "android-admin": {
         "id": "android-admin",
@@ -61,6 +64,7 @@ DEFAULTS: dict[str, dict] = {
         "url": "",
         "file": "",
         "file_label": "",
+        "file_sha256": "",
     },
     "ios-admin": {
         "id": "ios-admin",
@@ -74,8 +78,30 @@ DEFAULTS: dict[str, dict] = {
         "url": "",
         "file": "",
         "file_label": "",
+        "file_sha256": "",
     },
 }
+
+# Reference builds published with earlier releases. The shop cabinet serves the
+# file an administrator uploaded; these links are the project packages.
+OFFICIAL_APPS = (
+    {
+        "id": "android-user",
+        "audience": "user",
+        "platform": "android",
+        "version": "2.10.0",
+        "url": "https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk",
+        "checksum_url": "https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk.sha256",
+    },
+    {
+        "id": "android-admin",
+        "audience": "admin",
+        "platform": "android",
+        "version": "2.12.0",
+        "url": "https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk",
+        "checksum_url": "https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk.sha256",
+    },
+)
 
 PACKAGE_NAME = re.compile(r"^[a-f0-9]{32}\.(apk|ipa)$")
 MAX_PACKAGE_BYTES = 80 * 1024 * 1024
@@ -121,6 +147,13 @@ def _clip(value: str, limit: int, fallback: str) -> str:
     return text[:limit]
 
 
+def safe_sha256(value: str) -> str:
+    text = str(value or "").strip().lower()
+    if len(text) == 64 and all(ch in "0123456789abcdef" for ch in text):
+        return text
+    return ""
+
+
 def safe_package_name(value: str) -> str:
     name = str(value or "")
     if name != pathlib.Path(name).name or not PACKAGE_NAME.fullmatch(name):
@@ -164,6 +197,7 @@ def card_from_input(raw: dict) -> dict:
         "url": normalize_store_url(str(raw.get("url") or "")),
         "file": "",
         "file_label": "",
+        "file_sha256": "",
     }
 
 
@@ -171,6 +205,7 @@ def attach_stored_file(card: dict, raw: dict) -> dict:
     name = safe_package_name(str(raw.get("file") or ""))
     card["file"] = name
     card["file_label"] = _clip(str(raw.get("file_label") or ""), 80, "") if name else ""
+    card["file_sha256"] = safe_sha256(str(raw.get("file_sha256") or "")) if name else ""
     return card
 
 
@@ -180,8 +215,10 @@ def view_card(card: dict, *, public: bool) -> dict:
     if visible:
         prefix = "/api/public/apps" if public else "/api/admin/apps"
         shown["download_url"] = f"{prefix}/{card['id']}/download"
+        shown["sha256"] = safe_sha256(str(card.get("file_sha256") or ""))
     else:
         shown["download_url"] = ""
+        shown["sha256"] = ""
     if not public:
         shown["has_file"] = bool(card.get("file"))
         shown["file_label"] = card.get("file_label") or ""
@@ -264,6 +301,7 @@ async def save_apps(payload: AppsIn, db: AsyncSession = Depends(get_db), admin=D
         previous = current.get(card["id"], {})
         card["file"] = safe_package_name(str(previous.get("file") or ""))
         card["file_label"] = previous.get("file_label") or "" if card["file"] else ""
+        card["file_sha256"] = safe_sha256(str(previous.get("file_sha256") or "")) if card["file"] else ""
         if card["id"] in ids:
             raise HTTPException(400, "Приложение указано дважды")
         ids.append(card["id"])
@@ -368,6 +406,7 @@ async def upload_app_file(app_id: str, admin=Depends(require_permission("manage_
     data = await _read_package(file)
     if not data.startswith(b"PK\x03\x04"):
         raise HTTPException(400, "Файл не похож на пакет приложения")
+    digest = hashlib.sha256(data).hexdigest()
     name = secrets.token_hex(16) + ext
     path = package_path(name)
     if path is None:
@@ -381,6 +420,7 @@ async def upload_app_file(app_id: str, admin=Depends(require_permission("manage_
         previous = card.get("file") or ""
         card["file"] = name
         card["file_label"] = ext.removeprefix(".")
+        card["file_sha256"] = digest
     try:
         await _write_catalog(db, cards)
         await audit(db, "content.apps.file.updated", admin.email, app_id)
@@ -408,6 +448,7 @@ async def delete_app_file(app_id: str, db: AsyncSession = Depends(get_db), admin
         removed = card.get("file") or ""
         card["file"] = ""
         card["file_label"] = ""
+        card["file_sha256"] = ""
     await _write_catalog(db, cards)
     await audit(db, "content.apps.file.deleted", admin.email, app_id)
     await db.commit()
@@ -415,6 +456,27 @@ async def delete_app_file(app_id: str, db: AsyncSession = Depends(get_db), admin
     if old:
         old.unlink(missing_ok=True)
     return await catalog_payload(db, public=False)
+
+
+@router.get("/api/public/apps/install")
+async def public_install_guide(db: AsyncSession = Depends(get_db)):
+    catalog = await catalog_payload(db, public=True)
+    return {
+        "shop_apps": catalog["apps"],
+        "official": list(OFFICIAL_APPS),
+        "steps_ru": [
+            "Покупатель Android: в личном кабинете откройте блок «Приложения» и нажмите «Скачать», либо откройте GET /api/public/apps/android-user/download, если администратор загрузил APK.",
+            "Покупатель iOS: та же карточка ведёт на GET /api/public/apps/ios-user/download, если администратор загрузил IPA. Готового IPA в релизах GitHub нет.",
+            "Сборка проекта для Android покупателя 2.10.0 и администратора 2.12.0 лежит на GitHub. Рядом с APK есть файл .sha256. Проверка: sha256sum -c имя.apk.sha256 в каталоге, где лежат оба файла.",
+            "На Android разрешите установку из выбранного источника и откройте APK. На iOS пакет подписывают в Xcode на macOS из mobile/ios-user или mobile/ios-admin.",
+        ],
+        "steps_en": [
+            "Android buyer: in the user cabinet open Apps and press Download, or open GET /api/public/apps/android-user/download when an administrator has uploaded an APK.",
+            "iOS buyer: the same card leads to GET /api/public/apps/ios-user/download when an administrator has uploaded an IPA. GitHub releases do not include an IPA.",
+            "The project Android builds stay at buyer 2.10.0 and administrator 2.12.0 on GitHub. A .sha256 file sits next to each APK. Check it with sha256sum -c name.apk.sha256 in the directory that holds both files.",
+            "On Android, allow installation from the source you chose and open the APK. On iOS, sign the package in Xcode on macOS from mobile/ios-user or mobile/ios-admin.",
+        ],
+    }
 
 
 @router.get("/api/public/apps/{app_id}/download")

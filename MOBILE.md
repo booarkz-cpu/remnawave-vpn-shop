@@ -1,8 +1,12 @@
-# Мобильные приложения 3.0.1 / Mobile apps 3.0.1
+# Мобильные приложения 3.1.0 / Mobile apps 3.1.0
 
-Серверная версия **3.0.1** не меняет пакеты Android и проекты iOS. Покупатель остаётся **2.10.0**, администратор — **2.12.0**. Повторное нажатие «оплатить с баланса» на уже установленном приложении больше не списывает сумму второй раз: сервер требует `Idempotency-Key` и 30 секунд блокирует ту же покупку.
+Серверная версия **3.1.0** не меняет пакеты Android и проекты iOS. Покупатель остаётся **2.10.0**, администратор — **2.12.0**. Загруженный APK или IPA получает SHA-256, и кабинет показывает её рядом с кнопкой **Скачать**. Файл подписки скачивается кнопкой **Скачать подписку**. Повторное нажатие «оплатить с баланса» по-прежнему не списывает сумму второй раз: это исправление **3.0.1**, сервер требует `Idempotency-Key`.
 
-Server version **3.0.1** does not change the Android packages or the iOS projects. The buyer app stays **2.10.0** and the administrator app stays **2.12.0**. A second tap on “pay from balance” in an already installed app does not debit the amount again: the server requires `Idempotency-Key` and blocks the same purchase for 30 seconds.
+Как скачать сборки репозитория: покупатель https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk , администратор https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk . Проверка — `sha256sum -c` по соседнему файлу `.sha256`. IPA нет: Xcode, каталоги `mobile/ios-user` и `mobile/ios-admin`.
+
+Server version **3.1.0** does not change the Android packages or the iOS projects. The buyer app stays **2.10.0** and the administrator app stays **2.12.0**. An uploaded APK or IPA receives a SHA-256, and the cabinet shows it beside **Скачать** (Download). The subscription file is downloaded with **Скачать подписку** (Download subscription). A second tap on “pay from balance” still does not debit the amount again: that is the **3.0.1** fix, and the server requires `Idempotency-Key`.
+
+Repository builds: buyer https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk , administrator https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk . Check them with `sha256sum -c` against the neighbouring `.sha256` file. There is no IPA: use Xcode and the directories `mobile/ios-user` and `mobile/ios-admin`.
 
 С версии **2.13.0** ссылка на скачивание приложения администратора стоит в веб-панели, а ссылка на приложение покупателя — в личном кабинете. Сами пакеты Android остаются **2.12.0** для администратора и **2.10.0** для покупателя, пока администратор не загрузит новый файл.
 

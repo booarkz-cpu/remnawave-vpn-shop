@@ -525,6 +525,7 @@ export const EN: Record<string, string> = {
   "Удалить файл": "Remove file",
   "Файл приложения сохранён": "App file saved",
   "Файл приложения удалён": "App file removed",
+  "Контрольная сумма": "Checksum",
 };
 
 let activeLang: Lang = "ru";

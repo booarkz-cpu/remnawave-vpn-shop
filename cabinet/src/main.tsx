@@ -160,6 +160,9 @@ function AppsNotice({apps, lang}: {apps: any[]; lang: string}) {
                 <p className="section-sub">{text}</p>
               </div>
               {fileHref && <a className="btn-primary" href={fileHref}>Скачать</a>}
+              {typeof row.sha256 === "string" && /^[a-f0-9]{64}$/.test(row.sha256) && (
+                <p className="section-sub">Контрольная сумма {row.sha256}</p>
+              )}
               {storeHref && (
                 <a className="btn-primary" href={storeHref} target="_blank" rel="noopener noreferrer">
                   Скачать по ссылке
@@ -759,6 +762,7 @@ function App() {
                           <button type="button" className="btn-primary" onClick={() => copyLink(subUrl)}>
                             {copied ? "Скопировано" : "Копировать ссылку"}
                           </button>
+                          <a className="btn-primary" href={API + "/api/me/subscription-file"}>Скачать подписку</a>
                         </div>
                       </label>
                     </div>

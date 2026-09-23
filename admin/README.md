@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.1.0
+
+Карточка приложения показывает контрольную сумму SHA-256, когда файл загружен. Публичный список тарифов её не касается: идентификатор профиля Remnawave в ответе покупателя отсутствует.
+
+An app card shows the SHA-256 checksum when a file is uploaded. The public plan list is separate: the buyer response does not include the Remnawave profile id.
+
 ## 3.0.1
 
 Повторная оплата с баланса в течение 30 секунд не создаёт второе списание. Загрузка пакета по-прежнему проверяет `manage_content` до чтения файла.

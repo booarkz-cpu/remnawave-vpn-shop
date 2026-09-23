@@ -1,8 +1,8 @@
-# Production checklist 3.0.1
+# Production checklist 3.1.0
 
 ## Русский
 
-Версия **3.0.1** исправляет автопродление, проверку шифрованной копии и повторное списание с баланса. Схема и APK те же, что у **3.0.0-realise**. Запись прогона ниже относится к хосту сборки 3.0.0-realise и не отмечает заново пункты, которые на живом VPS не запускались.
+Версия **3.1.0** скрывает `remnawave_profile_id` в публичном списке тарифов, заменяет текст ошибки автопродления, считает SHA-256 пакета и отдаёт файл подписки. Схема и APK те же, что у **3.0.1** и **3.0.0-realise**. Запись прогона ниже относится к хосту сборки 3.0.0-realise и не отмечает заново пункты, которые на живом VPS не запускались. Для 3.1.0 на этом хосте 23 сентября 2026 прошли `scripts/preflight.sh` (333 теста), `scripts/security-scan.sh` и локальный API на `127.0.0.1:8000`. Docker, `scripts/doctor.sh`, живые кассы, Xcode и установка на телефон не запускались.
 
 Этот файл — порядок выкладки на VPS и запись прогона на хосте сборки от 22 сентября 2026. Пункты раздела «Порядок на VPS» остаются открытыми, пока их не выполнит администратор на своём сервере. Раздел «Прогон на хосте сборки» отмечает только то, что реально запускалось здесь.
 
@@ -133,9 +133,30 @@
 - [ ] `docker compose config`, `docker compose up`, `scripts/integration-test.sh` и `scripts/doctor.sh` не запускались: Docker на этом хосте нет.
 - [ ] Файрвол, S3, SMTP, живые кассы, Xcode, установка APK на телефон, резервная копия и тестовое восстановление не выполнялись.
 
+### Прогон 3.1.0 на этом хосте
+
+23 сентября 2026. Та же машина: PostgreSQL 16, Redis 7, API `127.0.0.1:8000` после перезапуска на коде 3.1.0. Пункты «Порядок на VPS» остаются открытыми.
+
+- [x] `alembic_version` уже `0038_v2_6_0_platform`. Новой миграции нет.
+- [x] `GET /health` вернул `ok=true`, `version=3.1.0`, `redis=true`, `database=true`.
+- [x] `GET /api/plans` не содержит `remnawave_profile_id`. `GET /api/admin/plans` это поле сохраняет.
+- [x] `GET /api/public/apps/install` вернул карточки `android-user` и `ios-user`, официальные ссылки `android-user` и `android-admin` и по 4 шага на русском и английском.
+- [x] Вход администратора вернул `email`, `mfa_enabled`, `role`. Поля `access_token` нет. Вход покупателя из браузера тоже без `access_token`.
+- [x] `GET /api/public/servers` вернул `ok=false`. В ответе нет адреса, токена и пароля.
+- [x] Маленький ZIP загружен на карточку покупателя. В JSON есть `has_file` и SHA-256 из 64 символов, ключа `file` нет. В каталоге media файлов 0, в `app-packages` файл 1.
+- [x] `GET /api/public/apps/android-admin/download` — 404. `GET /api/public/apps/android-user/download` — 200.
+- [x] `Content-Length: 14000000` на `POST /api/payments/create` — 413. Тот же размер на загрузке пакета — 401. Размер 80 МБ + 1 байт — 413.
+- [x] Покупатель без подписки: `GET /api/me/auto-renew` вернул `last_error=null`, `GET /api/me/subscription-file` — 404 «Subscription is not available».
+- [x] `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh` прошёл здоровье версии 3.1.0, публичный конфиг, меню кабинета (6 пунктов), регистрацию и создание sandbox-платежа. `POST /api/payments/sandbox/complete` ответил HTTP 500, потому что выдача обращается к Remnawave. Скрипт завершился с кодом 22. Пункт чеклиста из-за этого не закрыт.
+- [x] `bash -n` для `install.sh`, `deploy/*.sh` и `scripts/*.sh` прошёл.
+- [x] `scripts/security-scan.sh` завершился с кодом 0. `npm audit --omit=dev --audit-level=high` для `admin`, `miniapp` и `cabinet` — 0 уязвимостей. Предупреждения: нет `pip-audit`, Docker, `trivy` и `syft`.
+- [x] `scripts/preflight.sh` завершился с кодом 0: 333 теста. `docker compose config` не вызывался.
+- [ ] `docker compose config`, `docker compose up`, `scripts/integration-test.sh` и `scripts/doctor.sh` не запускались.
+- [ ] Файрвол, S3, SMTP, живые кассы, Xcode, телефон, резервная копия и восстановление не выполнялись. Повтор зрителя на рассылке в этом прогоне не делался.
+
 ## English
 
-Version **3.0.1** fixes auto-renew, encrypted backup validation and a second wallet debit. The schema and the APKs stay the same as **3.0.0-realise**. The run record below belongs to the 3.0.0-realise build host and does not mark live-VPS items done again.
+Version **3.1.0** hides `remnawave_profile_id` on the public plan list, replaces the auto-renew error text, stores a package SHA-256 and serves a subscription file. The schema and the APKs stay the same as **3.0.1** and **3.0.0-realise**. The run record below belongs to the 3.0.0-realise build host and does not mark live-VPS items done again. On 23 September 2026 this host passed `scripts/preflight.sh` (333 tests), `scripts/security-scan.sh` and a local API on `127.0.0.1:8000` for 3.1.0. Docker, `scripts/doctor.sh`, live gateways, Xcode and a phone install were not run.
 
 This file is the VPS rollout order and the record of the build-host run on 22 September 2026. Items under “VPS order” stay open until an administrator runs them on their own server. “Build-host run” marks only what actually ran here.
 
@@ -265,3 +286,24 @@ The build host is this virtual machine. It has no Docker, no Xcode, no live gate
 - [x] `scripts/preflight.sh` exited 0: 328 tests passed and `compileall` passed. Docker is absent on this host, so preflight did not call `docker compose config`.
 - [ ] `docker compose config`, `docker compose up`, `scripts/integration-test.sh` and `scripts/doctor.sh` were not run. Docker is not installed on this host.
 - [ ] The firewall, S3, SMTP, live gateways, Xcode, a phone APK install, a backup and a test restore were not run.
+
+### 3.1.0 build-host run
+
+23 September 2026. The same machine: PostgreSQL 16, Redis 7, and the API on `127.0.0.1:8000` after a restart on the 3.1.0 code. The VPS order stays open.
+
+- [x] `alembic_version` was already `0038_v2_6_0_platform`. There is no new migration.
+- [x] `GET /health` returned `ok=true`, `version=3.1.0`, `redis=true`, `database=true`.
+- [x] `GET /api/plans` does not contain `remnawave_profile_id`. `GET /api/admin/plans` still includes the field.
+- [x] `GET /api/public/apps/install` returned the `android-user` and `ios-user` cards, the official `android-user` and `android-admin` links, and 4 steps in each language.
+- [x] Administrator login returned `email`, `mfa_enabled` and `role`. There is no `access_token`. A browser buyer login also has no `access_token`.
+- [x] `GET /api/public/servers` returned `ok=false`. The payload has no address, token or password.
+- [x] A small ZIP was uploaded to the buyer card. The JSON has `has_file` and a 64-character SHA-256, and no `file` key. The media directory has 0 files and `app-packages` has 1 file.
+- [x] `GET /api/public/apps/android-admin/download` returned 404. `GET /api/public/apps/android-user/download` returned 200.
+- [x] `Content-Length: 14000000` on `POST /api/payments/create` returned 413. The same size on the package route returned 401. 80 MB plus 1 byte returned 413.
+- [x] A buyer without a subscription: `GET /api/me/auto-renew` returned `last_error=null`, and `GET /api/me/subscription-file` returned 404 «Subscription is not available».
+- [x] `SANDBOX_API_BASE=http://127.0.0.1:8000 bash scripts/sandbox-e2e.sh` passed health at version 3.1.0, public config, the cabinet menu (6 items), registration and sandbox payment creation. `POST /api/payments/sandbox/complete` returned HTTP 500 because fulfillment calls Remnawave. The script exited 22. That checklist item stays open.
+- [x] `bash -n` passed for `install.sh`, `deploy/*.sh` and `scripts/*.sh`.
+- [x] `scripts/security-scan.sh` exited 0. `npm audit --omit=dev --audit-level=high` for `admin`, `miniapp` and `cabinet` reported 0 vulnerabilities. Warnings: `pip-audit`, Docker, `trivy` and `syft` are absent.
+- [x] `scripts/preflight.sh` exited 0: 333 tests. `docker compose config` was not called.
+- [ ] `docker compose config`, `docker compose up`, `scripts/integration-test.sh` and `scripts/doctor.sh` were not run.
+- [ ] The firewall, S3, SMTP, live gateways, Xcode, a phone, a backup and a restore were not run. The viewer broadcast check was not repeated in this run.

@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 2.5.0
+# Полная инструкция — Remnawave VPN Shop 3.1.0
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`. Предыдущий полный контур кабинета описан как 2.4.0 и сохранён.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.0**. Разделы 9.3–9.13 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
 ---
 
@@ -426,6 +426,16 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 4. Новый ключ на `POST /api/payments/create` не открывает второй счёт, пока предыдущий счёт того же снимка тарифа моложе 30 секунд и ещё не оплачен или его результат не определён.
 5. `README.md` и `SECURITY.md` на GitHub описывают 3.0.1. Раздел Security репозитория берётся из `SECURITY.md`.
 
+## 9.14. Релиз 3.1.0
+
+1. Версия API — `3.1.0`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA нет: покупатель **2.10.0**, администратор Android **2.12.0**.
+2. Обновление установленной копии: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` не затирается.
+3. Публичный `GET /api/plans` не содержит `remnawave_profile_id`. В панели администратора поле остаётся.
+4. `GET /api/me/auto-renew` при ошибке отдаёт «Автопродление не выполнено».
+5. После загрузки APK или IPA карточка показывает SHA-256. Кабинет и панель выводят её только если это 64 шестнадцатеричных символа.
+6. Во вкладке «Подключение» кнопка **Скачать подписку** открывает `GET /api/me/subscription-file`.
+7. Как скачать приложения проекта: покупатель Android — https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk , администратор Android — https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk . Проверка: `sha256sum -c` по файлу `.sha256` в том же каталоге. iOS собирается в Xcode из `mobile/ios-user` и `mobile/ios-admin`. Справка без входа: `GET /api/public/apps/install`.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -536,9 +546,9 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 2.5.0
+# Full instruction — Remnawave VPN Shop 3.1.0
 
-This is the operator guide for installing the shop, turning payments on, and running the admin panel. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
+This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.0**. Sections 9.3–9.13 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
 ## 1. What it is
 
@@ -935,6 +945,16 @@ The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `
 3. Wallet payment requires the `Idempotency-Key` header. The same key returns the earlier payment. A different key for the same purchase within 30 seconds answers 409 and leaves the balance unchanged.
 4. A new key on `POST /api/payments/create` does not open a second invoice while the previous invoice for the same plan snapshot is younger than 30 seconds and is still unpaid or has an unknown result.
 5. `README.md` and `SECURITY.md` on GitHub describe 3.0.1. The repository Security tab is taken from `SECURITY.md`.
+
+## 9.14. Release 3.1.0
+
+1. The API version is `3.1.0`. The schema stays `0038_v2_6_0_platform`. There is no new APK and no IPA: the buyer app stays **2.10.0** and the Android administrator app stays **2.12.0**.
+2. Update an installed copy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` is kept.
+3. Public `GET /api/plans` does not contain `remnawave_profile_id`. The administrator panel still shows the field.
+4. `GET /api/me/auto-renew` answers «Автопродление не выполнено» after a failure.
+5. After an APK or IPA upload the card shows SHA-256. The cabinet and the panel print it only when it is 64 hexadecimal characters.
+6. On the Connection tab, **Скачать подписку** (Download subscription) opens `GET /api/me/subscription-file`.
+7. Project app downloads: Android buyer https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk , Android administrator https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk . Check with `sha256sum -c` against the `.sha256` file in the same directory. iOS is built in Xcode from `mobile/ios-user` and `mobile/ios-admin`. The signed-out summary is `GET /api/public/apps/install`.
 
 ## 10. Mini App
 
