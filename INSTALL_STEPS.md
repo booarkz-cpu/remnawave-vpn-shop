@@ -1,4 +1,4 @@
-# Пошаговая установка — Remnawave VPN Shop 3.1.2
+# Пошаговая установка — Remnawave VPN Shop 3.1.3
 
 Этот файл — отдельная установка с нуля. Каждый вопрос ниже совпадает с вопросом `deploy/install-vps.sh`. Панель staging E2E и кнопка «Разрешить реальные платежи» описаны в разделе 9.15 `INSTRUCTION.md`.
 
@@ -6,7 +6,7 @@
 
 ### 1. Что будет установлено
 
-На Debian или Ubuntu скрипт ставит Docker Engine и Docker Compose, копирует проект в `/opt/vpn-shop`, пишет `.env` с правами `0600`, собирает образы, поднимает PostgreSQL 16, Redis 7, API, worker, бота, админку, Mini App, личный кабинет и Caddy. Миграции Alembic доходят до `0038_v2_6_0_platform`. Версия установщика — **3.1.2**. Вопросы те же, что в **3.1.1**.
+На Debian или Ubuntu скрипт ставит Docker Engine и Docker Compose, копирует проект в `/opt/vpn-shop`, пишет `.env` с правами `0600`, собирает образы, поднимает PostgreSQL 16, Redis 7, API, worker, бота, админку, Mini App, личный кабинет и Caddy. Миграции Alembic доходят до `0038_v2_6_0_platform`. Версия установщика — **3.1.3**. Вопросы те же, что в **3.1.2** и **3.1.1**.
 
 Наружу остаются SSH, TCP 80, TCP 443 и UDP 443. PostgreSQL, Redis, API и панели в firewall не публикуются. Их отдаёт Caddy по своим доменам.
 
@@ -51,6 +51,8 @@ curl -fsSL https://raw.githubusercontent.com/booarkz-cpu/remnawave-vpn-shop/main
 ```
 
 `install.sh` проверяет root, ставит `ca-certificates`, `curl`, `git`, `openssl` и Docker, затем передаёт управление `deploy/install-vps.sh`. Запуск через `curl` клонирует ветку `main` в `/opt/vpn-shop-src`. Запуск из каталога проекта использует этот каталог. Если `/opt/vpn-shop` уже содержит `docker-compose.yml` или `.env`, скрипт останавливается и просит обновлять существующую копию, а не ставить вторую.
+
+Канал `curl | bash` занят текстом скрипта, поэтому вопросы читаются с терминала SSH (`/dev/tty`). В **3.1.2** первый вопрос на этом канале завершался строкой `installation failed at line 34`. С **3.1.3** тот же запуск дожидается ответа в терминале. Без терминала задайте `INSTALL_NONINTERACTIVE=1` и переменные окружения.
 
 ### 5. Ответы по порядку
 
@@ -118,7 +120,7 @@ sudo --preserve-env bash install.sh
 
 ### 7. Что проверить сразу после установки
 
-В конце скрипт печатает адреса Admin, Mini App, Cabinet и API, версию `3.1.2` и почту администратора. Сгенерированный пароль печатается одной строкой `Admin password (generated)`. Сохраните его вне сервера и включите 2FA: админка → **Безопасность**.
+В конце скрипт печатает адреса Admin, Mini App, Cabinet и API, версию `3.1.3` и почту администратора. Сгенерированный пароль печатается одной строкой `Admin password (generated)`. Сохраните его вне сервера и включите 2FA: админка → **Безопасность**.
 
 ```bash
 curl -fsS "https://api.ВАШ-ДОМЕН/health"
@@ -127,7 +129,7 @@ docker compose ps
 ./scripts/doctor.sh
 ```
 
-Ответ `/health` содержит `"ok": true`, `"version": "3.1.2"`, `"database": true` и `"redis": true`. `doctor.sh` рассчитан на каталог `/opt/vpn-shop` и запущенный Docker.
+Ответ `/health` содержит `"ok": true`, `"version": "3.1.3"`, `"database": true` и `"redis": true`. Предыдущий релиз отвечал `"version": "3.1.2"`. `doctor.sh` рассчитан на каталог `/opt/vpn-shop` и запущенный Docker.
 
 Откройте `https://admin.<домен>`, войдите почтой и паролем администратора. Создайте хотя бы один включённый тариф: его числовой ID понадобится в staging E2E.
 
@@ -156,7 +158,7 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 
 ---
 
-# Step-by-step install — Remnawave VPN Shop 3.1.2
+# Step-by-step install — Remnawave VPN Shop 3.1.3
 
 This file is the from-scratch install. Each prompt below is the prompt in `deploy/install-vps.sh`. The staging E2E panel and **Разрешить реальные платежи** (Allow live payments) are in section 9.15 of `INSTRUCTION.md`.
 
@@ -164,7 +166,7 @@ This file is the from-scratch install. Each prompt below is the prompt in `deplo
 
 ### 1. What gets installed
 
-On Debian or Ubuntu the script installs Docker Engine and Docker Compose, copies the project to `/opt/vpn-shop`, writes `.env` as mode `0600`, builds the images, and starts PostgreSQL 16, Redis 7, the API, the worker, the bot, the admin UI, the Mini App, the user cabinet, and Caddy. Alembic migrates to `0038_v2_6_0_platform`. The installer version is **3.1.2**. The prompts are the same as in **3.1.1**.
+On Debian or Ubuntu the script installs Docker Engine and Docker Compose, copies the project to `/opt/vpn-shop`, writes `.env` as mode `0600`, builds the images, and starts PostgreSQL 16, Redis 7, the API, the worker, the bot, the admin UI, the Mini App, the user cabinet, and Caddy. Alembic migrates to `0038_v2_6_0_platform`. The installer version is **3.1.3**. The prompts are the same as in **3.1.2** and **3.1.1**.
 
 The firewall keeps SSH, TCP 80, TCP 443, and UDP 443. PostgreSQL, Redis, the API, and the panels stay unpublished. Caddy serves them on their own domains.
 
@@ -209,6 +211,8 @@ curl -fsSL https://raw.githubusercontent.com/booarkz-cpu/remnawave-vpn-shop/main
 ```
 
 `install.sh` checks for root, installs `ca-certificates`, `curl`, `git`, `openssl`, and Docker, then execs `deploy/install-vps.sh`. A `curl` launch clones branch `main` into `/opt/vpn-shop-src`. A launch from the project directory uses that directory. If `/opt/vpn-shop` already has `docker-compose.yml` or `.env`, the script stops and asks you to update the existing copy.
+
+The `curl | bash` pipe is occupied by the script text, so questions are read from the SSH terminal (`/dev/tty`). In **3.1.2** the first question on that pipe ended with `installation failed at line 34`. From **3.1.3** the same command waits for the answer in the terminal. Without a terminal, set `INSTALL_NONINTERACTIVE=1` and the environment variables.
 
 ### 5. Answers, in order
 
@@ -276,7 +280,7 @@ An empty required variable stops the script with `Не задано обязат
 
 ### 7. Check the install immediately
 
-The script prints Admin, Mini App, Cabinet, and API URLs, version `3.1.2`, and the administrator email. A generated password is the line `Admin password (generated)`. Store it off the server and turn on 2FA under **Безопасность** (Security).
+The script prints Admin, Mini App, Cabinet, and API URLs, version `3.1.3`, and the administrator email. A generated password is the line `Admin password (generated)`. Store it off the server and turn on 2FA under **Безопасность** (Security).
 
 ```bash
 curl -fsS "https://api.YOUR-DOMAIN/health"
@@ -285,7 +289,7 @@ docker compose ps
 ./scripts/doctor.sh
 ```
 
-`/health` returns `"ok": true`, `"version": "3.1.2"`, `"database": true`, and `"redis": true`. `doctor.sh` expects `/opt/vpn-shop` and a running Docker engine.
+`/health` returns `"ok": true`, `"version": "3.1.3"`, `"database": true`, and `"redis": true`. The previous release answered `"version": "3.1.2"`. `doctor.sh` expects `/opt/vpn-shop` and a running Docker engine.
 
 Open `https://admin.<domain>` and sign in. Create one enabled plan: its numeric id is required for staging E2E.
 

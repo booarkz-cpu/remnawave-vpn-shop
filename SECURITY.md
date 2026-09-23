@@ -1,4 +1,9 @@
-# Security / Безопасность — Remnawave VPN Shop 3.1.2
+# Security / Безопасность — Remnawave VPN Shop 3.1.3
+
+## Аудит 3.1.3 / 3.1.3 audit
+
+- `curl | bash` больше не читает ответы оператора из исчерпанного stdin. Вопросы идут с `/dev/tty`. Секретные поля по-прежнему скрыты `read -s`. Без терминала установщик останавливается и просит `INSTALL_NONINTERACTIVE=1`, а не обрывается на пустом `read`.
+- `curl | bash` no longer reads operator answers from an exhausted stdin. Questions come from `/dev/tty`. Secret fields stay hidden with `read -s`. Without a terminal the installer stops and asks for `INSTALL_NONINTERACTIVE=1` instead of failing on an empty `read`.
 
 ## Аудит 3.1.2 / 3.1.2 audit
 

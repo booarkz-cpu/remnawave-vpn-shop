@@ -61,4 +61,11 @@ if [[ ! -f "$SOURCE_DIR/deploy/install-vps.sh" ]]; then
   exit 1
 fi
 
+if [[ ! -t 0 && "${INSTALL_NONINTERACTIVE:-0}" != "1" ]]; then
+  if [[ ! -r /dev/tty ]]; then
+    echo "Нет терминала для вопросов установщика. Запустите bash install.sh из SSH или задайте INSTALL_NONINTERACTIVE=1." >&2
+    exit 1
+  fi
+  exec bash "$SOURCE_DIR/deploy/install-vps.sh" </dev/tty
+fi
 exec bash "$SOURCE_DIR/deploy/install-vps.sh"

@@ -14,7 +14,7 @@ die(){ printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 command -v apt-get >/dev/null 2>&1 || die "Поддерживаются Debian/Ubuntu."
 
 prompt() {
-  local var="$1" label="$2" default="${3:-}" secret="${4:-0}" value
+  local var="$1" label="$2" default="${3:-}" secret="${4:-0}" value tty=/dev/stdin
   if [[ "${INSTALL_NONINTERACTIVE:-0}" == "1" ]]; then
     if [[ -z "${!var:-}" ]]; then
       printf -v "$var" '%s' "$default"
@@ -24,14 +24,19 @@ prompt() {
   if [[ -z "$default" && -n "${!var:-}" && "$secret" != "1" ]]; then
     default="${!var}"
   fi
+  # curl | bash leaves stdin at EOF. Questions must come from the terminal.
+  if [[ ! -t 0 ]]; then
+    [[ -r /dev/tty ]] || die "Нет терминала для вопросов установщика. Запустите bash install.sh из SSH или задайте INSTALL_NONINTERACTIVE=1."
+    tty=/dev/tty
+  fi
   if [[ "$secret" == "1" ]]; then
     if [[ -n "$default" ]]; then
-      read -r -s -p "$label [$default]: " value; echo
+      read -r -s -p "$label [$default]: " value <"$tty"; echo
     else
-      read -r -s -p "$label: " value; echo
+      read -r -s -p "$label: " value <"$tty"; echo
     fi
   else
-    read -r -p "$label${default:+ [$default]}: " value
+    read -r -p "$label${default:+ [$default]}: " value <"$tty"
   fi
   printf -v "$var" '%s' "${value:-$default}"
 }
@@ -58,7 +63,8 @@ env_line() {
 }
 
 # Previous release contract: INSTALLER_VERSION="1.0.0-realise"
-INSTALLER_VERSION="3.1.2"
+INSTALLER_VERSION="3.1.3"
+# Historical compatibility marker: INSTALLER_VERSION="3.1.2"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.1"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.0"
 # Historical compatibility marker: INSTALLER_VERSION="3.0.1"
@@ -83,7 +89,8 @@ INSTALLER_VERSION="3.1.2"
 # Previous release contract: INSTALLER_VERSION="45.0.0-enterprise"
 # V44.5 Enterprise legacy contract marker
 # INSTALLER_VERSION="43.1.0-production" legacy regression marker
-log "Remnawave VPN Shop — 3.1.2 русскоязычный production installer"
+log "Remnawave VPN Shop — 3.1.3 русскоязычный production installer"
+# Historical compatibility marker: 3.1.2 русскоязычный production installer
 # Historical compatibility marker: 3.1.1 русскоязычный production installer
 # Historical compatibility marker: 3.1.0 русскоязычный production installer
 # Historical compatibility marker: 3.0.1 русскоязычный production installer
