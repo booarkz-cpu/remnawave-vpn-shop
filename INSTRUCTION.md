@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 3.1.1
+# Полная инструкция — Remnawave VPN Shop 3.1.2
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.1**. Разделы 9.3–9.14 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.2**. Разделы 9.3–9.15 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
 ---
 
@@ -452,6 +452,15 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 10. Пока цепочка не записана, кнопка отвечает 409 «Сначала необходимо успешно завершить полный staging E2E: checkout → webhook → fulfillment → duplicate webhook → refund». Если `finished_at` старше 24 часов, ответ 409 «Результат staging E2E устарел; запустите проверку заново».
 11. **Заблокировать** ставит gate в `0`. Любое следующее сохранение staging-конфигурации тоже ставит gate в `0`. Для YooKassa вебхук с пустым или чужим allowlist отвечает 403 `Webhook IP not allowed`.
 
+## 9.16. Релиз 3.1.2
+
+1. Версия API — `3.1.2`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA нет: покупатель **2.10.0**, администратор Android **2.12.0**.
+2. Обновление установленной копии: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` не затирается. Вопросы установщика те же, что в **3.1.1**.
+3. Роль `viewer` не открывает `GET /api/admin/remnawave/users/{id}/subscription` и `GET /api/admin/remnawave/users/{id}/keys`. Нужно право `users.keys` (роли `operator` и `admin`).
+4. Списки пользователей Remnawave, поток и карточка не содержат ссылку подписки и пароли протоколов. Обзор показывает только общее число. Идентификатор пользователя — строка, в том числе UUID. Некорректный идентификатор отвечает 400 «Некорректный идентификатор пользователя Remnawave».
+5. Диагностика, задания, копии, провайдеры, выплаты, мониторы и операции восстановления в поле ошибки отвечают `unavailable`. Восстановление не возвращает stderr. Журнал аудита в JSON прячет ключи `error`, `token`, `secret`, `password` и `authorization`. Причина возврата не содержит хвост с текстом исключения.
+6. Production gate не ослаблен. Порядок включения реальных платежей остаётся в разделе 9.15. Строка `FULL_E2E_PASS` по-прежнему обязательна.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -562,9 +571,9 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 3.1.1
+# Full instruction — Remnawave VPN Shop 3.1.2
 
-This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.1**. Sections 9.3–9.14 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
+This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.2**. Sections 9.3–9.15 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
 ## 1. What it is
 
@@ -987,6 +996,15 @@ Role `admin` has `staging_e2e.manage` and `security.manage`. Roles `viewer` and 
 9. Within 24 hours of `passed` and `full_e2e`, open **Безопасность** (Security). **Разрешение реальных платежей** (live-payment permission) reads «ВЫКЛ — заблокировано». Press **Разрешить реальные платежи** (Allow live payments). The permission required is `security.manage`. Success sets the gate to `1`.
 10. Until that chain is stored, the button answers 409 «Сначала необходимо успешно завершить полный staging E2E: checkout → webhook → fulfillment → duplicate webhook → refund». When `finished_at` is older than 24 hours, the answer is 409 «Результат staging E2E устарел; запустите проверку заново».
 11. **Заблокировать** (Block) sets the gate to `0`. Any later staging-config save also sets the gate to `0`. A YooKassa webhook with an empty or foreign allowlist answers 403 `Webhook IP not allowed`.
+
+## 9.16. Release 3.1.2
+
+1. The API version is `3.1.2`. The schema stays `0038_v2_6_0_platform`. There is no new APK and no IPA: the buyer app stays **2.10.0** and the Android administrator app stays **2.12.0**.
+2. Update an installed copy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` is kept. The installer prompts are the same as in **3.1.1**.
+3. Role `viewer` cannot open `GET /api/admin/remnawave/users/{id}/subscription` or `GET /api/admin/remnawave/users/{id}/keys`. The permission is `users.keys` (roles `operator` and `admin`).
+4. Remnawave user lists, the stream, and the user card omit the subscription URL and protocol passwords. Overview shows only the total. The user id is a string, including a UUID. An invalid id answers 400 «Некорректный идентификатор пользователя Remnawave».
+5. Diagnostics, jobs, backups, providers, payouts, monitors, and recovery operations answer `unavailable` in the error field. Restore does not return stderr. The audit log hides JSON keys `error`, `token`, `secret`, `password`, and `authorization`. A refund reason does not include the exception tail.
+6. The production gate is unchanged. The order for live payments stays in section 9.15. The line `FULL_E2E_PASS` is still required.
 
 ## 10. Mini App
 

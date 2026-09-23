@@ -20,13 +20,14 @@ from .config import settings
 from .db import engine, get_db
 from .models import User, Plan, Payment, Subscription, AuditLog, FinancialLedger, AdminUser, AdminSession, AppSetting, BotMenuItem, CustomField, MenuImage, Promotion, PromoCode, PromoRedemption, Advertisement, Broadcast, BackupJob, AuthExchangeCode, ReferralReward, PaymentProviderEvent, ReferralLedger, AutoRenewMethod, ProvisioningOperation, RefundRequest, SupportTicket, WithdrawalRequest, WorkerState, ReleaseRecord, SecurityIncident, Job, FraudSignal, PayoutTransaction, FeatureFlag, PaymentProviderHealth, SecurityIncidentEvent, BackupVerification, WebAuthnCredential, UserDevice, Campaign, AutomationRule, MonitoringCheck, TrialGrant, PromoReservation, GiftCode, GiftRedemption, UserSession, Notification, StatusComponent, Deployment, CabinetMenuItem, TariffConstructor
 from .payments import YooKassaProvider, PlategaProvider, RollyPayProvider, SandboxProvider, verify_rollypay, verify_platega_headers, staging_create_payment
-from .remnawave import RemnawaveClient
+from .remnawave import RemnawaveClient, redact_remote
 from .provisioner import run_ssh, ProvisionError
 from .security import (hash_password, verify_password, encrypt_secret, decrypt_secret, issue_token, decode_token,
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "3.1.1"
+APP_VERSION = "3.1.2"
+# Historical compatibility marker: APP_VERSION = "3.1.1"
 # Historical compatibility marker: APP_VERSION = "3.1.0"
 # Historical compatibility marker: APP_VERSION = "3.0.1"
 # Historical compatibility marker: APP_VERSION = "3.0.0-realise"
@@ -1063,7 +1064,7 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
         try:
             lock_key, lock_token=await _acquire_redis_lock(lock_key,ttl=300,conflict_message="Payment creation is already in progress")
         except RuntimeError as exc:
-            raise HTTPException(409,str(exc)) from exc
+            raise _lock_conflict(exc, "Payment creation is already in progress") from exc
         try:
             result=await provider.create(final_amount,existing.order_id,f"VPN plan {existing.plan_id}",settings.mini_app_url)
             if not result.get("id"):
@@ -1271,7 +1272,23 @@ async def _acquire_user_fulfillment_lock(user_id: int, ttl: int = 300):
     try:
         return await _acquire_redis_lock(key,ttl=ttl,conflict_message="User provisioning/deletion is already in progress")
     except RuntimeError as exc:
-        raise HTTPException(409,str(exc)) from exc
+        raise _lock_conflict(exc, "User provisioning/deletion is already in progress") from exc
+
+_SAFE_LOCK_MESSAGES = {
+    "Payment creation is already in progress",
+    "User provisioning/deletion is already in progress",
+    "A backup is already running",
+    "Maintenance operation already in progress",
+    "Redis is required for distributed locking",
+    "Payment side effect is already in progress",
+}
+
+def _lock_conflict(exc: BaseException, fallback: str) -> HTTPException:
+    message = str(exc)
+    if message not in _SAFE_LOCK_MESSAGES:
+        logger.warning("Unexpected lock error: %s", exc)
+        message = fallback
+    return HTTPException(409, message)
 
 async def _confirm_and_fulfill_payment(payment_id:int, db:AsyncSession):
     """Confirm a provider-successful payment without ever reviving a refunded payment.
@@ -1741,7 +1758,8 @@ async def refund_revoke_scheduler():
                             await _release_payment_side_effect_lock(user_lock,user_token)
                 await db.commit()
         except Exception as exc:
-            await send_alert("Refund scheduler failure: "+str(exc)[:500])
+            logger.warning("Refund scheduler failure: %s", exc)
+            await send_alert("Refund scheduler failure")
         await asyncio.sleep(30)
 
 async def auto_renew_scheduler():
@@ -2515,7 +2533,7 @@ async def deployment_list(db:AsyncSession=Depends(get_db),admin=Depends(require_
 @app.get("/api/admin/recovery/operations")
 async def recovery_operations(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
     rows=(await db.execute(select(ProvisioningOperation).order_by(ProvisioningOperation.updated_at.desc()).limit(200))).scalars().all()
-    return [{"id":x.id,"payment_id":x.payment_id,"user_id":x.user_id,"operation_key":x.operation_key,"status":x.status,"attempts":x.attempts,"last_error":x.last_error,"remote_user_id":x.remote_user_id,"updated_at":x.updated_at} for x in rows]
+    return [{"id":x.id,"payment_id":x.payment_id,"user_id":x.user_id,"operation_key":x.operation_key,"status":x.status,"attempts":x.attempts,"last_error":"unavailable" if x.last_error else None,"remote_user_id":x.remote_user_id,"updated_at":x.updated_at} for x in rows]
 
 @app.post("/api/admin/recovery/operations/{operation_id}/retry")
 async def retry_operation(operation_id:int,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("payments.retry"))):
@@ -2531,7 +2549,7 @@ async def retry_operation(operation_id:int,db:AsyncSession=Depends(get_db),admin
 @app.get("/api/admin/refunds")
 async def admin_refunds(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
     rows=(await db.execute(select(RefundRequest).order_by(RefundRequest.id.desc()).limit(200))).scalars().all()
-    return [{"id":x.id,"payment_id":x.payment_id,"user_id":x.user_id,"amount":str(x.amount),"status":x.status,"reason":x.reason,"provider_refund_id":x.provider_refund_id,"created_at":x.created_at} for x in rows]
+    return [{"id":x.id,"payment_id":x.payment_id,"user_id":x.user_id,"amount":str(x.amount),"status":x.status,"reason":_public_refund_reason(x.reason),"provider_refund_id":x.provider_refund_id,"created_at":x.created_at} for x in rows]
 
 @app.post("/api/admin/payments/{payment_id}/refund-request")
 async def request_refund(payment_id:int,payload:RefundIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("payments.reconcile"))):
@@ -2980,7 +2998,7 @@ async def admin_monitoring(db:AsyncSession=Depends(get_db),admin=Depends(require
 @app.get("/api/admin/jobs")
 async def admin_jobs(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
     rows=(await db.execute(select(Job).order_by(Job.id.desc()).limit(500))).scalars().all()
-    return [{"id":x.id,"job_key":x.job_key,"kind":x.kind,"status":x.status,"attempts":x.attempts,"max_attempts":x.max_attempts,"next_retry_at":x.next_retry_at,"worker_id":x.worker_id,"error":x.error,"created_at":x.created_at,"completed_at":x.completed_at} for x in rows]
+    return [{"id":x.id,"job_key":x.job_key,"kind":x.kind,"status":x.status,"attempts":x.attempts,"max_attempts":x.max_attempts,"next_retry_at":x.next_retry_at,"worker_id":x.worker_id,"error":"unavailable" if x.error else None,"created_at":x.created_at,"completed_at":x.completed_at} for x in rows]
 
 @app.post("/api/admin/jobs/{job_id}/retry")
 async def retry_job(job_id:int,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("payments.retry"))):
@@ -3015,7 +3033,7 @@ async def fraud_scan(db:AsyncSession=Depends(get_db),admin=Depends(require_permi
 @app.get("/api/admin/payouts")
 async def admin_payouts(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("referrals.withdrawals.read"))):
     rows=(await db.execute(select(PayoutTransaction).order_by(PayoutTransaction.id.desc()).limit(200))).scalars().all()
-    return [{"id":x.id,"withdrawal_id":x.withdrawal_id,"provider":x.provider,"external_id":x.external_id,"amount":str(x.amount),"status":x.status,"attempts":x.attempts,"last_error":x.last_error,"created_at":x.created_at,"paid_at":x.paid_at} for x in rows]
+    return [{"id":x.id,"withdrawal_id":x.withdrawal_id,"provider":x.provider,"external_id":x.external_id,"amount":str(x.amount),"status":x.status,"attempts":x.attempts,"last_error":"unavailable" if x.last_error else None,"created_at":x.created_at,"paid_at":x.paid_at} for x in rows]
 
 @app.post("/api/admin/ops/withdrawals/{withdrawal_id}/approve")
 async def admin_withdrawal_approve(withdrawal_id:int,payload:WithdrawalActionIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("referrals.withdrawals.approve"))):
@@ -3087,7 +3105,7 @@ async def customer_360(user_id:int,db:AsyncSession=Depends(get_db),admin=Depends
     referrals=(await db.execute(select(ReferralLedger).where(ReferralLedger.user_id==user_id).order_by(ReferralLedger.id.desc()).limit(50))).scalars().all()
     tickets=(await db.execute(select(SupportTicket).where(SupportTicket.user_id==user_id).order_by(SupportTicket.id.desc()).limit(50))).scalars().all()
     signals=(await db.execute(select(FraudSignal).where(FraudSignal.user_id==user_id).order_by(FraudSignal.id.desc()).limit(50))).scalars().all()
-    return {"user":{"id":user.id,"telegram_id":user.telegram_id,"yandex_id":user.yandex_id,"username":user.username,"created_at":user.created_at,"deleted_at":user.deleted_at},"subscription":None if not sub else {"id":sub.id,"plan_id":sub.plan_id,"status":sub.lifecycle_status,"expires_at":sub.expires_at,"grace_until":sub.grace_until,"scheduled_cancel_at":sub.scheduled_cancel_at},"payments":[{"id":p.id,"order_id":p.order_id,"amount":str(p.amount),"currency":p.currency,"status":p.status,"fulfillment_status":p.fulfillment_status,"created_at":p.created_at} for p in payments],"refunds":[{"id":r.id,"payment_id":r.payment_id,"status":r.status,"amount":str(r.amount),"reason":r.reason} for r in refunds],"devices":[{"id":d.id,"name":d.name,"status":d.status,"last_ip":d.last_ip,"last_seen_at":d.last_seen_at} for d in devices],"referrals":[{"id":x.id,"amount":str(x.amount),"kind":x.kind,"payment_id":x.payment_id} for x in referrals],"tickets":[{"id":t.id,"subject":t.subject,"status":t.status,"created_at":t.created_at} for t in tickets],"fraud":[{"id":x.id,"kind":x.kind,"score":x.score,"status":x.status,"details":x.details} for x in signals]}
+    return {"user":{"id":user.id,"telegram_id":user.telegram_id,"yandex_id":user.yandex_id,"username":user.username,"created_at":user.created_at,"deleted_at":user.deleted_at},"subscription":None if not sub else {"id":sub.id,"plan_id":sub.plan_id,"status":sub.lifecycle_status,"expires_at":sub.expires_at,"grace_until":sub.grace_until,"scheduled_cancel_at":sub.scheduled_cancel_at},"payments":[{"id":p.id,"order_id":p.order_id,"amount":str(p.amount),"currency":p.currency,"status":p.status,"fulfillment_status":p.fulfillment_status,"created_at":p.created_at} for p in payments],"refunds":[{"id":r.id,"payment_id":r.payment_id,"status":r.status,"amount":str(r.amount),"reason":_public_refund_reason(r.reason)} for r in refunds],"devices":[{"id":d.id,"name":d.name,"status":d.status,"last_ip":d.last_ip,"last_seen_at":d.last_seen_at} for d in devices],"referrals":[{"id":x.id,"amount":str(x.amount),"kind":x.kind,"payment_id":x.payment_id} for x in referrals],"tickets":[{"id":t.id,"subject":t.subject,"status":t.status,"created_at":t.created_at} for t in tickets],"fraud":[{"id":x.id,"kind":x.kind,"score":x.score,"status":x.status,"details":x.details} for x in signals]}
 
 @app.get("/api/admin/refunds/{refund_id}/dry-run")
 async def refund_dry_run(refund_id:int,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("payments.refund"))):
@@ -3145,15 +3163,34 @@ async def admin_gift_create(payload:GiftCreateIn,db:AsyncSession=Depends(get_db)
     db.add(x); await audit(db,"gift.created",admin.email,code,{"plan_id":plan.id,"max_uses":payload.max_uses}); await db.commit(); await db.refresh(x)
     return {"id":x.id,"code":x.code}
 
+def _remnawave_total(payload):
+    if not isinstance(payload, dict):
+        return None
+    response = payload.get("response") if isinstance(payload.get("response"), dict) else payload
+    try:
+        return int(response.get("total"))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+def _remote_user_id(value: str) -> str:
+    if not value or len(value) > 80 or any(not (ch.isalnum() or ch in "-_") for ch in value):
+        raise HTTPException(400, "Некорректный идентификатор пользователя Remnawave")
+    return value
+
 @app.get("/api/admin/overview")
 async def admin_overview(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
+    plan_count=int((await db.execute(select(func.count()).select_from(Plan))).scalar() or 0)
+    payment_count=int((await db.execute(select(func.count()).select_from(Payment))).scalar() or 0)
     try:
-        users=await RemnawaveClient().list_users(start=0,size=1); raw_nodes=await RemnawaveClient().list_nodes(start=0,size=100)
+        raw_users=await RemnawaveClient().list_users(start=0,size=1)
+        total=_remnawave_total(raw_users)
+        users={"response":{"total":total}} if total is not None else {"error":"unavailable"}
+        raw_nodes=await RemnawaveClient().list_nodes(start=0,size=100)
         from .tariff_api import _iter_nodes, public_node
         safe_nodes=[public_node(n) for n in _iter_nodes(raw_nodes)]
         nodes={"total":len(safe_nodes),"nodes":safe_nodes}
     except Exception: users={"error":"unavailable"}; nodes={"error":"unavailable"}
-    return {"plans":len((await db.execute(select(Plan))).scalars().all()),"payments":len((await db.execute(select(Payment))).scalars().all()),"remnawave_users":users,"nodes":nodes,"role":admin.role}
+    return {"plans":plan_count,"payments":payment_count,"remnawave_users":users,"nodes":nodes,"role":admin.role}
 
 @app.get("/api/admin/plans")
 async def admin_list_plans(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
@@ -3211,24 +3248,67 @@ async def admin_payments(page:int=1,page_size:int=50,db:AsyncSession=Depends(get
     rows=(await db.execute(select(Payment).order_by(Payment.id.desc()).offset(offset).limit(page_size))).scalars().all()
     return [{"id":x.id,"provider":x.provider,"status":x.status,"fulfillment_status":x.fulfillment_status,"fulfillment_attempts":x.fulfillment_attempts,"amount":float(x.amount),"currency":x.currency,"created_at":str(x.created_at),"paid_at":str(x.paid_at) if x.paid_at else None} for x in rows]
 
+_AUDIT_SECRET_KEYS = {"error", "token", "secret", "password", "authorization"}
+_REFUND_EXCEPTION_TAILS = (
+    "\nRevoke pending: ",
+    "\nRefund reconciliation pending: ",
+    "\nRevoke retry pending: ",
+    "\nProvider refund outcome uncertain/failed: ",
+)
+
+def _redact_audit_value(value):
+    if isinstance(value, dict):
+        clean = {}
+        for key, item in value.items():
+            if str(key).lower() in _AUDIT_SECRET_KEYS:
+                clean[key] = "unavailable"
+            else:
+                clean[key] = _redact_audit_value(item)
+        return clean
+    if isinstance(value, list):
+        return [_redact_audit_value(item) for item in value]
+    return value
+
+def _public_audit_details(details):
+    if not isinstance(details, str) or not details:
+        return details
+    try:
+        parsed = json.loads(details)
+    except (TypeError, ValueError):
+        return details
+    if not isinstance(parsed, (dict, list)):
+        return details
+    return json.dumps(_redact_audit_value(parsed), ensure_ascii=False)
+
+def _public_refund_reason(reason):
+    if not isinstance(reason, str) or not reason:
+        return reason
+    cut = len(reason)
+    for marker in _REFUND_EXCEPTION_TAILS:
+        idx = reason.find(marker)
+        if idx != -1:
+            cut = min(cut, idx)
+    return reason[:cut]
+
 @app.get("/api/admin/audit")
 async def admin_audit(page:int=1,page_size:int=50,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
     page=max(1,page); page_size=max(1,min(page_size,100)); offset=(page-1)*page_size
     rows=(await db.execute(select(AuditLog).order_by(AuditLog.id.desc()).offset(offset).limit(page_size))).scalars().all()
-    return [{"id":x.id,"action":x.action,"actor":x.actor,"target":x.target,"details":x.details,"created_at":str(x.created_at)} for x in rows]
+    return [{"id":x.id,"action":x.action,"actor":x.actor,"target":x.target,"details":_public_audit_details(x.details),"created_at":str(x.created_at)} for x in rows]
 
 @app.get("/api/admin/remnawave/users")
-async def rw_users(start:int=0,size:int=25,admin=Depends(require_permission("read"))): return await RemnawaveClient().list_users(start,max(1,min(size,1000)))
+async def rw_users(start:int=0,size:int=25,admin=Depends(require_permission("read"))): return redact_remote(await RemnawaveClient().list_users(start,max(1,min(size,1000))))
 @app.get("/api/admin/remnawave/users/stream")
-async def rw_user_stream(telegram_id:int|None=None,cursor:int|None=None,size:int=250,status:str|None=None,admin=Depends(require_permission("read"))): return await RemnawaveClient().stream_users(telegram_id,cursor,size,status)
+async def rw_user_stream(telegram_id:int|None=None,cursor:int|None=None,size:int=250,status:str|None=None,admin=Depends(require_permission("read"))): return redact_remote(await RemnawaveClient().stream_users(telegram_id,cursor,size,status))
 @app.get("/api/admin/remnawave/nodes")
 async def rw_nodes(start:int=0,size:int=25,admin=Depends(require_permission("read"))):
     from .tariff_api import remnawave_server_status
     return await remnawave_server_status("admin")
 @app.get("/api/admin/remnawave/users/{user_id}")
-async def rw_user(user_id:int,admin=Depends(require_permission("read"))): return await RemnawaveClient().get_user(user_id)
+async def rw_user(user_id:str,admin=Depends(require_permission("read"))): return redact_remote(await RemnawaveClient().get_user(_remote_user_id(user_id)))
 @app.post("/api/admin/remnawave/users/{user_id}/extend")
-async def rw_extend(user_id:int,payload:dict,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_users"))):
+async def rw_extend(user_id:str,payload:dict,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_users"))):
+    user_id=_remote_user_id(user_id)
     # All manual extensions use the same remote-first verification algorithm as payment provisioning.
     days=int(payload.get("days",0))
     if not 1<=days<=3650: raise HTTPException(400,"days must be 1..3650")
@@ -3241,9 +3321,10 @@ async def rw_extend(user_id:int,payload:dict,db:AsyncSession=Depends(get_db),adm
     result=await rw.extend_idempotent(user_id,days,before,after)
     await audit(db,"remnawave.user.extend",admin.email,str(user_id),{"days":days,"verified_expires_at":str(result.get("expires_at"))}); await db.commit(); return {"ok":True,"already_applied":result.get("already_applied",False),"expires_at":result.get("expires_at")}
 @app.get("/api/admin/remnawave/users/{user_id}/subscription")
-async def rw_subscription(user_id:int,admin=Depends(require_permission("read"))): return await RemnawaveClient().get_subscription(user_id)
+async def rw_subscription(user_id:str,admin=Depends(require_permission("users.keys"))): return await RemnawaveClient().get_subscription(_remote_user_id(user_id))
 @app.get("/api/admin/remnawave/users/{user_id}/keys")
-async def rw_keys(user_id:int,admin=Depends(require_permission("manage_users"))): return await RemnawaveClient().get_connection_keys(user_id)
+# Historical compatibility marker: async def rw_keys(user_id:int,admin=Depends(require_permission("manage_users")))
+async def rw_keys(user_id:str,admin=Depends(require_permission("users.keys"))): return await RemnawaveClient().get_connection_keys(_remote_user_id(user_id))
 
 @app.get("/api/admin/remnawave/health")
 async def remnawave_health(admin=Depends(require_permission("read"))):
@@ -3545,7 +3626,7 @@ async def create_project_backup(db, actor="system"):
     try:
         backup_lock,lock_token=await _acquire_redis_lock("lock:backup",ttl=3600,conflict_message="A backup is already running")
     except RuntimeError as exc:
-        raise HTTPException(409,str(exc)) from exc
+        raise _lock_conflict(exc, "A backup is already running") from exc
     async with BACKUP_LOCK:
         job=BackupJob(status="running",created_at=datetime.utcnow()); db.add(job); await db.commit(); await db.refresh(job)
         ts=datetime.utcnow().strftime("%Y%m%d-%H%M%S"); work=pathlib.Path("/tmp")/f"vpn-backup-{job.id}-{ts}"; work.mkdir(parents=True,exist_ok=True)
@@ -3601,14 +3682,14 @@ async def create_project_backup(db, actor="system"):
             await audit(db,"backup.created",actor,final.name,{"encrypted":encrypt,"include_env":include_env,"sha256":job.sha256,"s3":await setting_value(db,"backup_s3_enabled","0")=="1"}); await enforce_backup_retention(db); await db.commit()
             return {"id":job.id,"status":job.status,"filename":job.filename,"size_bytes":job.size_bytes,"encrypted":encrypt}
         except Exception as e:
-            job.status="failed"; job.error=str(e)[:2000]; job.finished_at=datetime.utcnow(); _METRICS["backup_failures"] += 1; await db.commit(); await send_alert(f"Backup #{job.id} failed: {str(e)[:500]}"); raise
+            job.status="failed"; job.error=str(e)[:2000]; job.finished_at=datetime.utcnow(); _METRICS["backup_failures"] += 1; await db.commit(); logger.warning("Backup %s failed: %s", job.id, e); await send_alert(f"Backup #{job.id} failed"); raise
         finally:
             shutil.rmtree(work,ignore_errors=True)
             await _release_payment_side_effect_lock(backup_lock,lock_token)
 @app.get("/api/admin/backups")
 async def list_backups(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
     rows=(await db.execute(select(BackupJob).order_by(BackupJob.created_at.desc()).limit(50))).scalars().all()
-    return [{"id":x.id,"status":x.status,"filename":x.filename,"size_bytes":x.size_bytes,"sha256":x.sha256,"encrypted":x.encrypted,"error":x.error,"created_at":x.created_at,"finished_at":x.finished_at} for x in rows]
+    return [{"id":x.id,"status":x.status,"filename":x.filename,"size_bytes":x.size_bytes,"sha256":x.sha256,"encrypted":x.encrypted,"error":"unavailable" if x.error else None,"created_at":x.created_at,"finished_at":x.finished_at} for x in rows]
 
 class BackupConfigIn(BaseModel):
     schedule: str = "24h"
@@ -3635,7 +3716,14 @@ async def update_backup_config(payload:BackupConfigIn,db:AsyncSession=Depends(ge
     await audit(db,"backup.config.updated",admin.email,None,{"schedule":payload.schedule,"retention":payload.retention,"encrypt":payload.encrypt,"include_env":payload.include_env}); await db.commit(); return await backup_config(db,admin)
 
 @app.post("/api/admin/backups/run")
-async def run_backup(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_admins"))): return await create_project_backup(db,admin.email)
+async def run_backup(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_admins"))):
+    try:
+        return await create_project_backup(db,admin.email)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Backup request failed: %s", exc)
+        raise HTTPException(500, "Backup failed") from exc
 
 @app.get("/api/admin/backups/{backup_id}/download")
 async def download_backup(backup_id:int,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("manage_admins"))):
@@ -3752,13 +3840,17 @@ async def restore_backup(backup_id:int,confirm:str,otp:str|None=None,db:AsyncSes
     try:
         maintenance_lock,maintenance_token=await _acquire_redis_lock("lock:maintenance",ttl=1800,conflict_message="Maintenance operation already in progress")
     except RuntimeError as exc:
-        raise HTTPException(409,str(exc)) from exc
+        raise _lock_conflict(exc, "Maintenance operation already in progress") from exc
     try:
         await set_setting(db,"maintenance_mode","1"); await db.commit()
         # Always create a fresh pre-restore snapshot so a failed/incorrect restore can be recovered.
         await create_project_backup(db, f"pre-restore:{admin.email}")
-    except Exception:
+    except HTTPException:
         await _release_payment_side_effect_lock(maintenance_lock,maintenance_token); raise
+    except Exception as exc:
+        logger.warning("Pre-restore snapshot failed: %s", exc)
+        await _release_payment_side_effect_lock(maintenance_lock,maintenance_token)
+        raise HTTPException(500, "Restore failed") from exc
     work=pathlib.Path("/tmp")/f"restore-{secrets.token_hex(8)}"; work.mkdir()
     restore_ok=False
     try:
@@ -3812,11 +3904,15 @@ async def restore_backup(backup_id:int,confirm:str,otp:str|None=None,db:AsyncSes
         db_name=(db_url.path or "/vpnshop").lstrip("/") or "vpnshop"
         db_password=urllib.parse.unquote(db_url.password or os.getenv("DB_PASSWORD", ""))
         proc=await asyncio.create_subprocess_exec("psql","-h",db_host,"-U",db_user,"-d",db_name,"-v","ON_ERROR_STOP=1","-f",str(sql_file),env={**os.environ,"PGPASSWORD":db_password},stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE); out,err=await proc.communicate()
-        if proc.returncode!=0: raise HTTPException(500,f"Restore failed: {err.decode(errors='ignore')[-1000:]}")
+        if proc.returncode!=0:
+            logger.warning("Restore failed: %s", err.decode(errors="ignore")[-1000:])
+            raise HTTPException(500, "Restore failed")
         # The active SQLAlchemy session is invalid after destructive DB replacement.
         await db.close()
         mig=await asyncio.create_subprocess_exec("alembic","upgrade","head",cwd=settings.project_dir,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE); mout,merr=await mig.communicate()
-        if mig.returncode!=0: raise HTTPException(500,f"Migration after restore failed: {merr.decode(errors='ignore')[-1000:]}")
+        if mig.returncode!=0:
+            logger.warning("Migration after restore failed: %s", merr.decode(errors="ignore")[-1000:])
+            raise HTTPException(500, "Migration after restore failed")
         async with AsyncSession(engine,expire_on_commit=False) as check_db:
             await check_db.execute(sql_text("SELECT 1"))
             await audit(check_db,"backup.restored",admin.email,job.filename); await check_db.commit()
@@ -4382,7 +4478,7 @@ async def monitor_checks_scheduler():
 @app.get("/api/admin/enterprise/monitoring")
 async def enterprise_monitoring(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("read"))):
     rows=(await db.execute(select(MonitoringCheck).order_by(MonitoringCheck.id))).scalars().all()
-    return [{"id":x.id,"name":x.name,"url":x.url,"method":x.method,"interval_seconds":x.interval_seconds,"timeout_seconds":x.timeout_seconds,"enabled":x.enabled,"last_status":x.last_status,"last_latency_ms":x.last_latency_ms,"last_error":x.last_error,"last_checked_at":x.last_checked_at,"failure_streak":x.failure_streak} for x in rows]
+    return [{"id":x.id,"name":x.name,"url":x.url,"method":x.method,"interval_seconds":x.interval_seconds,"timeout_seconds":x.timeout_seconds,"enabled":x.enabled,"last_status":x.last_status,"last_latency_ms":x.last_latency_ms,"last_error":"unavailable" if x.last_error else None,"last_checked_at":x.last_checked_at,"failure_streak":x.failure_streak} for x in rows]
 
 @app.post("/api/admin/enterprise/monitoring")
 async def enterprise_monitoring_create(payload:MonitoringCheckIn,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("ops.diagnostics"))):
@@ -4497,7 +4593,7 @@ async def v41_crm_users(q:str="",page:int=1,page_size:int=50,db:AsyncSession=Dep
 async def v41_providers(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("ops.providers"))):
     await _ensure_v41_defaults(db)
     rows=(await db.execute(select(PaymentProviderHealth).order_by(PaymentProviderHealth.priority,PaymentProviderHealth.provider))).scalars().all()
-    return [{"provider":x.provider,"enabled":x.enabled,"priority":x.priority,"success_count":x.success_count,"failure_count":x.failure_count,"last_latency_ms":x.last_latency_ms,"last_error":x.last_error,"circuit_open_until":str(x.circuit_open_until) if x.circuit_open_until else None} for x in rows]
+    return [{"provider":x.provider,"enabled":x.enabled,"priority":x.priority,"success_count":x.success_count,"failure_count":x.failure_count,"last_latency_ms":x.last_latency_ms,"last_error":"unavailable" if x.last_error else None,"circuit_open_until":str(x.circuit_open_until) if x.circuit_open_until else None} for x in rows]
 
 class ProviderHealthIn(BaseModel):
     enabled: bool
@@ -4516,15 +4612,21 @@ async def v41_diagnostics(db:AsyncSession=Depends(get_db),admin=Depends(require_
     checks=[]
     start=asyncio.get_running_loop().time()
     try: await db.execute(sql_text("SELECT 1")); checks.append({"name":"PostgreSQL","status":"ok","latency_ms":round((asyncio.get_running_loop().time()-start)*1000)})
-    except Exception as exc: checks.append({"name":"PostgreSQL","status":"error","error":str(exc)})
+    except Exception as exc:
+        logger.warning("Diagnostics PostgreSQL check failed: %s", exc)
+        checks.append({"name":"PostgreSQL","status":"error","error":"unavailable"})
     start=asyncio.get_running_loop().time()
     if redis_client:
         try: await redis_client.ping(); checks.append({"name":"Redis","status":"ok","latency_ms":round((asyncio.get_running_loop().time()-start)*1000)})
-        except Exception as exc: checks.append({"name":"Redis","status":"error","error":str(exc)})
+        except Exception as exc:
+            logger.warning("Diagnostics Redis check failed: %s", exc)
+            checks.append({"name":"Redis","status":"error","error":"unavailable"})
     else: checks.append({"name":"Redis","status":"error","error":"Не подключён"})
     try:
         rw=RemnawaveClient(); await rw.list_nodes(start=0,size=1); checks.append({"name":"Remnawave","status":"ok"})
-    except Exception as exc: checks.append({"name":"Remnawave","status":"error","error":str(exc)})
+    except Exception as exc:
+        logger.warning("Diagnostics Remnawave check failed: %s", exc)
+        checks.append({"name":"Remnawave","status":"error","error":"unavailable"})
     return {"status":"ok" if all(x["status"]=="ok" for x in checks) else "degraded","checks":checks,"checked_at":datetime.utcnow().isoformat()}
 
 class IncidentCreateIn(BaseModel):
@@ -4551,7 +4653,7 @@ async def v41_incident_resolve(incident_id:int,db:AsyncSession=Depends(get_db),a
 @app.get("/api/admin/v41/backups/verification")
 async def v41_backup_verification_list(db:AsyncSession=Depends(get_db),admin=Depends(require_permission("ops.backups.verify"))):
     rows=(await db.execute(select(BackupVerification).order_by(BackupVerification.id.desc()).limit(100))).scalars().all()
-    return [{"id":x.id,"backup_id":x.backup_id,"status":x.status,"checksum_ok":x.checksum_ok,"archive_safe":x.archive_safe,"restore_tested":x.restore_tested,"error":x.error,"created_at":str(x.created_at),"finished_at":str(x.finished_at) if x.finished_at else None} for x in rows]
+    return [{"id":x.id,"backup_id":x.backup_id,"status":x.status,"checksum_ok":x.checksum_ok,"archive_safe":x.archive_safe,"restore_tested":x.restore_tested,"error":"unavailable" if x.error else None,"created_at":str(x.created_at),"finished_at":str(x.finished_at) if x.finished_at else None} for x in rows]
 
 @app.post("/api/admin/v41/backups/{backup_id}/test-restore")
 async def v41_backup_test_restore(backup_id:int,db:AsyncSession=Depends(get_db),admin=Depends(require_permission("ops.backups.verify"))):
@@ -4602,8 +4704,9 @@ async def v41_backup_test_restore(backup_id:int,db:AsyncSession=Depends(get_db),
         record.restore_tested=True; record.status="passed"; record.finished_at=datetime.utcnow(); await audit(db,"backup.test_restore",admin.email,str(backup_id),{"status":"passed","restore_tested":True}); await db.commit()
         return {"status":"passed","checksum_ok":True,"archive_safe":True,"restore_tested":True,"isolated_database":True}
     except Exception as exc:
-        record.status="failed"; record.error=str(exc)[:2000]; record.finished_at=datetime.utcnow(); await audit(db,"backup.test_restore",admin.email,str(backup_id),{"status":"failed","error":record.error}); await db.commit()
-        return {"status":"failed","checksum_ok":record.checksum_ok,"archive_safe":record.archive_safe,"restore_tested":False,"error":record.error}
+        logger.warning("Backup test-restore failed for %s: %s", backup_id, exc)
+        record.status="failed"; record.error="unavailable"; record.finished_at=datetime.utcnow(); await audit(db,"backup.test_restore",admin.email,str(backup_id),{"status":"failed"}); await db.commit()
+        return {"status":"failed","checksum_ok":record.checksum_ok,"archive_safe":record.archive_safe,"restore_tested":False,"error":"unavailable"}
     finally:
         try:
             drop=await asyncio.create_subprocess_exec("psql","-h",dbcli["host"],"-p",dbcli["port"],"-U",dbcli["user"],"-d",dbcli["database"],"-c",f'DROP DATABASE IF EXISTS "{temp_db}"',env={**os.environ,"PGPASSWORD":dbcli["password"]},stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)

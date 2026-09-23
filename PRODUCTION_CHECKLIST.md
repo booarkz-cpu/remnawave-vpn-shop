@@ -1,6 +1,12 @@
-# Production checklist 3.1.1
+# Production checklist 3.1.2
 
 ## Русский
+
+Версия **3.1.2** закрывает утечки учётных данных VPN и текста исключений в ответах панели. Схема и APK те же, что у **3.1.1**, **3.1.0**, **3.0.1** и **3.0.0-realise**. Пошаговая установка — `INSTALL_STEPS.md`, панель — раздел 9.16 `INSTRUCTION.md`. Production gate по-прежнему требует `FULL_E2E_PASS` (раздел 9.15). Записи прогонов 3.1.1 и 3.1.0 ниже остаются фактами тех хостов и не отмечают заново пункты, которые на живом VPS не запускались. Docker, `scripts/doctor.sh`, живые кассы, firewall, S3, SMTP, Xcode и установка на телефон для 3.1.2 не запускались.
+
+### Прогон 3.1.2 на этом хосте
+
+23 сентября 2026. `MEDIA_DIR=/tmp/media python3 -m pytest -q` завершился с кодом 0: 342 теста. `bash -n` прошёл для `install.sh`, `deploy/install-vps.sh`, `scripts/build-release.sh` и обоих файлов `staging-e2e.sh`. Живой API, Docker и кассы в этом прогоне не запускались.
 
 Версия **3.1.1** сохраняет секреты staging при повторном сохранении, печатает `[CHECKOUT]` и требует `FULL_E2E_PASS` для кнопки **Разрешить реальные платежи**. Схема и APK те же, что у **3.1.0**, **3.0.1** и **3.0.0-realise**. Пошаговая установка — `INSTALL_STEPS.md`, панель — раздел 9.15 `INSTRUCTION.md`. Запись прогона 3.1.0 ниже остаётся фактом того хоста и не отмечает заново пункты, которые на живом VPS не запускались. Docker, `scripts/doctor.sh`, живые кассы, firewall, S3, SMTP, Xcode и установка на телефон для 3.1.1 не запускались.
 
@@ -159,6 +165,12 @@
 - [ ] Файрвол, S3, SMTP, живые кассы, Xcode, телефон, резервная копия и восстановление не выполнялись. Повтор зрителя на рассылке в этом прогоне не делался.
 
 ## English
+
+Version **3.1.2** closes leaks of VPN credentials and exception text in panel responses. The schema and the APKs stay the same as **3.1.1**, **3.1.0**, **3.0.1**, and **3.0.0-realise**. The step-by-step install is `INSTALL_STEPS.md` and the panel changes are section 9.16 of `INSTRUCTION.md`. The production gate still requires `FULL_E2E_PASS` (section 9.15). The 3.1.1 and 3.1.0 run records below stay facts of those hosts and do not mark live-VPS items done again. Docker, `scripts/doctor.sh`, live gateways, the firewall, S3, SMTP, Xcode, and a phone install were not run for 3.1.2.
+
+### 3.1.2 build-host run
+
+23 September 2026. `MEDIA_DIR=/tmp/media python3 -m pytest -q` exited 0: 342 tests. `bash -n` passed for `install.sh`, `deploy/install-vps.sh`, `scripts/build-release.sh`, and both `staging-e2e.sh` files. The live API, Docker, and cashiers were not started in this run.
 
 Version **3.1.1** keeps staging secrets on a later save, prints `[CHECKOUT]`, and requires `FULL_E2E_PASS` for **Разрешить реальные платежи** (Allow live payments). The schema and the APKs stay the same as **3.1.0**, **3.0.1**, and **3.0.0-realise**. The step-by-step install is `INSTALL_STEPS.md` and the panel order is section 9.15 of `INSTRUCTION.md`. The 3.1.0 run record below stays a fact of that host and does not mark live-VPS items done again. Docker, `scripts/doctor.sh`, live gateways, the firewall, S3, SMTP, Xcode, and a phone install were not run for 3.1.1.
 

@@ -1,5 +1,7 @@
-import io, os, shlex, time, base64, hashlib
+import io, os, shlex, time, base64, hashlib, logging
 import paramiko
+
+logger = logging.getLogger("remnawave.provisioner")
 
 class ProvisionError(RuntimeError):
     pass
@@ -63,7 +65,8 @@ def run_ssh(host,port,username,password,private_key,compose_yaml,panel_ip,node_p
         err=stderr.read().decode(errors="replace")
         rc=stdout.channel.recv_exit_status()
         if rc!=0:
-            raise ProvisionError(f"Remote install failed ({rc}): {err[-4000:]}")
-        return {"ok":True,"host":host,"directory":"/opt/remnanode","output":out[-6000:]}
+            logger.warning("Remote install failed (%s): %s", rc, err[-4000:])
+            raise ProvisionError("Remote install failed")
+        return {"ok":True,"host":host,"directory":"/opt/remnanode"}
     finally:
         client.close()

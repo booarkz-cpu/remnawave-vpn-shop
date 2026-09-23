@@ -6,6 +6,35 @@ from .config import settings
 
 logger = logging.getLogger("remnawave.remnawave")
 
+_SECRET_MARKERS = (
+    "password",
+    "token",
+    "secret",
+    "subscription",
+    "trojan",
+    "vless",
+    "shortuuid",
+    "suburl",
+    "connectionkey",
+    "rawkey",
+    "sspassword",
+)
+
+
+def redact_remote(value):
+    """Drop VPN credentials from a Remnawave payload before it reaches a read-only admin response."""
+    if isinstance(value, dict):
+        clean = {}
+        for key, item in value.items():
+            normalized = str(key).lower().replace("_", "")
+            if any(marker in normalized for marker in _SECRET_MARKERS):
+                continue
+            clean[key] = redact_remote(item)
+        return clean
+    if isinstance(value, list):
+        return [redact_remote(item) for item in value]
+    return value
+
 class RemnawaveError(RuntimeError):
     pass
 

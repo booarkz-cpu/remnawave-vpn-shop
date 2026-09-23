@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.1.2
+
+Обзор показывает только общее число пользователей Remnawave. Карточка пользователя не содержит ссылку подписки и пароли протоколов. Подписка и ключи открываются ролям с правом `users.keys`. Поля ошибок в заданиях, копиях и состоянии показывают `unavailable`. Журнал аудита не отдаёт текст исключения из JSON.
+
+Overview shows only the Remnawave user total. The user card omits the subscription URL and protocol passwords. The subscription and keys open for roles with `users.keys`. Error fields on jobs, backups, and status show `unavailable`. The audit log does not return exception text from JSON.
+
 ## 3.1.1
 
 Вкладка **Проверка тестового контура** требует флажок **Подтверждаю sandbox-ключи**. Пустое поле секрета, Shop ID или Merchant ID при повторном сохранении оставляет записанное значение. Журнал показывает строку `[CHECKOUT]`. Кнопка **Разрешить реальные платежи** на вкладке **Безопасность** включает gate после `FULL_E2E_PASS` не старше 24 часов. Порядок — раздел 9.15 `INSTRUCTION.md`.

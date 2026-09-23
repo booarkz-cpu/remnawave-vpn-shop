@@ -1,8 +1,14 @@
 # Разбор функций / Function reference
 
-Версия приложения: **3.1.1**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая установка — `INSTALL_STEPS.md`. Staging E2E и production gate — раздел 9.15 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_1.md`. Состав 3.1.0 — раздел 9.14 и `RELEASE_NOTES_V3_1_0.md`. Исправления 3.0.1 — раздел 9.13 и `RELEASE_NOTES_V3_0_1.md`. Исправления 3.0.0-realise — раздел 9.12 и `RELEASE_NOTES_V3_0_0.md`.
+Версия приложения: **3.1.2**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая установка — `INSTALL_STEPS.md`. Аудит ответов панели — раздел 9.16 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_2.md`. Staging E2E и production gate — раздел 9.15 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_1.md`. Состав 3.1.0 — раздел 9.14 и `RELEASE_NOTES_V3_1_0.md`. Исправления 3.0.1 — раздел 9.13 и `RELEASE_NOTES_V3_0_1.md`. Исправления 3.0.0-realise — раздел 9.12 и `RELEASE_NOTES_V3_0_0.md`.
 
-Application version: **3.1.1**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The step-by-step install is `INSTALL_STEPS.md`. Staging E2E and the production gate are section 9.15 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_1.md`. The 3.1.0 changes are section 9.14 and `RELEASE_NOTES_V3_1_0.md`. The 3.0.1 fixes are section 9.13 and `RELEASE_NOTES_V3_0_1.md`. The 3.0.0-realise fixes are section 9.12 and `RELEASE_NOTES_V3_0_0.md`.
+Application version: **3.1.2**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The step-by-step install is `INSTALL_STEPS.md`. The panel-response audit is section 9.16 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_2.md`. Staging E2E and the production gate are section 9.15 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_1.md`. The 3.1.0 changes are section 9.14 and `RELEASE_NOTES_V3_1_0.md`. The 3.0.1 fixes are section 9.13 and `RELEASE_NOTES_V3_0_1.md`. The 3.0.0-realise fixes are section 9.12 and `RELEASE_NOTES_V3_0_0.md`.
+
+## Аудит 3.1.2 / 3.1.2 audit
+
+`redact_remote` убирает поля с маркерами пароля, токена, подписки и протоколов из ответа Remnawave. `rw_subscription` и `rw_keys` требуют `users.keys`. `_public_audit_details` подменяет секретные ключи JSON на `unavailable`. `_public_refund_reason` отрезает хвост с текстом исключения. `admin_overview` считает строки через `func.count` и отдаёт только `response.total`.
+
+`redact_remote` drops Remnawave fields whose names carry password, token, subscription, or protocol markers. `rw_subscription` and `rw_keys` require `users.keys`. `_public_audit_details` replaces secret JSON keys with `unavailable`. `_public_refund_reason` cuts the exception tail. `admin_overview` counts rows with `func.count` and returns only `response.total`.
 
 ## Аудит 3.1.1 / 3.1.1 audit
 
