@@ -1,8 +1,8 @@
-# Remnawave VPN Shop 3.1.3
+# Remnawave VPN Shop 3.1.4
 
 Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-Состояние: **3.1.3**. Предыдущие релизы: **3.1.2**, **3.1.1**, **3.1.0**, **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTALL_STEPS.md`, `INSTRUCTION.md` (разделы 9.17, 9.16 и 9.15), `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **3.1.4**. Предыдущие релизы: **3.1.3**, **3.1.2**, **3.1.1**, **3.1.0**, **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTALL_STEPS.md`, `INSTRUCTION.md` (разделы 9.18, 9.17, 9.16 и 9.15), `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Русский
 
@@ -17,6 +17,12 @@
 | Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+### Возможности 3.1.4
+
+- **Первый запуск больше не роняет API.** Backend и worker больше не создают `alembic_version` одновременно. Если контейнер всё же не поднялся, установщик печатает логи backend и worker, а не только `installation failed at line 382`.
+- Пробелы в ответах снимаются. Часовой пояс `Moscow` записывается как `Europe/Moscow`.
+- Схема остаётся `0038_v2_6_0_platform`. Покупатель Android остаётся **2.10.0**, администратор — **2.12.0**. Подробности — раздел 9.18 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_4.md`.
 
 ### Возможности 3.1.3
 
@@ -224,7 +230,7 @@ cd ../cabinet && npm install && npx vite build
 
 A VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Current release: **3.1.3**. Previous releases: **3.1.2**, **3.1.1**, **3.1.0**, **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTALL_STEPS.md`, sections 9.17, 9.16 and 9.15 of `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
+Current release: **3.1.4**. Previous releases: **3.1.3**, **3.1.2**, **3.1.1**, **3.1.0**, **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTALL_STEPS.md`, sections 9.18, 9.17, 9.16 and 9.15 of `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
 
 ### What is in the tree
 
@@ -237,6 +243,12 @@ Current release: **3.1.3**. Previous releases: **3.1.2**, **3.1.1**, **3.1.0**, 
 | Android and iOS | Kotlin Compose, SwiftUI | Buyer and administrator, Russian and English |
 | Edge | Docker Compose, Caddy | HTTPS and separate domains |
 | Checks | `tests/`, `scripts/sandbox-e2e.sh` | Regression and a run without live gateways |
+
+### What 3.1.4 adds
+
+- **The first boot no longer drops the API.** Backend and worker no longer create `alembic_version` at the same time. If a container still does not start, the installer prints the backend and worker logs instead of only `installation failed at line 382`.
+- Answers are trimmed. The time zone `Moscow` is stored as `Europe/Moscow`.
+- The schema stays `0038_v2_6_0_platform`. The Android buyer app stays **2.10.0** and the administrator app stays **2.12.0**. Details are in section 9.18 of `INSTRUCTION.md` and in `RELEASE_NOTES_V3_1_4.md`.
 
 ### What 3.1.3 adds
 

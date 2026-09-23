@@ -1,8 +1,14 @@
 # Разбор функций / Function reference
 
-Версия приложения: **3.1.3**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая установка — `INSTALL_STEPS.md`. Установка через канал — раздел 9.17 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_3.md`. Аудит ответов панели — раздел 9.16 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_2.md`. Staging E2E и production gate — раздел 9.15 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_1.md`. Состав 3.1.0 — раздел 9.14 и `RELEASE_NOTES_V3_1_0.md`. Исправления 3.0.1 — раздел 9.13 и `RELEASE_NOTES_V3_0_1.md`. Исправления 3.0.0-realise — раздел 9.12 и `RELEASE_NOTES_V3_0_0.md`.
+Версия приложения: **3.1.4**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая установка — `INSTALL_STEPS.md`. Первый запуск — раздел 9.18 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_4.md`. Установка через канал — раздел 9.17 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_3.md`. Аудит ответов панели — раздел 9.16 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_2.md`. Staging E2E и production gate — раздел 9.15 `INSTRUCTION.md` и `RELEASE_NOTES_V3_1_1.md`. Состав 3.1.0 — раздел 9.14 и `RELEASE_NOTES_V3_1_0.md`. Исправления 3.0.1 — раздел 9.13 и `RELEASE_NOTES_V3_0_1.md`. Исправления 3.0.0-realise — раздел 9.12 и `RELEASE_NOTES_V3_0_0.md`.
 
-Application version: **3.1.3**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The step-by-step install is `INSTALL_STEPS.md`. The piped install is section 9.17 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_3.md`. The panel-response audit is section 9.16 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_2.md`. Staging E2E and the production gate are section 9.15 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_1.md`. The 3.1.0 changes are section 9.14 and `RELEASE_NOTES_V3_1_0.md`. The 3.0.1 fixes are section 9.13 and `RELEASE_NOTES_V3_0_1.md`. The 3.0.0-realise fixes are section 9.12 and `RELEASE_NOTES_V3_0_0.md`.
+Application version: **3.1.4**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The step-by-step install is `INSTALL_STEPS.md`. The first boot is section 9.18 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_4.md`. The piped install is section 9.17 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_3.md`. The panel-response audit is section 9.16 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_2.md`. Staging E2E and the production gate are section 9.15 of `INSTRUCTION.md` and `RELEASE_NOTES_V3_1_1.md`. The 3.1.0 changes are section 9.14 and `RELEASE_NOTES_V3_1_0.md`. The 3.0.1 fixes are section 9.13 and `RELEASE_NOTES_V3_0_1.md`. The 3.0.0-realise fixes are section 9.12 and `RELEASE_NOTES_V3_0_0.md`.
+
+## Аудит 3.1.4 / 3.1.4 audit
+
+`alembic/env.py` берёт `pg_advisory_xact_lock` до `CREATE TABLE alembic_version`. Worker в `docker-compose.yml` ждёт healthy backend. `prompt` снимает пробелы по краям ответа. `normalize_tz` заменяет `Moscow` на `Europe/Moscow`.
+
+`alembic/env.py` takes `pg_advisory_xact_lock` before `CREATE TABLE alembic_version`. The worker in `docker-compose.yml` waits for a healthy backend. `prompt` trims the answer. `normalize_tz` replaces `Moscow` with `Europe/Moscow`.
 
 ## Аудит 3.1.3 / 3.1.3 audit
 

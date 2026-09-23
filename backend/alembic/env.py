@@ -20,8 +20,12 @@ def do_run_migrations(connection):
     # ids such as 0025_v44_5_8_entitlement_idempotency do not fit, so a fresh
     # install stops there. Create the table at VARCHAR(128) first. An older
     # database is widened in the same transaction.
+    # Backend and worker both run `alembic upgrade head` at boot. PostgreSQL
+    # CREATE TABLE IF NOT EXISTS is not race-safe: the loser dies on
+    # pg_type_typname_nsp_index and the API container exits before /health.
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
+        connection.exec_driver_sql("SELECT pg_advisory_xact_lock(872663041314)")
         connection.exec_driver_sql(
             "CREATE TABLE IF NOT EXISTS alembic_version ("
             "version_num VARCHAR(128) NOT NULL PRIMARY KEY)"

@@ -13,12 +13,36 @@ die(){ printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 [[ -f "$SOURCE_ROOT/docker-compose.yml" ]] || die "docker-compose.yml не найден рядом с архивом/папкой проекта."
 command -v apt-get >/dev/null 2>&1 || die "Поддерживаются Debian/Ubuntu."
 
+trim_spaces() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+normalize_tz() {
+  local tz
+  tz="$(trim_spaces "$1")"
+  case "$tz" in
+    Moscow|moscow|MSK|msk) tz="Europe/Moscow" ;;
+  esac
+  if [[ -e "/usr/share/zoneinfo/$tz" || "$tz" == "UTC" || "$tz" =~ ^[A-Za-z0-9_+-]+/[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)?$ ]]; then
+    printf '%s' "$tz"
+    return 0
+  fi
+  return 1
+}
+
 prompt() {
   local var="$1" label="$2" default="${3:-}" secret="${4:-0}" value tty=/dev/stdin
   if [[ "${INSTALL_NONINTERACTIVE:-0}" == "1" ]]; then
     if [[ -z "${!var:-}" ]]; then
       printf -v "$var" '%s' "$default"
     fi
+    value="${!var}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf -v "$var" '%s' "$value"
     return
   fi
   if [[ -z "$default" && -n "${!var:-}" && "$secret" != "1" ]]; then
@@ -38,6 +62,8 @@ prompt() {
   else
     read -r -p "$label${default:+ [$default]}: " value <"$tty"
   fi
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
   printf -v "$var" '%s' "${value:-$default}"
 }
 
@@ -63,7 +89,8 @@ env_line() {
 }
 
 # Previous release contract: INSTALLER_VERSION="1.0.0-realise"
-INSTALLER_VERSION="3.1.3"
+INSTALLER_VERSION="3.1.4"
+# Historical compatibility marker: INSTALLER_VERSION="3.1.3"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.2"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.1"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.0"
@@ -89,7 +116,8 @@ INSTALLER_VERSION="3.1.3"
 # Previous release contract: INSTALLER_VERSION="45.0.0-enterprise"
 # V44.5 Enterprise legacy contract marker
 # INSTALLER_VERSION="43.1.0-production" legacy regression marker
-log "Remnawave VPN Shop — 3.1.3 русскоязычный production installer"
+log "Remnawave VPN Shop — 3.1.4 русскоязычный production installer"
+# Historical compatibility marker: 3.1.3 русскоязычный production installer
 # Historical compatibility marker: 3.1.2 русскоязычный production installer
 # Historical compatibility marker: 3.1.1 русскоязычный production installer
 # Historical compatibility marker: 3.1.0 русскоязычный production installer
@@ -121,6 +149,7 @@ prompt ADMIN_EMAIL "Email администратора" "admin@${BASE_DOMAIN}"
 prompt ADMIN_PASSWORD "Пароль администратора (Enter = сгенерировать)" "" 1
 prompt_required BOT_TOKEN "Telegram BOT_TOKEN от @BotFather" 1
 prompt_required REMNAWAVE_URL "Remnawave Panel URL (например https://panel.example.com)"
+[[ "$REMNAWAVE_URL" =~ ^https://[^[:space:]]+$ ]] || die "Remnawave Panel URL должен начинаться с https:// и не содержать пробелов"
 prompt_required REMNAWAVE_TOKEN "Remnawave API token" 1
 
 echo
@@ -176,7 +205,17 @@ prompt DEFAULT_LANGUAGE "Язык по умолчанию (ru/en)" "ru"
 DEFAULT_LANGUAGE="$(printf '%s' "$DEFAULT_LANGUAGE" | tr '[:upper:]' '[:lower:]')"
 [[ "$DEFAULT_LANGUAGE" == "ru" || "$DEFAULT_LANGUAGE" == "en" ]] || die "DEFAULT_LANGUAGE должен быть ru или en"
 prompt DEFAULT_CURRENCY "Валюта" "RUB"
-prompt TZ_VALUE "Часовой пояс" "Europe/Moscow"
+while :; do
+  prompt TZ_VALUE "Часовой пояс" "Europe/Moscow"
+  if normalized_tz="$(normalize_tz "$TZ_VALUE")"; then
+    TZ_VALUE="$normalized_tz"
+    break
+  fi
+  if [[ "${INSTALL_NONINTERACTIVE:-0}" == "1" ]]; then
+    die "Неизвестный часовой пояс: $TZ_VALUE. Пример: Europe/Moscow"
+  fi
+  echo "Неизвестный часовой пояс. Укажите имя IANA, например Europe/Moscow."
+done
 prompt CADDY_EMAIL "Email для TLS-сертификата" "$ADMIN_EMAIL"
 prompt WEBHOOK_DOMAIN "Домен вебхуков" "pay.${BASE_DOMAIN}"
 prompt MINIAPP_DOMAIN "Домен Mini App, если отличается" "$APP_DOMAIN"
@@ -200,6 +239,10 @@ prompt VK_CLIENT_ID "VK OAuth Client ID (Enter = пропустить)"
 prompt VK_CLIENT_SECRET "VK OAuth Client Secret (Enter = пропустить)" "" 1
 prompt PAYMENTS_SANDBOX "Песочница платежей без шлюзов (true/false)" "false"
 prompt TRIAL_MAX_DAYS "Максимум дней пробного периода" "3"
+for price_name in PRICE_1 PRICE_3 PRICE_6 PRICE_12 AUTO_RENEW_LEAD_DAYS NOTIFICATION_EXPIRY_DAYS TRIAL_MAX_DAYS; do
+  [[ "${!price_name}" =~ ^[0-9]+$ ]] || die "$price_name должно быть целым числом"
+done
+[[ "$REFERRAL_REWARD_PERCENT" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "Процент реферального вознаграждения должен быть числом"
 
 echo
 prompt S3_ENDPOINT_URL "S3 endpoint (Enter = отключить off-site backup)"
@@ -379,7 +422,11 @@ docker compose config >/dev/null
 
 log "Собираю production-образы с актуальными базовыми образами..."
 docker compose build --pull --no-cache
-docker compose up -d
+if ! docker compose up -d; then
+  docker compose ps >&2 || true
+  docker compose logs --tail=180 backend worker >&2 || true
+  die "Контейнеры не запустились. Логи backend и worker напечатаны выше."
+fi
 
 log "Ожидаю API и миграции..."
 healthy=0

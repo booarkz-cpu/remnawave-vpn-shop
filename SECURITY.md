@@ -1,4 +1,11 @@
-# Security / Безопасность — Remnawave VPN Shop 3.1.3
+# Security / Безопасность — Remnawave VPN Shop 3.1.4
+
+## Аудит 3.1.4 / 3.1.4 audit
+
+- Два процесса больше не создают `alembic_version` одновременно. Проигравший в **3.1.3** завершал контейнер API до `/health`, и `docker compose up` сообщал `container vpn-shop-backend-1 is unhealthy`.
+- Ответы установщика обрезаются по краям. Имя `Moscow` заменяется на `Europe/Moscow`, потому что PostgreSQL не принимает `TimeZone=Moscow`.
+- Two processes no longer create `alembic_version` at the same time. In **3.1.3** the loser exited the API container before `/health`, and `docker compose up` reported `container vpn-shop-backend-1 is unhealthy`.
+- Installer answers are trimmed. The name `Moscow` is replaced with `Europe/Moscow`, because PostgreSQL rejects `TimeZone=Moscow`.
 
 ## Аудит 3.1.3 / 3.1.3 audit
 
