@@ -1,8 +1,8 @@
-# Remnawave VPN Shop 3.1.0
+# Remnawave VPN Shop 3.1.1
 
 Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-Состояние: **3.1.0**. Предыдущие релизы: **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **3.1.1**. Предыдущие релизы: **3.1.0**, **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTALL_STEPS.md`, `INSTRUCTION.md` (раздел 9.15), `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Русский
 
@@ -17,6 +17,14 @@
 | Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+### Возможности 3.1.1
+
+- **Секреты staging сохраняются.** Повторное сохранение вкладки **Проверка тестового контура** оставляет пустое поле секрета, Shop ID и Merchant ID как уже записанное значение. Совпадение с ключами из `.env` по-прежнему отклоняется.
+- **Адрес оплаты в журнале.** Раннер печатает `[CHECKOUT]` и https-ссылку. Статус `awaiting_checkout` production gate не открывает. Кнопка **Разрешить реальные платежи** ждёт `FULL_E2E_PASS` моложе 24 часов. Порядок — раздел 9.15 `INSTRUCTION.md`.
+- **Журнал без секретов.** Перед записью статуса токены и секреты длиннее 7 символов заменяются на `[скрыто]`.
+- **Установка по шагам.** `INSTALL_STEPS.md` перечисляет каждый вопрос `install.sh` и `deploy/install-vps.sh`.
+- Схема остаётся `0038_v2_6_0_platform`. Покупатель Android остаётся **2.10.0**, администратор — **2.12.0**. Подробности — `RELEASE_NOTES_V3_1_1.md`.
 
 ### Возможности 3.1.0
 
@@ -204,7 +212,7 @@ cd ../cabinet && npm install && npx vite build
 
 A VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Current release: **3.1.0**. Previous releases: **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
+Current release: **3.1.1**. Previous releases: **3.1.0**, **3.0.1**, **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTALL_STEPS.md`, section 9.15 of `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
 
 ### What is in the tree
 
@@ -217,6 +225,14 @@ Current release: **3.1.0**. Previous releases: **3.0.1**, **3.0.0-realise**, **2
 | Android and iOS | Kotlin Compose, SwiftUI | Buyer and administrator, Russian and English |
 | Edge | Docker Compose, Caddy | HTTPS and separate domains |
 | Checks | `tests/`, `scripts/sandbox-e2e.sh` | Regression and a run without live gateways |
+
+### What 3.1.1 adds
+
+- **Staging secrets are kept.** Saving **Проверка тестового контура** (Staging checks) again leaves a blank secret, Shop ID, or Merchant ID as the value already stored. A match with the `.env` keys is still rejected.
+- **The payment URL is in the log.** The runner prints `[CHECKOUT]` and an https link. Status `awaiting_checkout` does not open the production gate. **Разрешить реальные платежи** (Allow live payments) waits for `FULL_E2E_PASS` younger than 24 hours. The order is section 9.15 of `INSTRUCTION.md`.
+- **The log hides secrets.** Before the status is stored, tokens and secrets of 8 characters or more are replaced with `[скрыто]`.
+- **Step-by-step install.** `INSTALL_STEPS.md` lists every prompt from `install.sh` and `deploy/install-vps.sh`.
+- The schema stays `0038_v2_6_0_platform`. The Android buyer app stays **2.10.0** and the administrator app stays **2.12.0**. Details are in `RELEASE_NOTES_V3_1_1.md`.
 
 ### What 3.1.0 adds
 

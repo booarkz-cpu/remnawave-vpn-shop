@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.1.1
+
+Вкладка **Проверка тестового контура** требует флажок **Подтверждаю sandbox-ключи**. Пустое поле секрета, Shop ID или Merchant ID при повторном сохранении оставляет записанное значение. Журнал показывает строку `[CHECKOUT]`. Кнопка **Разрешить реальные платежи** на вкладке **Безопасность** включает gate после `FULL_E2E_PASS` не старше 24 часов. Порядок — раздел 9.15 `INSTRUCTION.md`.
+
+**Проверка тестового контура** (Staging checks) requires **Подтверждаю sandbox-ключи** (I confirm these are sandbox keys). A blank secret, Shop ID, or Merchant ID on a later save keeps the stored value. The log shows a `[CHECKOUT]` line. **Разрешить реальные платежи** (Allow live payments) on **Безопасность** (Security) enables the gate after `FULL_E2E_PASS` younger than 24 hours. The order is section 9.15 of `INSTRUCTION.md`.
+
 ## 3.1.0
 
 Карточка приложения показывает контрольную сумму SHA-256, когда файл загружен. Публичный список тарифов её не касается: идентификатор профиля Remnawave в ответе покупателя отсутствует.

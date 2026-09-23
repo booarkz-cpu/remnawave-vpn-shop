@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 3.1.0
+# Полная инструкция — Remnawave VPN Shop 3.1.1
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.0**. Разделы 9.3–9.13 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.1**. Разделы 9.3–9.14 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
 ---
 
@@ -33,7 +33,7 @@ sudo bash install.sh
 
 Скрипт сам ставит Docker, спрашивает данные, которые нельзя угадать, генерирует `APP_SECRET` и пароль базы, пишет `.env` с правами `0600`, собирает образы, поднимает PostgreSQL и Redis, применяет миграции Alembic и печатает адреса панели, Mini App, кабинета и API. Он настраивает UFW (SSH, TCP 80/443, UDP 443) и Fail2Ban для SSH.
 
-`install.sh` ставит Docker, клонирует репозиторий при запуске через `curl` и выполняет `deploy/install-vps.sh`. Все операторские поля вводятся в этом скрипте: домены (включая кабинет), почта TLS, бот и его username, Telegram ID, Remnawave, язык `ru`/`en`, валюта, цены 1/3/6/12, автопродление и срок списания, обязательный канал, реферальный процент, YooKassa, Platega, RollyPay, Yandex ID, VK ID, sandbox и S3. Секреты приложения и базы скрипт генерирует сам. Повторный вопрос не задаётся, если экспортнуты переменные и указан `INSTALL_NONINTERACTIVE=1`.
+`install.sh` ставит Docker, клонирует репозиторий при запуске через `curl` и выполняет `deploy/install-vps.sh`. Все операторские поля вводятся в этом скрипте: домены (включая кабинет), почта TLS, бот и его username, Telegram ID, Remnawave, язык `ru`/`en`, валюта, цены 1/3/6/12, автопродление и срок списания, обязательный канал, реферальный процент, YooKassa, Platega, RollyPay, Yandex ID, VK ID, sandbox и S3. Секреты приложения и базы скрипт генерирует сам. Повторный вопрос не задаётся, если экспортнуты переменные и указан `INSTALL_NONINTERACTIVE=1`. Каждый вопрос по порядку записан в `INSTALL_STEPS.md`.
 
 Firewall после установки: SSH, TCP 80/443 и UDP 443. Порты API, админки, Mini App, кабинета, PostgreSQL и Redis наружу не открываются.
 
@@ -436,6 +436,22 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 6. Во вкладке «Подключение» кнопка **Скачать подписку** открывает `GET /api/me/subscription-file`.
 7. Как скачать приложения проекта: покупатель Android — https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk , администратор Android — https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk . Проверка: `sha256sum -c` по файлу `.sha256` в том же каталоге. iOS собирается в Xcode из `mobile/ios-user` и `mobile/ios-admin`. Справка без входа: `GET /api/public/apps/install`.
 
+## 9.15. Staging E2E и production gate в панели
+
+Роль `admin` имеет права `staging_e2e.manage` и `security.manage`. Роли `viewer` и `operator` эти вкладки не открывают. `PAYMENTS_SANDBOX` и `scripts/sandbox-e2e.sh` production gate не включают: sandbox-завершение отвечает 500, пока `REMNAWAVE_URL` пуст, и этот пункт чеклиста остаётся открытым.
+
+1. Войдите в админку и откройте **Проверка тестового контура**. Карточка называется **Настройка боевого staging E2E**.
+2. `Публичный HTTPS URL` — адрес этого магазина, с которого контейнер `backend` открывает `GET /health`. Ответ содержит `database` и `redis`. `URL Remnawave` — HTTPS адрес staging-панели, не боевой, если они разные. `Токен Remnawave` — API-токен этой staging-панели. `ID тестового тарифа` — числовой ID включённого тарифа из вкладки **Тарифы**.
+3. Отметьте только кассы, у которых есть sandbox-ключи: ЮKassa, Platega, RollyPay. Введите sandbox Shop ID и секрет, Merchant ID и Secret, API-ключ и signing secret. Совпадение любого из этих значений с одноимённым полем `.env` отвечает 400 «Staging E2E не может использовать production-платёжные credentials».
+4. Повторное сохранение: пустой секрет, Shop ID или Merchant ID оставляет уже записанное зашифрованное значение. Подсказка под заголовком говорит об этом прямо. Парольные поля после загрузки пустые, потому что `GET` отдаёт только признаки «секрет задан».
+5. Отметьте **Подтверждаю sandbox-ключи**. Без флажка сохранение останавливается тостом «Подтвердите, что это sandbox-ключи», а API отвечает 400 «Подтвердите, что используются sandbox/staging-учётные данные; production-ключи запрещены». Нажмите **Сохранить безопасную конфигурацию**. Сохранение ставит production gate в `0` и выпускает новый runner token. Уже запущенная проверка со старым токеном больше не пройдёт.
+6. Нажмите **Запустить staging E2E**. В контейнере `backend` выполняется `/app/staging-e2e.sh`. Образ 3.1.1 содержит `curl`. Журнал на карточке **Запуск и результат** показывает `[CHECKOUT]` и https-адрес. Откройте этот адрес и завершите sandbox-оплату в кабинете кассы.
+7. Статус `awaiting_checkout` означает, что раннер создал платежи и завершился с кодом 0. Этого недостаточно для gate. Строка `FULL_E2E_PASS` появляется в журнале, когда наблюдаются checkout, подписанный webhook, сверка суммы, статус paid, выдача worker, повторный webhook без второй выдачи и refund на staging Remnawave. Ручная вставка этой строки в JSON статуса gate не заменяет.
+8. Внутренний вызов `POST /api/internal/staging-e2e/payment` доступен только с `127.0.0.1` и заголовком `X-Staging-Runner-Token`. Он создаёт платёж у sandbox-провайдера и не пишет строку `Payment` магазина, чтобы worker не выдал VPN на боевой Remnawave.
+9. В течение 24 часов после `passed` и `full_e2e` откройте **Безопасность**. Строка **Разрешение реальных платежей** должна быть «ВЫКЛ — заблокировано». Нажмите **Разрешить реальные платежи**. Нужно право `security.manage`. Успех ставит gate в `1`.
+10. Пока цепочка не записана, кнопка отвечает 409 «Сначала необходимо успешно завершить полный staging E2E: checkout → webhook → fulfillment → duplicate webhook → refund». Если `finished_at` старше 24 часов, ответ 409 «Результат staging E2E устарел; запустите проверку заново».
+11. **Заблокировать** ставит gate в `0`. Любое следующее сохранение staging-конфигурации тоже ставит gate в `0`. Для YooKassa вебхук с пустым или чужим allowlist отвечает 403 `Webhook IP not allowed`.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -489,7 +505,7 @@ Platega: сверяются заголовки магазина. Возврат 
 
 RollyPay: HMAC и окно времени 5 минут. В тестовом staging-теле выставляется флаг теста. Возврат уходит на `ROLLYPAY_REFUND_URL`.
 
-Пока production gate выключен, боевой `create` для покупателя не проводится. Сначала пройдите раздел **Проверка тестового контура**.
+Пока production gate выключен, боевой `create` для покупателя не проводится. Порядок включения — раздел 9.15, вкладка **Проверка тестового контура**, затем **Безопасность**.
 
 Рекомендуемый прогон перед включением кассы:
 
@@ -546,9 +562,9 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 3.1.0
+# Full instruction — Remnawave VPN Shop 3.1.1
 
-This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.0**. Sections 9.3–9.13 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
+This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.1**. Sections 9.3–9.14 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
 ## 1. What it is
 
@@ -578,7 +594,7 @@ sudo bash install.sh
 
 The script installs Docker, asks for values it cannot invent, generates `APP_SECRET` and the database password, writes `.env` as mode `0600`, builds images, starts PostgreSQL and Redis, runs Alembic migrations, and prints the admin, Mini App, and API URLs. It configures UFW (SSH, TCP 80/443, UDP 443) and Fail2Ban for SSH.
 
-`install.sh` installs Docker, clones the repository when started from `curl`, and execs `deploy/install-vps.sh`. That script asks for every operator field: domains, the TLS email, the bot token and username, the admin Telegram id, Remnawave, language `ru` or `en`, currency, the 1/3/6/12 prices, auto-renew and its lead time, the required channel, the referral percent, YooKassa, Platega, RollyPay, Yandex ID and S3. Application and database secrets are generated. Export the variables and set `INSTALL_NONINTERACTIVE=1` to skip questions.
+`install.sh` installs Docker, clones the repository when started from `curl`, and execs `deploy/install-vps.sh`. That script asks for every operator field: domains, the TLS email, the bot token and username, the admin Telegram id, Remnawave, language `ru` or `en`, currency, the 1/3/6/12 prices, auto-renew and its lead time, the required channel, the referral percent, YooKassa, Platega, RollyPay, Yandex ID and S3. Application and database secrets are generated. Export the variables and set `INSTALL_NONINTERACTIVE=1` to skip questions. Every prompt, in order, is written in `INSTALL_STEPS.md`.
 
 The firewall keeps SSH, TCP 80/443 and UDP 443. The API, admin UI, Mini App, PostgreSQL and Redis are not published.
 
@@ -956,6 +972,22 @@ The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `
 6. On the Connection tab, **Скачать подписку** (Download subscription) opens `GET /api/me/subscription-file`.
 7. Project app downloads: Android buyer https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.10.0/remnawave_vpn_shop_android_user_2_10_0.apk , Android administrator https://github.com/booarkz-cpu/remnawave-vpn-shop/releases/download/v2.12.0/remnawave_vpn_shop_android_admin_2_12_0.apk . Check with `sha256sum -c` against the `.sha256` file in the same directory. iOS is built in Xcode from `mobile/ios-user` and `mobile/ios-admin`. The signed-out summary is `GET /api/public/apps/install`.
 
+## 9.15. Staging E2E and the production gate in the panel
+
+Role `admin` has `staging_e2e.manage` and `security.manage`. Roles `viewer` and `operator` do not open these controls. `PAYMENTS_SANDBOX` and `scripts/sandbox-e2e.sh` do not enable the production gate: sandbox completion answers 500 while `REMNAWAVE_URL` is empty, and that checklist item stays open.
+
+1. Sign in to the admin UI and open **Проверка тестового контура** (Staging checks). The card title is **Настройка боевого staging E2E** (Live staging E2E setup).
+2. `Публичный HTTPS URL` is this shop’s address, from which the `backend` container opens `GET /health`. The body contains `database` and `redis`. `URL Remnawave` is the staging panel HTTPS address when it differs from production. `Токен Remnawave` is that staging panel’s API token. `ID тестового тарифа` is the numeric id of an enabled plan from **Тарифы** (Plans).
+3. Enable only cashiers that have sandbox keys: YooKassa, Platega, RollyPay. Enter the sandbox Shop ID and secret, Merchant ID and Secret, API key and signing secret. A value equal to the same `.env` field answers 400 «Staging E2E не может использовать production-платёжные credentials».
+4. On a later save, a blank secret, Shop ID, or Merchant ID keeps the encrypted value already stored. The sentence under the title says so. Password fields are empty after load because `GET` returns only “secret is set” flags.
+5. Check **Подтверждаю sandbox-ключи** (I confirm these are sandbox keys). Without it, save stops with the toast «Подтвердите, что это sandbox-ключи», and the API answers 400 «Подтвердите, что используются sandbox/staging-учётные данные; production-ключи запрещены». Press **Сохранить безопасную конфигурацию** (Save the safe configuration). The save sets the production gate to `0` and mints a new runner token. A run still using the old token no longer passes the internal check.
+6. Press **Запустить staging E2E** (Run staging E2E). The `backend` container runs `/app/staging-e2e.sh`. The 3.1.1 image includes `curl`. The log on **Запуск и результат** (Run and result) shows `[CHECKOUT]` and an https URL. Open that URL and finish the sandbox payment in the cashier.
+7. Status `awaiting_checkout` means the runner created payments and exited 0. That status does not open the gate. The line `FULL_E2E_PASS` appears when checkout, a signed webhook, the amount check, status paid, worker fulfillment, a duplicate webhook with no second provision, and a refund on the staging Remnawave have been observed. Pasting that line into the status JSON by hand does not replace the runner.
+8. `POST /api/internal/staging-e2e/payment` accepts only `127.0.0.1` and the header `X-Staging-Runner-Token`. It creates the provider payment and does not insert a shop `Payment` row, so the worker does not provision a VPN user on the production Remnawave.
+9. Within 24 hours of `passed` and `full_e2e`, open **Безопасность** (Security). **Разрешение реальных платежей** (live-payment permission) reads «ВЫКЛ — заблокировано». Press **Разрешить реальные платежи** (Allow live payments). The permission required is `security.manage`. Success sets the gate to `1`.
+10. Until that chain is stored, the button answers 409 «Сначала необходимо успешно завершить полный staging E2E: checkout → webhook → fulfillment → duplicate webhook → refund». When `finished_at` is older than 24 hours, the answer is 409 «Результат staging E2E устарел; запустите проверку заново».
+11. **Заблокировать** (Block) sets the gate to `0`. Any later staging-config save also sets the gate to `0`. A YooKassa webhook with an empty or foreign allowlist answers 403 `Webhook IP not allowed`.
+
 ## 10. Mini App
 
 The buyer opens the shop from the bot. The app loads `/api/me/dashboard`, `/api/public/config`, `/api/plans`, billing, the security center, notifications, and the public status.
@@ -996,7 +1028,7 @@ Platega compares the merchant headers. Refunds go to `PLATEGA_REFUND_URL`.
 
 RollyPay checks HMAC and a five-minute timestamp window. Staging payloads set the test flag. Refunds go to `ROLLYPAY_REFUND_URL`.
 
-While the production gate is off, a buyer cannot start a live charge. Use **Staging checks** first.
+While the production gate is off, a buyer cannot start a live charge. The enable order is section 9.15: **Проверка тестового контура** (Staging checks), then **Безопасность** (Security).
 
 Before enabling a cashier:
 
