@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.1.5
+
+Панель 3.1.5 не меняет экраны. Контейнер nginx больше не падает на `Read-only file system`, поэтому `https://admin.<домен>` открывается после установки.
+
+The 3.1.5 panel does not change the screens. The nginx container no longer crashes on `Read-only file system`, so `https://admin.<domain>` opens after install.
+
 ## 3.1.4
 
 Установщик 3.1.4 не меняет панель. Первый запуск больше не роняет API из-за двух одновременных миграций.

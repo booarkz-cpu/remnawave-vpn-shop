@@ -89,7 +89,8 @@ env_line() {
 }
 
 # Previous release contract: INSTALLER_VERSION="1.0.0-realise"
-INSTALLER_VERSION="3.1.4"
+INSTALLER_VERSION="3.1.5"
+# Historical compatibility marker: INSTALLER_VERSION="3.1.4"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.3"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.2"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.1"
@@ -116,7 +117,7 @@ INSTALLER_VERSION="3.1.4"
 # Previous release contract: INSTALLER_VERSION="45.0.0-enterprise"
 # V44.5 Enterprise legacy contract marker
 # INSTALLER_VERSION="43.1.0-production" legacy regression marker
-log "Remnawave VPN Shop — 3.1.4 русскоязычный production installer"
+log "Remnawave VPN Shop — 3.1.5 русскоязычный production installer"
 # Historical compatibility marker: 3.1.3 русскоязычный production installer
 # Historical compatibility marker: 3.1.2 русскоязычный production installer
 # Historical compatibility marker: 3.1.1 русскоязычный production installer
@@ -420,12 +421,32 @@ chmod 600 .env
 log "Проверяю Docker Compose..."
 docker compose config >/dev/null
 
+if [[ -w /proc/sys/vm/overcommit_memory ]]; then
+  sysctl -w vm.overcommit_memory=1 >/dev/null || true
+  if [[ -f /etc/sysctl.conf ]] && ! grep -q '^vm.overcommit_memory' /etc/sysctl.conf; then
+    echo 'vm.overcommit_memory = 1' >> /etc/sysctl.conf || true
+  fi
+fi
 log "Собираю production-образы с актуальными базовыми образами..."
 docker compose build --pull --no-cache
 if ! docker compose up -d; then
   docker compose ps >&2 || true
-  docker compose logs --tail=180 backend worker >&2 || true
-  die "Контейнеры не запустились. Логи backend и worker напечатаны выше."
+  docker compose logs --tail=180 backend worker admin miniapp cabinet >&2 || true
+  die "Контейнеры не запустились. Логи backend, worker и панелей напечатаны выше."
+fi
+panels_ok=0
+for _ in {1..20}; do
+  restarting="$(docker compose ps --status restarting --format '{{.Service}}' 2>/dev/null || true)"
+  if ! printf '%s\n' "$restarting" | grep -Eq '^(admin|miniapp|cabinet)$'; then
+    panels_ok=1
+    break
+  fi
+  sleep 2
+done
+if [[ "$panels_ok" != "1" ]]; then
+  docker compose ps >&2 || true
+  docker compose logs --tail=80 admin miniapp cabinet >&2 || true
+  die "Админка, Mini App или кабинет перезапускаются. Логи напечатаны выше."
 fi
 
 log "Ожидаю API и миграции..."

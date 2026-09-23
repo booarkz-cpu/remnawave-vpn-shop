@@ -1,4 +1,9 @@
-# Security / Безопасность — Remnawave VPN Shop 3.1.4
+# Security / Безопасность — Remnawave VPN Shop 3.1.5
+
+## Аудит 3.1.5 / 3.1.5 audit
+
+- Админка, Mini App и кабинет остаются с `read_only: true`. Запись nginx идёт только в tmpfs `/tmp`, `/var/cache/nginx` и `/run`. В **3.1.4** отсутствие этих каталогов роняло процесс, и Caddy отвечал 502, пока контейнер перезапускался.
+- The admin UI, Mini App, and cabinet stay `read_only: true`. nginx writes only on the tmpfs mounts `/tmp`, `/var/cache/nginx`, and `/run`. In **3.1.4** the missing directories crashed the process, and Caddy answered 502 while the container restarted.
 
 ## Аудит 3.1.4 / 3.1.4 audit
 

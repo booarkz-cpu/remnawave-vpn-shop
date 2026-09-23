@@ -143,8 +143,11 @@ services:
     security_opt:
       - no-new-privileges:true
     read_only: true
+    # nginx creates /var/cache/nginx/client_temp and writes its pid under /run.
     tmpfs:
       - /tmp
+      - /var/cache/nginx
+      - /run
 
   miniapp:
     build:
@@ -162,8 +165,11 @@ services:
     security_opt:
       - no-new-privileges:true
     read_only: true
+    # nginx creates /var/cache/nginx/client_temp and writes its pid under /run.
     tmpfs:
       - /tmp
+      - /var/cache/nginx
+      - /run
 
   cabinet:
     build:
@@ -181,8 +187,11 @@ services:
     security_opt:
       - no-new-privileges:true
     read_only: true
+    # nginx creates /var/cache/nginx/client_temp and writes its pid under /run.
     tmpfs:
       - /tmp
+      - /var/cache/nginx
+      - /run
 
   caddy:
     image: ${CADDY_IMAGE:-caddy:2.10-alpine}
