@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.1.4
+
+Установщик 3.1.4 не меняет панель. Первый запуск больше не роняет API из-за двух одновременных миграций.
+
+Installer 3.1.4 does not change the panel. The first boot no longer drops the API because of two migrations at once.
+
 ## 3.1.3
 
 Установщик 3.1.3 не меняет панель. Команда `curl | bash` на сервере снова задаёт вопросы с терминала SSH.

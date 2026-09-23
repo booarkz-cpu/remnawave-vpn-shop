@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 3.1.3
+# Полная инструкция — Remnawave VPN Shop 3.1.4
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.3**. Разделы 9.3–9.16 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.4**. Разделы 9.3–9.17 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
 ---
 
@@ -461,6 +461,17 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 5. Диагностика, задания, копии, провайдеры, выплаты, мониторы и операции восстановления в поле ошибки отвечают `unavailable`. Восстановление не возвращает stderr. Журнал аудита в JSON прячет ключи `error`, `token`, `secret`, `password` и `authorization`. Причина возврата не содержит хвост с текстом исключения.
 6. Production gate не ослаблен. Порядок включения реальных платежей остаётся в разделе 9.15. Строка `FULL_E2E_PASS` по-прежнему обязательна.
 
+## 9.18. Релиз 3.1.4
+
+1. Версия API — `3.1.4`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA нет: покупатель **2.10.0**, администратор Android **2.12.0**.
+2. На чистой базе backend и worker оба выполняли `alembic upgrade head`. PostgreSQL не гарантирует `CREATE TABLE IF NOT EXISTS` при двух транзакциях: второй процесс падал на `pg_type_typname_nsp_index` для `alembic_version`. Контейнер API завершался, и `docker compose up` писал `container vpn-shop-backend-1 is unhealthy` и `installation failed at line 382`.
+3. Миграция берёт `pg_advisory_xact_lock` до создания таблицы. Worker стартует только после healthy backend. Повторный `alembic upgrade head` тогда уже ничего не меняет.
+4. Ответы установщика обрезаются. Часовой пояс `Moscow` записывается как `Europe/Moscow`. Цена должна быть целым числом. URL панели должен начинаться с `https://`.
+5. Если `docker compose up` всё же завершился с ошибкой, скрипт печатает `docker compose ps` и последние логи backend и worker.
+6. Неудачная установка **3.1.3** уже могла занять `/opt/vpn-shop`. Перед повтором удалите незавершённый контур: `cd /opt/vpn-shop && docker compose down -v`, затем `rm -rf /opt/vpn-shop /opt/vpn-shop-src`. Это стирает тома этой неудачной установки. Рабочий магазин так не сбрасывайте.
+7. Обновление уже работающей копии: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` не затирается.
+8. Production gate не ослаблен. Строка `FULL_E2E_PASS` по-прежнему обязательна. Порядок — раздел 9.15.
+
 ## 9.17. Релиз 3.1.3
 
 1. Версия API — `3.1.3`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA нет: покупатель **2.10.0**, администратор Android **2.12.0**.
@@ -579,9 +590,9 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 3.1.3
+# Full instruction — Remnawave VPN Shop 3.1.4
 
-This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.3**. Sections 9.3–9.16 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
+This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.4**. Sections 9.3–9.17 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
 ## 1. What it is
 
@@ -1013,6 +1024,17 @@ Role `admin` has `staging_e2e.manage` and `security.manage`. Roles `viewer` and 
 4. Remnawave user lists, the stream, and the user card omit the subscription URL and protocol passwords. Overview shows only the total. The user id is a string, including a UUID. An invalid id answers 400 «Некорректный идентификатор пользователя Remnawave».
 5. Diagnostics, jobs, backups, providers, payouts, monitors, and recovery operations answer `unavailable` in the error field. Restore does not return stderr. The audit log hides JSON keys `error`, `token`, `secret`, `password`, and `authorization`. A refund reason does not include the exception tail.
 6. The production gate is unchanged. The order for live payments stays in section 9.15. The line `FULL_E2E_PASS` is still required.
+
+## 9.18. Release 3.1.4
+
+1. The API version is `3.1.4`. The schema stays `0038_v2_6_0_platform`. There is no new APK and no IPA: the buyer app stays **2.10.0** and the Android administrator app stays **2.12.0**.
+2. On an empty database both backend and worker ran `alembic upgrade head`. PostgreSQL does not make `CREATE TABLE IF NOT EXISTS` safe for two transactions: the second process failed on `pg_type_typname_nsp_index` for `alembic_version`. The API container exited, and `docker compose up` printed `container vpn-shop-backend-1 is unhealthy` and `installation failed at line 382`.
+3. The migration takes `pg_advisory_xact_lock` before creating the table. The worker starts only after the backend is healthy. A second `alembic upgrade head` then changes nothing.
+4. Installer answers are trimmed. The time zone `Moscow` is stored as `Europe/Moscow`. A price must be an integer. The panel URL must start with `https://`.
+5. If `docker compose up` still fails, the script prints `docker compose ps` and the latest backend and worker logs.
+6. A failed **3.1.3** install may already occupy `/opt/vpn-shop`. Before retrying, remove the unfinished stack: `cd /opt/vpn-shop && docker compose down -v`, then `rm -rf /opt/vpn-shop /opt/vpn-shop-src`. That deletes the volumes of that failed install. Do not reset a working shop this way.
+7. Update a copy that is already running with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` is left in place.
+8. The production gate is unchanged. The line `FULL_E2E_PASS` is still required. The order is section 9.15.
 
 ## 9.17. Release 3.1.3
 
