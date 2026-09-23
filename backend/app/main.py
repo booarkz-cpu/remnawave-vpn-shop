@@ -26,7 +26,8 @@ from .security import (hash_password, verify_password, encrypt_secret, decrypt_s
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "3.1.0"
+APP_VERSION = "3.1.1"
+# Historical compatibility marker: APP_VERSION = "3.1.0"
 # Historical compatibility marker: APP_VERSION = "3.0.1"
 # Historical compatibility marker: APP_VERSION = "3.0.0-realise"
 # Historical compatibility marker: APP_VERSION = "2.13.0"
@@ -3404,19 +3405,34 @@ async def update_staging_e2e_config(payload:StagingE2EConfigIn,db:AsyncSession=D
         validate_public_url(provider_url, allow_empty=False)
     if not payload.staging_confirmed:
         raise HTTPException(400,"Подтвердите, что используются sandbox/staging-учётные данные; production-ключи запрещены")
-    prod_pairs=[(payload.yookassa_shop_id,payload.yookassa_secret_key,(settings.yookassa_shop_id,settings.yookassa_secret_key)),(payload.platega_merchant_id,payload.platega_secret,(settings.platega_merchant_id,settings.platega_secret)),(payload.rollypay_api_key,payload.rollypay_signing_secret,(settings.rollypay_api_key,settings.rollypay_signing_secret))]
+    previous=await _staging_config(db) or {}
+    data=payload.model_dump()
+    for key in ("remnawave_token","user_bearer_token","yookassa_shop_id","yookassa_secret_key","platega_merchant_id","platega_secret","rollypay_api_key","rollypay_signing_secret"):
+        if not str(data.get(key) or "").strip() and str(previous.get(key) or "").strip():
+            data[key]=previous[key]
+    if not str(data.get("remnawave_token") or "").strip():
+        raise HTTPException(400,"Укажите токен Remnawave для staging")
+    prod_pairs=[(data.get("yookassa_shop_id"),data.get("yookassa_secret_key"),(settings.yookassa_shop_id,settings.yookassa_secret_key)),(data.get("platega_merchant_id"),data.get("platega_secret"),(settings.platega_merchant_id,settings.platega_secret)),(data.get("rollypay_api_key"),data.get("rollypay_signing_secret"),(settings.rollypay_api_key,settings.rollypay_signing_secret))]
     for a,b,(pa,pb) in prod_pairs:
         if (a and pa and a==pa) or (b and pb and b==pb):
             raise HTTPException(400,"Staging E2E не может использовать production-платёжные credentials")
     providers=[p for p in payload.providers if p in {"yookassa","platega","rollypay"}]
     enabled=[p for p,flag in (("yookassa",payload.yookassa_enabled),("platega",payload.platega_enabled),("rollypay",payload.rollypay_enabled)) if flag]
     providers=[p for p in providers if p in enabled] or enabled
-    data=payload.model_dump(); data["providers"]=providers; data["runner_token"]=secrets.token_urlsafe(32)
+    data["providers"]=providers; data["runner_token"]=secrets.token_urlsafe(32)
     await set_setting(db,STAGING_E2E_CONFIG_KEY,encrypt_secret(json.dumps(data,ensure_ascii=False)))
     await set_setting(db,PRODUCTION_PAYMENTS_GATE_KEY,"0")
     await audit(db,"staging_e2e.config.updated",admin.email,None,{"providers":providers,"public_base_url":payload.public_base_url,"remnawave_url":payload.remnawave_url,"plan_id":payload.plan_id})
     await db.commit()
     return {"ok":True,"providers":providers}
+
+def _redact_staging_output(text: str, config: dict) -> str:
+    redacted = text or ""
+    for key in ("remnawave_token", "user_bearer_token", "runner_token", "yookassa_secret_key", "platega_secret", "rollypay_api_key", "rollypay_signing_secret"):
+        value = str((config or {}).get(key) or "")
+        if len(value) >= 8:
+            redacted = redacted.replace(value, "[скрыто]")
+    return redacted
 
 async def _run_staging_e2e(config, admin_email):
     async with AsyncSession(engine,expire_on_commit=False) as db:
@@ -3429,7 +3445,7 @@ async def _run_staging_e2e(config, admin_email):
         try: out,_=await asyncio.wait_for(proc.communicate(),timeout=config.get("timeout_seconds",1800)+30)
         except asyncio.TimeoutError:
             proc.kill(); out,_=await proc.communicate(); raise RuntimeError("Превышен таймаут staging E2E")
-        text=out.decode("utf-8","replace")[-30000:]
+        text=_redact_staging_output(out.decode("utf-8","replace")[-30000:], config)
         # Exit code 0 only means the runner completed its configured checks. A production gate
         # requires an explicit FULL_E2E_PASS marker emitted after checkout/webhook/fulfillment/refund
         # verification. This prevents the old false-positive where payment creation alone unlocked production.
@@ -3437,7 +3453,7 @@ async def _run_staging_e2e(config, admin_email):
         status="passed" if full_pass else ("awaiting_checkout" if proc.returncode==0 else "failed")
         result={"status":status,"full_e2e":full_pass,"exit_code":proc.returncode,"finished_at":datetime.utcnow().isoformat(),"output":text,"admin":admin_email}
     except Exception as exc:
-        result={"status":"failed","exit_code":-1,"finished_at":datetime.utcnow().isoformat(),"output":str(exc),"admin":admin_email}
+        result={"status":"failed","exit_code":-1,"finished_at":datetime.utcnow().isoformat(),"output":_redact_staging_output(str(exc), config),"admin":admin_email}
     async with AsyncSession(engine,expire_on_commit=False) as db:
         await set_setting(db,STAGING_E2E_STATUS_KEY,json.dumps(result,ensure_ascii=False)); await audit(db,"staging_e2e.completed",admin_email,None,{"status":result["status"],"exit_code":result["exit_code"]}); await db.commit()
 

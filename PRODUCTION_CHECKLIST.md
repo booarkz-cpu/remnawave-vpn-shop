@@ -1,8 +1,12 @@
-# Production checklist 3.1.0
+# Production checklist 3.1.1
 
 ## Русский
 
-Версия **3.1.0** скрывает `remnawave_profile_id` в публичном списке тарифов, заменяет текст ошибки автопродления, считает SHA-256 пакета и отдаёт файл подписки. Схема и APK те же, что у **3.0.1** и **3.0.0-realise**. Запись прогона ниже относится к хосту сборки 3.0.0-realise и не отмечает заново пункты, которые на живом VPS не запускались. Для 3.1.0 на этом хосте 23 сентября 2026 прошли `scripts/preflight.sh` (333 теста), `scripts/security-scan.sh` и локальный API на `127.0.0.1:8000`. Docker, `scripts/doctor.sh`, живые кассы, Xcode и установка на телефон не запускались.
+Версия **3.1.1** сохраняет секреты staging при повторном сохранении, печатает `[CHECKOUT]` и требует `FULL_E2E_PASS` для кнопки **Разрешить реальные платежи**. Схема и APK те же, что у **3.1.0**, **3.0.1** и **3.0.0-realise**. Пошаговая установка — `INSTALL_STEPS.md`, панель — раздел 9.15 `INSTRUCTION.md`. Запись прогона 3.1.0 ниже остаётся фактом того хоста и не отмечает заново пункты, которые на живом VPS не запускались. Docker, `scripts/doctor.sh`, живые кассы, firewall, S3, SMTP, Xcode и установка на телефон для 3.1.1 не запускались.
+
+### Прогон 3.1.1 на этом хосте
+
+23 сентября 2026. `MEDIA_DIR=/tmp/media python3 -m pytest -q` завершился с кодом 0: 338 тестов. `bash -n` прошёл для `install.sh`, `deploy/install-vps.sh` и обоих файлов `staging-e2e.sh`. Живой API, Docker и кассы в этом прогоне не запускались.
 
 Этот файл — порядок выкладки на VPS и запись прогона на хосте сборки от 22 сентября 2026. Пункты раздела «Порядок на VPS» остаются открытыми, пока их не выполнит администратор на своём сервере. Раздел «Прогон на хосте сборки» отмечает только то, что реально запускалось здесь.
 
@@ -156,7 +160,11 @@
 
 ## English
 
-Version **3.1.0** hides `remnawave_profile_id` on the public plan list, replaces the auto-renew error text, stores a package SHA-256 and serves a subscription file. The schema and the APKs stay the same as **3.0.1** and **3.0.0-realise**. The run record below belongs to the 3.0.0-realise build host and does not mark live-VPS items done again. On 23 September 2026 this host passed `scripts/preflight.sh` (333 tests), `scripts/security-scan.sh` and a local API on `127.0.0.1:8000` for 3.1.0. Docker, `scripts/doctor.sh`, live gateways, Xcode and a phone install were not run.
+Version **3.1.1** keeps staging secrets on a later save, prints `[CHECKOUT]`, and requires `FULL_E2E_PASS` for **Разрешить реальные платежи** (Allow live payments). The schema and the APKs stay the same as **3.1.0**, **3.0.1**, and **3.0.0-realise**. The step-by-step install is `INSTALL_STEPS.md` and the panel order is section 9.15 of `INSTRUCTION.md`. The 3.1.0 run record below stays a fact of that host and does not mark live-VPS items done again. Docker, `scripts/doctor.sh`, live gateways, the firewall, S3, SMTP, Xcode, and a phone install were not run for 3.1.1.
+
+### 3.1.1 build-host run
+
+23 September 2026. `MEDIA_DIR=/tmp/media python3 -m pytest -q` exited 0: 338 tests. `bash -n` passed for `install.sh`, `deploy/install-vps.sh`, and both `staging-e2e.sh` files. The live API, Docker, and cashiers were not started in this run.
 
 This file is the VPS rollout order and the record of the build-host run on 22 September 2026. Items under “VPS order” stay open until an administrator runs them on their own server. “Build-host run” marks only what actually ran here.
 

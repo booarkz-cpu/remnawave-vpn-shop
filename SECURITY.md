@@ -1,4 +1,16 @@
-# Security / Безопасность — Remnawave VPN Shop 3.1.0
+# Security / Безопасность — Remnawave VPN Shop 3.1.1
+
+## Аудит 3.1.1 / 3.1.1 audit
+
+- Повторное сохранение staging-конфигурации подставляет прежний секрет, Shop ID или Merchant ID, если новое поле пустое. Сравнение с production-ключами идёт по уже объединённым значениям, поэтому пустая форма не прячет боевой ключ, оставшийся в базе.
+- Журнал раннера проходит `_redact_staging_output`. Токен Remnawave, bearer пользователя, runner token и секреты касс длиной от 8 символов заменяются на `[скрыто]` и в stdout, и в тексте исключения. Shop ID и Merchant ID остаются, потому что они могут быть частью https-адреса `[CHECKOUT]`.
+- Production gate по-прежнему требует статус `passed`, `full_e2e` и строку `FULL_E2E_PASS` не старше 24 часов. Статус `awaiting_checkout` gate не включает. Сохранение конфигурации и кнопка **Заблокировать** ставят gate в `0`.
+- Образ backend ставит `curl`, иначе `/app/staging-e2e.sh` завершается до проверки `/health`.
+
+- A later staging-config save keeps the previous secret, Shop ID, or Merchant ID when the new field is blank. The production-credential comparison uses the merged values, so a blank form cannot hide a live key that is already stored.
+- The runner log passes through `_redact_staging_output`. The Remnawave token, the user bearer, the runner token, and cashier secrets of 8 characters or more become `[скрыто]` in stdout and in the exception text. Shop ID and Merchant ID stay, because they can be part of the `[CHECKOUT]` https URL.
+- The production gate still requires status `passed`, `full_e2e`, and the line `FULL_E2E_PASS` younger than 24 hours. Status `awaiting_checkout` does not enable the gate. A config save and **Заблокировать** (Block) set the gate to `0`.
+- The backend image installs `curl`. Without it, `/app/staging-e2e.sh` exits before the `/health` check.
 
 ## Аудит 3.1.0 / 3.1.0 audit
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+command -v curl >/dev/null 2>&1 || { echo 'FAIL: в контейнере backend нет curl' >&2; exit 2; }
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 : "${STAGING_PUBLIC_BASE_URL:?Укажите публичный HTTPS URL staging}"
@@ -45,12 +46,14 @@ for provider in "${providers[@]}"; do
   python - "$provider" "$body" <<'PY'
 import json,sys
 provider=sys.argv[1]; d=json.loads(sys.argv[2])
-if not d.get('id') or not d.get('url'):
-    raise SystemExit(f'FAIL {provider}: приложение не вернуло id/url')
+if not d.get('id') or not str(d.get('url') or '').startswith('https://'):
+    raise SystemExit(f'FAIL {provider}: приложение не вернуло id и https checkout')
 print(f'[PASS] {provider}: платёж создан, id={d["id"]}')
-print('[ACTION] Откройте checkout URL из staging-панели и завершите sandbox-оплату.')
+print(f'[CHECKOUT] {provider} {d["url"]}')
+print('[ACTION] Откройте строку CHECKOUT в журнале панели и завершите sandbox-оплату.')
 PY
 done
 
 echo '[PASS] Создание staging-платежей для всех выбранных провайдеров завершено.'
 echo '[NEXT] Для каждого провайдера подтвердите: sandbox-оплата -> подписанный webhook -> проверка статуса/суммы -> paid -> worker -> Remnawave -> повторный webhook без двойной выдачи -> refund -> отзыв/восстановление.'
+echo '[GATE] Статус awaiting_checkout не включает production gate. Кнопка «Разрешить реальные платежи» ждёт строку FULL_E2E_PASS не старше 24 часов.'
