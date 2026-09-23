@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 2.5.0
+# Полная инструкция — Remnawave VPN Shop 3.1.0
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`. Предыдущий полный контур кабинета описан как 2.4.0 и сохранён.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.0**. Разделы 9.3–9.13 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
 ---
 
@@ -546,9 +546,9 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 2.5.0
+# Full instruction — Remnawave VPN Shop 3.1.0
 
-This is the operator guide for installing the shop, turning payments on, and running the admin panel. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
+This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.0**. Sections 9.3–9.13 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
 ## 1. What it is
 
