@@ -1,8 +1,8 @@
-# Мобильные приложения 3.0.0-realise / Mobile apps 3.0.0-realise
+# Мобильные приложения 3.0.1 / Mobile apps 3.0.1
 
-Серверная версия **3.0.0-realise** не меняет пакеты Android и проекты iOS. Покупатель остаётся **2.10.0**, администратор — **2.12.0**. Загрузка APK или IPA в панели принимает файл до 80 МБ, если браузер передаёт `Content-Length`.
+Серверная версия **3.0.1** не меняет пакеты Android и проекты iOS. Покупатель остаётся **2.10.0**, администратор — **2.12.0**. Повторное нажатие «оплатить с баланса» на уже установленном приложении больше не списывает сумму второй раз: сервер требует `Idempotency-Key` и 30 секунд блокирует ту же покупку.
 
-Server version **3.0.0-realise** does not change the Android packages or the iOS projects. The buyer app stays **2.10.0** and the administrator app stays **2.12.0**. An APK or IPA upload in the panel accepts a file up to 80 MB when the browser sends `Content-Length`.
+Server version **3.0.1** does not change the Android packages or the iOS projects. The buyer app stays **2.10.0** and the administrator app stays **2.12.0**. A second tap on “pay from balance” in an already installed app does not debit the amount again: the server requires `Idempotency-Key` and blocks the same purchase for 30 seconds.
 
 С версии **2.13.0** ссылка на скачивание приложения администратора стоит в веб-панели, а ссылка на приложение покупателя — в личном кабинете. Сами пакеты Android остаются **2.12.0** для администратора и **2.10.0** для покупателя, пока администратор не загрузит новый файл.
 

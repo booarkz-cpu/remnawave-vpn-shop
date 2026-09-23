@@ -418,6 +418,14 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 9. Флаги функций читаются по колонке `key`. Создание платежа не ищет строковый ключ в целочисленном `id`.
 10. Vite в `admin`, `miniapp` и `cabinet` — `7.3.6`. Это закрывает предупреждения `npm audit` для dev-сервера. В production панели отдаёт Caddy.
 
+## 9.13. Релиз 3.0.1
+
+1. Версия API — `3.0.1`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA нет: покупатель **2.10.0**, администратор Android **2.12.0**.
+2. Автопродление и проверка шифрованной копии расшифровывают секрет функцией `decrypt_secret`. Обновление: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+3. Оплата с баланса требует заголовок `Idempotency-Key`. Тот же ключ возвращает прежний платёж. Другой ключ на ту же покупку в течение 30 секунд отвечает 409 и баланс не трогает.
+4. Новый ключ на `POST /api/payments/create` не открывает второй счёт, пока предыдущий счёт того же снимка тарифа моложе 30 секунд и ещё не оплачен или его результат не определён.
+5. `README.md` и `SECURITY.md` на GitHub описывают 3.0.1. Раздел Security репозитория берётся из `SECURITY.md`.
+
 ## 10. Mini App
 
 Покупатель открывает магазин из бота. Приложение запрашивает `/api/me/dashboard`, `/api/public/config`, `/api/plans`, биллинг, центр безопасности, уведомления и публичный статус.
@@ -919,6 +927,14 @@ The script needs `.env` in `/opt/vpn-shop` (or in `APP_DIR`). It downloads the `
 8. The audit log stores `request_id`. A plan price stored as Decimal and a datetime are written as JSON, and creating a plan does not answer 500.
 9. Feature flags are loaded by the `key` column. Payment creation does not look up a string key in the integer `id`.
 10. Vite in `admin`, `miniapp` and `cabinet` is `7.3.6`. That clears the `npm audit` findings for the dev server. In production, Caddy serves the panels.
+
+## 9.13. Release 3.0.1
+
+1. The API version is `3.0.1`. The schema stays `0038_v2_6_0_platform`. There is no new APK and no IPA: the buyer app stays **2.10.0** and the Android administrator app stays **2.12.0**.
+2. Auto-renew and encrypted backup validation decrypt the secret with `decrypt_secret`. Update with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+3. Wallet payment requires the `Idempotency-Key` header. The same key returns the earlier payment. A different key for the same purchase within 30 seconds answers 409 and leaves the balance unchanged.
+4. A new key on `POST /api/payments/create` does not open a second invoice while the previous invoice for the same plan snapshot is younger than 30 seconds and is still unpaid or has an unknown result.
+5. `README.md` and `SECURITY.md` on GitHub describe 3.0.1. The repository Security tab is taken from `SECURITY.md`.
 
 ## 10. Mini App
 

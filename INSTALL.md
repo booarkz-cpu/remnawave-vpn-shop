@@ -1,8 +1,8 @@
-# Remnawave VPN Shop 3.0.0-realise — Установка одной командой
+# Remnawave VPN Shop 3.0.1 — Установка одной командой
 
-Версия **3.0.0-realise** не меняет схему базы и не заменяет APK. Загрузка пакета приложения принимает `Content-Length` до 80 МБ. Обновление установленной копии: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+Версия **3.0.1** не меняет схему базы и не заменяет APK. Она чинит автопродление, проверку шифрованной копии и повторное списание с баланса. Обновление установленной копии: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
 
-Version **3.0.0-realise** does not change the database schema and does not replace the APKs. An app package upload accepts `Content-Length` up to 80 MB. Update an installed copy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
+Version **3.0.1** does not change the database schema and does not replace the APKs. It fixes auto-renew, encrypted backup validation and a second wallet debit. Update an installed copy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`.
 
 Файлы приложений, загруженные в панели, лежат в каталоге `app-packages` рядом с `MEDIA_DIR`. Этот каталог не публикуется как `/media`. Ссылки на скачивание описаны в разделе 9.11 `INSTRUCTION.md`.
 

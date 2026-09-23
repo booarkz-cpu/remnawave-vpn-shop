@@ -21,6 +21,12 @@
 
 The header language button switches Russian and English. The choice is stored in `localStorage` (`rw_lang`). Russian strings stay in `src/main.tsx`; English is applied after render from `src/i18n.tsx`.
 
+## 3.0.1
+
+Повторная оплата с баланса в течение 30 секунд не создаёт второе списание. Загрузка пакета по-прежнему проверяет `manage_content` до чтения файла.
+
+A second wallet payment within 30 seconds does not create another debit. A package upload still checks `manage_content` before the file is read.
+
 ## 3.0.0-realise
 
 Загрузка APK или IPA на карточку принимает файл до 80 МБ при `Content-Length`. Сессия без `manage_content` получает отказ до чтения файла.

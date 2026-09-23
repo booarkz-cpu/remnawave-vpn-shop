@@ -5,7 +5,8 @@ cd "$ROOT"
 # Historical release: VERSION="39.0.0-production" artifact=remnawave_vpn_shop_v39_production.zip migration=0017_v39_staging_isolation
 # Previous release contract: VERSION="1.0.1-realise" artifact=remnawave_vpn_shop_v1_0_1_realise_deep_audited_fixed.zip
 # Legacy regression markers: VERSION="1.0.0-realise" artifact=remnawave_vpn_shop_v1_0_0_realise_deep_audited_fixed.zip
-VERSION="3.0.0-realise"
+VERSION="3.0.1"
+# Historical compatibility marker: VERSION="3.0.0-realise"
 # Historical compatibility marker: VERSION="2.13.0"
 # Historical compatibility marker: VERSION="2.12.0"
 # Historical compatibility marker: VERSION="2.11.0"
@@ -37,7 +38,8 @@ VERSION="3.0.0-realise"
 # Historical compatibility marker: 0032_v2_0_0_product_features
 # VERSION="43.1.0-production" legacy regression marker
 # migration_head="0021_v43_hardening_docs" legacy regression marker
-ARTIFACT="remnawave_vpn_shop_v3_0_0_realise_full_release.zip"
+ARTIFACT="remnawave_vpn_shop_v3_0_1_full_release.zip"
+# Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v3_0_0_realise_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v2_13_0_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v2_12_0_full_release.zip"
 # Historical compatibility marker: ARTIFACT="remnawave_vpn_shop_v2_11_0_full_release.zip"

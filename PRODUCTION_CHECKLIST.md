@@ -1,6 +1,8 @@
-# Production checklist 3.0.0-realise
+# Production checklist 3.0.1
 
 ## Русский
+
+Версия **3.0.1** исправляет автопродление, проверку шифрованной копии и повторное списание с баланса. Схема и APK те же, что у **3.0.0-realise**. Запись прогона ниже относится к хосту сборки 3.0.0-realise и не отмечает заново пункты, которые на живом VPS не запускались.
 
 Этот файл — порядок выкладки на VPS и запись прогона на хосте сборки от 22 сентября 2026. Пункты раздела «Порядок на VPS» остаются открытыми, пока их не выполнит администратор на своём сервере. Раздел «Прогон на хосте сборки» отмечает только то, что реально запускалось здесь.
 
@@ -132,6 +134,8 @@
 - [ ] Файрвол, S3, SMTP, живые кассы, Xcode, установка APK на телефон, резервная копия и тестовое восстановление не выполнялись.
 
 ## English
+
+Version **3.0.1** fixes auto-renew, encrypted backup validation and a second wallet debit. The schema and the APKs stay the same as **3.0.0-realise**. The run record below belongs to the 3.0.0-realise build host and does not mark live-VPS items done again.
 
 This file is the VPS rollout order and the record of the build-host run on 22 September 2026. Items under “VPS order” stay open until an administrator runs them on their own server. “Build-host run” marks only what actually ran here.
 
