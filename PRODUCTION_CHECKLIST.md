@@ -1,6 +1,12 @@
-# Production checklist 3.1.4
+# Production checklist 3.1.5
 
 ## Русский
+
+Версия **3.1.5** даёт nginx в админке, Mini App и кабинете временные каталоги `/var/cache/nginx` и `/run`, поэтому эти контейнеры не остаются в `Restarting` на read-only корне. В **3.1.4** Caddy отвечал 502, пока API уже был healthy. Схема и APK те же. Пошаговая установка — `INSTALL_STEPS.md`, панели — раздел 9.19 `INSTRUCTION.md`. Production gate по-прежнему требует `FULL_E2E_PASS` (раздел 9.15). Записи прогонов 3.1.4 и старше ниже остаются фактами тех хостов. Живой VPS, firewall, S3, SMTP, Xcode и установка на телефон для 3.1.5 не запускались.
+
+### Прогон 3.1.5 на этом хосте
+
+23 сентября 2026. `docker-compose.yml` для `admin`, `miniapp` и `cabinet` содержит tmpfs `/var/cache/nginx` и `/run` при `read_only: true`. `bash -n` прошёл для `install.sh` и `deploy/install-vps.sh`. `MEDIA_DIR=/tmp/media python3 -m pytest -q` завершился с кодом 0: 355 тестов. Живой контейнер nginx в этом прогоне не запускался: Docker на хосте сборки недоступен.
 
 Версия **3.1.4** не даёт backend и worker одновременно создавать `alembic_version`. В **3.1.3** проигравший процесс завершал контейнер API, и установка останавливалась на `installation failed at line 382`. Схема и APK те же. Пошаговая установка — `INSTALL_STEPS.md`, запуск — раздел 9.18 `INSTRUCTION.md`. Production gate по-прежнему требует `FULL_E2E_PASS` (раздел 9.15). Записи прогонов 3.1.3 и старше ниже остаются фактами тех хостов. Живой VPS, firewall, S3, SMTP, Xcode и установка на телефон для 3.1.4 не запускались.
 
@@ -177,6 +183,12 @@
 - [ ] Файрвол, S3, SMTP, живые кассы, Xcode, телефон, резервная копия и восстановление не выполнялись. Повтор зрителя на рассылке в этом прогоне не делался.
 
 ## English
+
+Version **3.1.5** gives nginx in the admin UI, Mini App, and cabinet temporary directories `/var/cache/nginx` and `/run`, so those containers do not stay in `Restarting` on a read-only root. In **3.1.4** Caddy answered 502 while the API was already healthy. The schema and the APKs stay the same. The step-by-step install is `INSTALL_STEPS.md` and the panels are section 9.19 of `INSTRUCTION.md`. The production gate still requires `FULL_E2E_PASS` (section 9.15). The 3.1.4 and older run records below stay facts of those hosts. A live VPS, the firewall, S3, SMTP, Xcode, and a phone install were not run for 3.1.5.
+
+### 3.1.5 build-host run
+
+23 September 2026. `docker-compose.yml` for `admin`, `miniapp`, and `cabinet` contains tmpfs `/var/cache/nginx` and `/run` with `read_only: true`. `bash -n` passed for `install.sh` and `deploy/install-vps.sh`. `MEDIA_DIR=/tmp/media python3 -m pytest -q` exited 0: 355 tests. A live nginx container was not started in this run: Docker is not available on the build host.
 
 Version **3.1.4** stops backend and worker from creating `alembic_version` at the same time. In **3.1.3** the losing process exited the API container, and the install stopped at `installation failed at line 382`. The schema and the APKs stay the same. The step-by-step install is `INSTALL_STEPS.md` and the boot fix is section 9.18 of `INSTRUCTION.md`. The production gate still requires `FULL_E2E_PASS` (section 9.15). The 3.1.3 and older run records below stay facts of those hosts. A live VPS, the firewall, S3, SMTP, Xcode, and a phone install were not run for 3.1.4.
 

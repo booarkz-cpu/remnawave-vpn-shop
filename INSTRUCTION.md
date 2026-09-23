@@ -1,6 +1,6 @@
-# Полная инструкция — Remnawave VPN Shop 3.1.4
+# Полная инструкция — Remnawave VPN Shop 3.1.5
 
-Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.4**. Разделы 9.3–9.17 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
+Документ для оператора, который ставит магазин, включает платежи и сопровождает панель. Актуальная версия — **3.1.5**. Разделы 9.3–9.18 сохраняют описание своих релизов, включая конструктор **2.5.0** и кабинет **2.4.0**. Пошаговая установка — `INSTALL_STEPS.md`. Каждый модуль и его назначение — в `MODULES.md`. Разбор функций кода — в `FUNCTIONS.md`. Модель безопасности — в `SECURITY.md`.
 
 ---
 
@@ -461,6 +461,16 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 5. Диагностика, задания, копии, провайдеры, выплаты, мониторы и операции восстановления в поле ошибки отвечают `unavailable`. Восстановление не возвращает stderr. Журнал аудита в JSON прячет ключи `error`, `token`, `secret`, `password` и `authorization`. Причина возврата не содержит хвост с текстом исключения.
 6. Production gate не ослаблен. Порядок включения реальных платежей остаётся в разделе 9.15. Строка `FULL_E2E_PASS` по-прежнему обязательна.
 
+## 9.19. Релиз 3.1.5
+
+1. Версия API — `3.1.5`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA нет: покупатель **2.10.0**, администратор Android **2.12.0**.
+2. В **3.1.4** контейнеры `admin`, `miniapp` и `cabinet` писали `mkdir() "/var/cache/nginx/client_temp" failed (30: Read-only file system)` и оставались в `Restarting (1)`. Caddy отвечал 502 и `lookup admin on 127.0.0.11:53`. API при этом уже был healthy.
+3. Корень этих контейнеров остаётся только для чтения. nginx получает tmpfs `/tmp`, `/var/cache/nginx` и `/run`.
+4. Установщик ждёт, пока эти три сервиса не в статусе `restarting`. Если они падают, печатаются их логи. Для Redis выставляется `vm.overcommit_memory=1`.
+5. Проверка API: `curl -fsS https://api.<домен>/health`. Имя команды — `curl`.
+6. Уже установленный **3.1.4** с healthy API обновляйте так: `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` и тома базы сохраняются. `docker compose down -v` здесь не нужен.
+7. Production gate не ослаблен. Строка `FULL_E2E_PASS` по-прежнему обязательна. Порядок — раздел 9.15.
+
 ## 9.18. Релиз 3.1.4
 
 1. Версия API — `3.1.4`. Схема остаётся `0038_v2_6_0_platform`. Новых APK и IPA нет: покупатель **2.10.0**, администратор Android **2.12.0**.
@@ -590,9 +600,9 @@ RollyPay: HMAC и окно времени 5 минут. В тестовом stag
 
 ---
 
-# Full instruction — Remnawave VPN Shop 3.1.4
+# Full instruction — Remnawave VPN Shop 3.1.5
 
-This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.4**. Sections 9.3–9.17 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
+This is the operator guide for installing the shop, turning payments on, and running the admin panel. The current version is **3.1.5**. Sections 9.3–9.18 keep the description of their own releases, including the **2.5.0** constructor and the **2.4.0** cabinet. The step-by-step install is `INSTALL_STEPS.md`. A function-by-function code reference is in `FUNCTIONS.md`. The security model is in `SECURITY.md`.
 
 ## 1. What it is
 
@@ -1024,6 +1034,16 @@ Role `admin` has `staging_e2e.manage` and `security.manage`. Roles `viewer` and 
 4. Remnawave user lists, the stream, and the user card omit the subscription URL and protocol passwords. Overview shows only the total. The user id is a string, including a UUID. An invalid id answers 400 «Некорректный идентификатор пользователя Remnawave».
 5. Diagnostics, jobs, backups, providers, payouts, monitors, and recovery operations answer `unavailable` in the error field. Restore does not return stderr. The audit log hides JSON keys `error`, `token`, `secret`, `password`, and `authorization`. A refund reason does not include the exception tail.
 6. The production gate is unchanged. The order for live payments stays in section 9.15. The line `FULL_E2E_PASS` is still required.
+
+## 9.19. Release 3.1.5
+
+1. The API version is `3.1.5`. The schema stays `0038_v2_6_0_platform`. There is no new APK and no IPA: the buyer app stays **2.10.0** and the Android administrator app stays **2.12.0**.
+2. In **3.1.4** the `admin`, `miniapp`, and `cabinet` containers logged `mkdir() "/var/cache/nginx/client_temp" failed (30: Read-only file system)` and stayed in `Restarting (1)`. Caddy answered 502 and `lookup admin on 127.0.0.11:53`. The API was already healthy.
+3. The root of those containers stays read-only. nginx gets tmpfs mounts for `/tmp`, `/var/cache/nginx`, and `/run`.
+4. The installer waits until those three services are not `restarting`. If they crash, it prints their logs. Redis gets `vm.overcommit_memory=1`.
+5. Check the API with `curl -fsS https://api.<domain>/health`. The command name is `curl`.
+6. Update an installed **3.1.4** copy whose API is already healthy with `sudo bash /opt/vpn-shop/scripts/update-from-github.sh`. `.env` and the database volumes stay. `docker compose down -v` is not needed here.
+7. The production gate is unchanged. The line `FULL_E2E_PASS` is still required. The order is section 9.15.
 
 ## 9.18. Release 3.1.4
 
