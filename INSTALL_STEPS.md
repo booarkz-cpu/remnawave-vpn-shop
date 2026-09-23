@@ -129,7 +129,7 @@ docker compose ps
 ./scripts/doctor.sh
 ```
 
-Ответ `/health` содержит `"ok": true`, `"version": "3.1.5"`, `"database": true` и `"redis": true`. Предыдущий релиз отвечал `"version": "3.1.4"`. Релиз **3.1.3** отвечал `"version": "3.1.3"`. Команда проверки — `curl -fsS`, не `url`. `docker compose ps` должен показывать `admin`, `miniapp` и `cabinet` как `Up`, а не `Restarting`. `doctor.sh` рассчитан на каталог `/opt/vpn-shop` и запущенный Docker.
+Ответ `/health` содержит `"ok": true`, `"version": "3.1.5"`, `"database": true` и `"redis": true`. Предыдущий релиз отвечал `"version": "3.1.4"`. Релиз **3.1.3** отвечал `"version": "3.1.3"`. Релиз **3.1.2** отвечал `"version": "3.1.2"`. Команда проверки — `curl -fsS`, не `url`. `docker compose ps` должен показывать `admin`, `miniapp` и `cabinet` как `Up`, а не `Restarting`. `doctor.sh` рассчитан на каталог `/opt/vpn-shop` и запущенный Docker.
 
 Откройте `https://admin.<домен>`, войдите почтой и паролем администратора. Создайте хотя бы один включённый тариф: его числовой ID понадобится в staging E2E.
 
@@ -289,7 +289,7 @@ docker compose ps
 ./scripts/doctor.sh
 ```
 
-`/health` returns `"ok": true`, `"version": "3.1.5"`, `"database": true`, and `"redis": true`. The previous release answered `"version": "3.1.4"`. Release **3.1.3** answered `"version": "3.1.3"`. The check command is `curl -fsS`, not `url`. `docker compose ps` should show `admin`, `miniapp`, and `cabinet` as `Up`, not `Restarting`. `doctor.sh` expects `/opt/vpn-shop` and a running Docker engine.
+`/health` returns `"ok": true`, `"version": "3.1.5"`, `"database": true`, and `"redis": true`. The previous release answered `"version": "3.1.4"`. Release **3.1.3** answered `"version": "3.1.3"`. Release **3.1.2** answered `"version": "3.1.2"`. The check command is `curl -fsS`, not `url`. `docker compose ps` should show `admin`, `miniapp`, and `cabinet` as `Up`, not `Restarting`. `doctor.sh` expects `/opt/vpn-shop` and a running Docker engine.
 
 Open `https://admin.<domain>` and sign in. Create one enabled plan: its numeric id is required for staging E2E.
 
