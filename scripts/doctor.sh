@@ -11,3 +11,10 @@ if docker compose exec -T backend python -c 'import urllib.request; urllib.reque
 else
   echo "API health: FAILED"; exit 1
 fi
+for svc in admin miniapp cabinet; do
+  if docker compose exec -T "$svc" curl -fsS http://127.0.0.1/ >/dev/null 2>&1; then
+    echo "$svc HTTP: OK"
+  else
+    echo "$svc HTTP: FAILED"; exit 1
+  fi
+done

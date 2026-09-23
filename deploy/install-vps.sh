@@ -89,7 +89,8 @@ env_line() {
 }
 
 # Previous release contract: INSTALLER_VERSION="1.0.0-realise"
-INSTALLER_VERSION="3.1.5"
+INSTALLER_VERSION="3.1.6"
+# Historical compatibility marker: INSTALLER_VERSION="3.1.5"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.4"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.3"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.2"
@@ -117,7 +118,7 @@ INSTALLER_VERSION="3.1.5"
 # Previous release contract: INSTALLER_VERSION="45.0.0-enterprise"
 # V44.5 Enterprise legacy contract marker
 # INSTALLER_VERSION="43.1.0-production" legacy regression marker
-log "Remnawave VPN Shop — 3.1.5 русскоязычный production installer"
+log "Remnawave VPN Shop — 3.1.6 русскоязычный production installer"
 # Historical compatibility marker: 3.1.3 русскоязычный production installer
 # Historical compatibility marker: 3.1.2 русскоязычный production installer
 # Historical compatibility marker: 3.1.1 русскоязычный production installer
@@ -448,6 +449,17 @@ if [[ "$panels_ok" != "1" ]]; then
   docker compose logs --tail=80 admin miniapp cabinet >&2 || true
   die "Админка, Mini App или кабинет перезапускаются. Логи напечатаны выше."
 fi
+for svc in admin miniapp cabinet; do
+  served=0
+  for _ in {1..15}; do
+    if docker compose exec -T "$svc" curl -fsS http://127.0.0.1/ >/dev/null 2>&1; then served=1; break; fi
+    sleep 2
+  done
+  if [[ "$served" != "1" ]]; then
+    docker compose logs --tail=80 "$svc" >&2 || true
+    die "Сервис $svc не отвечает на HTTP. Логи напечатаны выше."
+  fi
+done
 
 log "Ожидаю API и миграции..."
 healthy=0

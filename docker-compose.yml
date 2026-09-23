@@ -140,14 +140,23 @@ services:
         condition: service_healthy
     expose:
       - "80"
+    command: ["/bin/sh", "-c", "mkdir -p /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp && chmod 1777 /tmp/nginx /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp && exec nginx -g 'daemon off;'"]
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     security_opt:
       - no-new-privileges:true
     read_only: true
-    # nginx creates /var/cache/nginx/client_temp and writes its pid under /run.
     tmpfs:
       - /tmp
       - /var/cache/nginx
       - /run
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   miniapp:
     build:
@@ -162,14 +171,23 @@ services:
         condition: service_healthy
     expose:
       - "80"
+    command: ["/bin/sh", "-c", "mkdir -p /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp && chmod 1777 /tmp/nginx /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp && exec nginx -g 'daemon off;'"]
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     security_opt:
       - no-new-privileges:true
     read_only: true
-    # nginx creates /var/cache/nginx/client_temp and writes its pid under /run.
     tmpfs:
       - /tmp
       - /var/cache/nginx
       - /run
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   cabinet:
     build:
@@ -184,14 +202,23 @@ services:
         condition: service_healthy
     expose:
       - "80"
+    command: ["/bin/sh", "-c", "mkdir -p /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp && chmod 1777 /tmp/nginx /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp && exec nginx -g 'daemon off;'"]
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     security_opt:
       - no-new-privileges:true
     read_only: true
-    # nginx creates /var/cache/nginx/client_temp and writes its pid under /run.
     tmpfs:
       - /tmp
       - /var/cache/nginx
       - /run
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   caddy:
     image: ${CADDY_IMAGE:-caddy:2.10-alpine}
@@ -205,11 +232,11 @@ services:
       backend:
         condition: service_healthy
       admin:
-        condition: service_started
+        condition: service_healthy
       miniapp:
-        condition: service_started
+        condition: service_healthy
       cabinet:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"

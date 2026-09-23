@@ -11,6 +11,9 @@ if command -v docker >/dev/null 2>&1; then
   docker compose up -d --remove-orphans
   for i in {1..80}; do
     if docker compose exec -T backend python -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=3)' >/dev/null 2>&1; then
+      for svc in admin miniapp cabinet; do
+        docker compose exec -T "$svc" curl -fsS http://127.0.0.1/ >/dev/null || { docker compose logs --tail=80 "$svc" >&2; echo "$svc did not serve HTTP" >&2; exit 1; }
+      done
       docker compose ps
       exit 0
     fi

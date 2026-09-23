@@ -1,6 +1,12 @@
-# Production checklist 3.1.5
+# Production checklist 3.1.6
 
 ## Русский
+
+Версия **3.1.6** переносит pid и кэш nginx админки, Mini App и кабинета в `/tmp/nginx`, чтобы `https://admin.<домен>` не отвечал 502. Схема и APK те же. Пошаговая установка — `INSTALL_STEPS.md`, панели — раздел 9.20 `INSTRUCTION.md`. Production gate по-прежнему требует `FULL_E2E_PASS` (раздел 9.15). Живой VPS для 3.1.6 не запускался.
+
+### Прогон 3.1.6 на этом хосте
+
+23 сентября 2026. `deploy/nginx/nginx.conf` задаёт пути внутри `/tmp/nginx`. Compose монтирует его в три панели и ставит healthcheck `GET /`. Docker на хосте сборки недоступен, поэтому контейнер nginx здесь не стартовал.
 
 Версия **3.1.5** даёт nginx в админке, Mini App и кабинете временные каталоги `/var/cache/nginx` и `/run`, поэтому эти контейнеры не остаются в `Restarting` на read-only корне. В **3.1.4** Caddy отвечал 502, пока API уже был healthy. Схема и APK те же. Пошаговая установка — `INSTALL_STEPS.md`, панели — раздел 9.19 `INSTRUCTION.md`. Production gate по-прежнему требует `FULL_E2E_PASS` (раздел 9.15). Записи прогонов 3.1.4 и старше ниже остаются фактами тех хостов. Живой VPS, firewall, S3, SMTP, Xcode и установка на телефон для 3.1.5 не запускались.
 
@@ -183,6 +189,12 @@
 - [ ] Файрвол, S3, SMTP, живые кассы, Xcode, телефон, резервная копия и восстановление не выполнялись. Повтор зрителя на рассылке в этом прогоне не делался.
 
 ## English
+
+Version **3.1.6** moves the admin, Mini App, and cabinet nginx pid and cache to `/tmp/nginx`, so `https://admin.<domain>` does not answer 502. The schema and the APKs stay the same. The step-by-step install is `INSTALL_STEPS.md` and the panels are section 9.20 of `INSTRUCTION.md`. The production gate still requires `FULL_E2E_PASS` (section 9.15). A live VPS was not run for 3.1.6.
+
+### 3.1.6 build-host run
+
+23 September 2026. `deploy/nginx/nginx.conf` sets paths under `/tmp/nginx`. Compose mounts it into the three panels and adds a `GET /` healthcheck. Docker is not available on the build host, so an nginx container was not started here.
 
 Version **3.1.5** gives nginx in the admin UI, Mini App, and cabinet temporary directories `/var/cache/nginx` and `/run`, so those containers do not stay in `Restarting` on a read-only root. In **3.1.4** Caddy answered 502 while the API was already healthy. The schema and the APKs stay the same. The step-by-step install is `INSTALL_STEPS.md` and the panels are section 9.19 of `INSTRUCTION.md`. The production gate still requires `FULL_E2E_PASS` (section 9.15). The 3.1.4 and older run records below stay facts of those hosts. A live VPS, the firewall, S3, SMTP, Xcode, and a phone install were not run for 3.1.5.
 
