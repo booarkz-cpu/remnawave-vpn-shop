@@ -58,7 +58,8 @@ env_line() {
 }
 
 # Previous release contract: INSTALLER_VERSION="1.0.0-realise"
-INSTALLER_VERSION="3.1.1"
+INSTALLER_VERSION="3.1.2"
+# Historical compatibility marker: INSTALLER_VERSION="3.1.1"
 # Historical compatibility marker: INSTALLER_VERSION="3.1.0"
 # Historical compatibility marker: INSTALLER_VERSION="3.0.1"
 # Historical compatibility marker: INSTALLER_VERSION="3.0.0-realise"
@@ -82,7 +83,8 @@ INSTALLER_VERSION="3.1.1"
 # Previous release contract: INSTALLER_VERSION="45.0.0-enterprise"
 # V44.5 Enterprise legacy contract marker
 # INSTALLER_VERSION="43.1.0-production" legacy regression marker
-log "Remnawave VPN Shop — 3.1.1 русскоязычный production installer"
+log "Remnawave VPN Shop — 3.1.2 русскоязычный production installer"
+# Historical compatibility marker: 3.1.1 русскоязычный production installer
 # Historical compatibility marker: 3.1.0 русскоязычный production installer
 # Historical compatibility marker: 3.0.1 русскоязычный production installer
 # Historical compatibility marker: 3.0.0-realise русскоязычный production installer

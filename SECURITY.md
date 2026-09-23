@@ -1,4 +1,16 @@
-# Security / Безопасность — Remnawave VPN Shop 3.1.1
+# Security / Безопасность — Remnawave VPN Shop 3.1.2
+
+## Аудит 3.1.2 / 3.1.2 audit
+
+- `GET /api/admin/remnawave/users/{id}/subscription` и `GET /api/admin/remnawave/users/{id}/keys` требуют `users.keys`. Роль `viewer` это право не имеет. Списки, поток и карточка проходят `redact_remote` и не содержат ссылку подписки, `shortUuid` и пароли протоколов. Обзор отдаёт только `response.total`.
+- Диагностика, задания, копии, провайдеры, выплаты, мониторы, операции восстановления и проверка копии отдают `error` и `last_error` как `unavailable`. stderr `psql` и `alembic` в HTTP-ответ восстановления не попадает.
+- `GET /api/admin/audit` заменяет в JSON ключи `error`, `token`, `secret`, `password` и `authorization` на `unavailable`. Причина возврата обрезается перед хвостом с текстом исключения. Оповещение Telegram о сбое копии и планировщика возвратов текст исключения не содержит.
+- Установка узла по SSH отвечает `Remote install failed` и не возвращает вывод `docker compose`.
+
+- `GET /api/admin/remnawave/users/{id}/subscription` and `GET /api/admin/remnawave/users/{id}/keys` require `users.keys`. Role `viewer` does not have that permission. Lists, the stream, and the user card pass through `redact_remote` and omit the subscription URL, `shortUuid`, and protocol passwords. Overview returns only `response.total`.
+- Diagnostics, jobs, backups, providers, payouts, monitors, recovery operations, and backup verification return `error` and `last_error` as `unavailable`. `psql` and `alembic` stderr do not enter the restore HTTP response.
+- `GET /api/admin/audit` replaces JSON keys `error`, `token`, `secret`, `password`, and `authorization` with `unavailable`. A refund reason is cut before the tail that carried exception text. The Telegram alert for a backup failure and for the refund scheduler does not include the exception text.
+- SSH node install answers `Remote install failed` and does not return `docker compose` output.
 
 ## Аудит 3.1.1 / 3.1.1 audit
 
