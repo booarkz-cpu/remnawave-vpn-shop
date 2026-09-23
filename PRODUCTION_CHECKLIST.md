@@ -1,8 +1,8 @@
-# Production checklist 3.0.1
+# Production checklist 3.1.0
 
 ## Русский
 
-Версия **3.0.1** исправляет автопродление, проверку шифрованной копии и повторное списание с баланса. Схема и APK те же, что у **3.0.0-realise**. Запись прогона ниже относится к хосту сборки 3.0.0-realise и не отмечает заново пункты, которые на живом VPS не запускались.
+Версия **3.1.0** скрывает `remnawave_profile_id` в публичном списке тарифов, заменяет текст ошибки автопродления, считает SHA-256 пакета и отдаёт файл подписки. Схема и APK те же, что у **3.0.1** и **3.0.0-realise**. Запись прогона ниже относится к хосту сборки 3.0.0-realise и не отмечает заново пункты, которые на живом VPS не запускались. Для 3.1.0 на этом хосте `MEDIA_DIR=/tmp/media python3 -m pytest -q` завершился с 333 пройденными тестами. Docker, живые кассы, Xcode и установка на телефон не запускались.
 
 Этот файл — порядок выкладки на VPS и запись прогона на хосте сборки от 22 сентября 2026. Пункты раздела «Порядок на VPS» остаются открытыми, пока их не выполнит администратор на своём сервере. Раздел «Прогон на хосте сборки» отмечает только то, что реально запускалось здесь.
 
@@ -135,7 +135,7 @@
 
 ## English
 
-Version **3.0.1** fixes auto-renew, encrypted backup validation and a second wallet debit. The schema and the APKs stay the same as **3.0.0-realise**. The run record below belongs to the 3.0.0-realise build host and does not mark live-VPS items done again.
+Version **3.1.0** hides `remnawave_profile_id` on the public plan list, replaces the auto-renew error text, stores a package SHA-256 and serves a subscription file. The schema and the APKs stay the same as **3.0.1** and **3.0.0-realise**. The run record below belongs to the 3.0.0-realise build host and does not mark live-VPS items done again. For 3.1.0 this host ran `MEDIA_DIR=/tmp/media python3 -m pytest -q` and 333 tests passed. Docker, live gateways, Xcode and a phone install were not run.
 
 This file is the VPS rollout order and the record of the build-host run on 22 September 2026. Items under “VPS order” stay open until an administrator runs them on their own server. “Build-host run” marks only what actually ran here.
 

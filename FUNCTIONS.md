@@ -1,8 +1,14 @@
 # Разбор функций / Function reference
 
-Версия приложения: **3.0.1**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая рассылка — в `INSTRUCTION.md`, раздел 9.10, и в `RELEASE_NOTES_V2_12_0.md`. Исправления 3.0.1 — раздел 9.13 и `RELEASE_NOTES_V3_0_1.md`. Исправления 3.0.0-realise — раздел 9.12 и `RELEASE_NOTES_V3_0_0.md`.
+Версия приложения: **3.1.0**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая рассылка — в `INSTRUCTION.md`, раздел 9.10, и в `RELEASE_NOTES_V2_12_0.md`. Состав 3.1.0 — раздел 9.14 и `RELEASE_NOTES_V3_1_0.md`. Исправления 3.0.1 — раздел 9.13 и `RELEASE_NOTES_V3_0_1.md`. Исправления 3.0.0-realise — раздел 9.12 и `RELEASE_NOTES_V3_0_0.md`.
 
-Application version: **3.0.1**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The broadcast walkthrough is section 9.10 of `INSTRUCTION.md` and `RELEASE_NOTES_V2_12_0.md`. The 3.0.1 fixes are section 9.13 and `RELEASE_NOTES_V3_0_1.md`. The 3.0.0-realise fixes are section 9.12 and `RELEASE_NOTES_V3_0_0.md`.
+Application version: **3.1.0**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The broadcast walkthrough is section 9.10 of `INSTRUCTION.md` and `RELEASE_NOTES_V2_12_0.md`. The 3.1.0 changes are section 9.14 and `RELEASE_NOTES_V3_1_0.md`. The 3.0.1 fixes are section 9.13 and `RELEASE_NOTES_V3_0_1.md`. The 3.0.0-realise fixes are section 9.12 and `RELEASE_NOTES_V3_0_0.md`.
+
+## Аудит 3.1.0 / 3.1.0 audit
+
+`plans` не кладёт `remnawave_profile_id` в публичный JSON. `auto_renew_status` подменяет текст ошибки фразой «Автопродление не выполнено». `upload_app_file` пишет `file_sha256`. `public_install_guide` собирает шаги установки. `subscription_file` отдаёт ссылку подписки как `text/plain`.
+
+`plans` omits `remnawave_profile_id` from the public JSON. `auto_renew_status` replaces the error text with «Автопродление не выполнено». `upload_app_file` stores `file_sha256`. `public_install_guide` builds the install steps. `subscription_file` returns the subscription URL as `text/plain`.
 
 ## Аудит 3.0.1 / 3.0.1 audit
 

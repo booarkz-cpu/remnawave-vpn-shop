@@ -95,6 +95,8 @@ export const EN: Record<string, string> = {
   "Открыть": "Open",
   "Скачать": "Download",
   "Скачать по ссылке": "Download from link",
+  "Скачать подписку": "Download subscription",
+  "Контрольная сумма": "Checksum",
 };
 
 let activeLang: Lang = "ru";

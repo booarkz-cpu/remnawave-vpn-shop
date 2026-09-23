@@ -1,4 +1,18 @@
-# Security / Безопасность — Remnawave VPN Shop 3.0.1
+# Security / Безопасность — Remnawave VPN Shop 3.1.0
+
+## Аудит 3.1.0 / 3.1.0 audit
+
+- `GET /api/plans` не включает `remnawave_profile_id`. Внутренний идентификатор профиля Remnawave остаётся у администратора и в снимке платежа.
+- `GET /api/me/auto-renew` не возвращает `method.last_error`. Покупатель видит фиксированную фразу «Автопродление не выполнено».
+- SHA-256 пакета считается по байтам файла и проходит `safe_sha256`: 64 шестнадцатеричных символа. Имя файла на диске в JSON не попадает.
+- `GET /api/me/subscription-file` требует сессию покупателя, отвечает `Cache-Control: private, no-store` и отбрасывает ссылку с переводом строки.
+- `GET /api/public/apps/install` отдаёт публичные карточки и уже опубликованные ссылки GitHub. Карточки администратора магазина в `shop_apps` не входят.
+
+- `GET /api/plans` does not include `remnawave_profile_id`. The Remnawave profile id stays with the administrator and on the payment snapshot.
+- `GET /api/me/auto-renew` does not return `method.last_error`. The buyer sees the fixed sentence «Автопродление не выполнено».
+- The package SHA-256 is computed from the file bytes and passes `safe_sha256`: 64 hexadecimal characters. The stored file name is not returned in JSON.
+- `GET /api/me/subscription-file` requires a buyer session, answers `Cache-Control: private, no-store` and drops a URL that contains a newline.
+- `GET /api/public/apps/install` returns the public cards and the GitHub links that are already published. Shop administrator cards are not included in `shop_apps`.
 
 ## Аудит 3.0.1 / 3.0.1 audit
 
