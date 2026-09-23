@@ -1,8 +1,8 @@
-# Remnawave VPN Shop 3.0.0-realise
+# Remnawave VPN Shop 3.0.1
 
 Платформа магазина VPN: Telegram-бот, Mini App, отдельный личный кабинет, админ-панель Material Design + Web 3.0, отдельные приложения Android и iOS для покупателя и администратора, API, платежи YooKassa / Platega / RollyPay и sandbox без шлюзов, конструктор тарифа, статус узлов Remnawave, антиабьюз, агент узла, выдача доступа, очереди и резервные копии.
 
-Состояние: **3.0.0-realise**. Предыдущие релизы: **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
+Состояние: **3.0.1**. Предыдущие релизы: **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** и **2.4.0**. Перед production пройдите `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` и `PRODUCTION_CHECKLIST.md`. Лицензия — `LICENSE`.
 
 ## Русский
 
@@ -17,6 +17,13 @@
 | Android и iOS | Kotlin Compose, SwiftUI | Покупатель и администратор, русский и английский |
 | Периметр | Docker Compose, Caddy | HTTPS и разделение доменов |
 | Проверки | `tests/`, `scripts/sandbox-e2e.sh` | Регрессия и прогон без живых касс |
+
+### Возможности 3.0.1
+
+- **Автопродление и шифрованная копия.** Секрет расшифровывается через `decrypt_secret` из пакета `app`. В контейнере больше нет импорта `backend.app.security`, из‑за которого продление и проверка копии отвечали ошибкой.
+- **Баланс списывается один раз.** `POST /api/me/wallet/spend` требует `Idempotency-Key`. Повтор с тем же ключом возвращает уже созданный платёж. Другой ключ на ту же покупку в течение 30 секунд получает 409 и не списывает баланс второй раз. Покупка подарка повторно проверяет ключ уже под блокировкой пользователя.
+- **Второй счёт на ту же покупку.** Новый `Idempotency-Key` в течение 30 секунд не открывает второй сеанс провайдера, пока предыдущий счёт на тот же снимок тарифа ещё создаётся или ожидает оплаты.
+- Схема остаётся `0038_v2_6_0_platform`. Покупатель Android остаётся **2.10.0**, администратор — **2.12.0**. Подробности — раздел 9.13 в `INSTRUCTION.md`, `SECURITY.md` и `RELEASE_NOTES_V3_0_1.md`.
 
 ### Возможности 3.0.0-realise
 
@@ -126,6 +133,7 @@ sudo bash /opt/vpn-shop/scripts/update-from-github.sh
 | `DOCUMENTATION.md` | Карта актуальных документов и архивных аудитов |
 | `LICENSE` | Проприетарная лицензия 1.0, RU/EN |
 | `MOBILE.md` | Android и iOS: функции, сессия, логотип, сборка, RU/EN |
+| `RELEASE_NOTES_V3_0_1.md` | Аудит 3.0.1: автопродление, копия и баланс |
 | `RELEASE_NOTES_V3_0_0.md` | Аудит 3.0.0-realise и результат чеклиста |
 | `RELEASE_NOTES_V2_13_0.md` | Скачивание приложений 2.13.0 |
 | `RELEASE_NOTES_V2_12_0.md` | Рассылка 2.12.0, разбор функций и проверка |
@@ -161,7 +169,7 @@ cd ../cabinet && npm install && npx vite build
 
 A VPN shop with a Telegram bot, a Mini App, a standalone user cabinet, an admin console, separate Android and iOS apps for buyers and administrators, a FastAPI backend, three payment providers plus a sandbox provider, a tariff constructor, Remnawave node status, abuse scoring, a node agent, provisioning, queues and backups.
 
-Current release: **3.0.0-realise**. Previous releases: **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
+Current release: **3.0.1**. Previous releases: **3.0.0-realise**, **2.13.0**, **2.12.0**, **2.11.0**, **2.10.0**, **2.9.0**, **2.8.0**, **2.7.0**, **2.6.0**, **2.5.0** and **2.4.0**. Read `INSTRUCTION.md`, `MOBILE.md`, `MODULES.md`, `SECURITY.md` and `PRODUCTION_CHECKLIST.md` before production. The license is `LICENSE`.
 
 ### What is in the tree
 
@@ -174,6 +182,13 @@ Current release: **3.0.0-realise**. Previous releases: **2.13.0**, **2.12.0**, *
 | Android and iOS | Kotlin Compose, SwiftUI | Buyer and administrator, Russian and English |
 | Edge | Docker Compose, Caddy | HTTPS and separate domains |
 | Checks | `tests/`, `scripts/sandbox-e2e.sh` | Regression and a run without live gateways |
+
+### What 3.0.1 adds
+
+- **Auto-renew and encrypted backups.** Secrets are decrypted with `decrypt_secret` from the `app` package. The container no longer imports `backend.app.security`, which made renewal and backup validation fail.
+- **The wallet is debited once.** `POST /api/me/wallet/spend` requires `Idempotency-Key`. The same key returns the payment already created. A different key for the same purchase within 30 seconds receives 409 and does not debit the balance again. Gift purchase re-checks the key while the user row is locked.
+- **A second invoice for the same purchase.** A new `Idempotency-Key` within 30 seconds does not open another provider session while the previous invoice for the same plan snapshot is still being created or is waiting for payment.
+- The schema stays `0038_v2_6_0_platform`. The Android buyer app stays **2.10.0** and the administrator app stays **2.12.0**. Details are in section 9.13 of `INSTRUCTION.md`, in `SECURITY.md` and in `RELEASE_NOTES_V3_0_1.md`.
 
 ### What 3.0.0-realise adds
 
@@ -267,6 +282,7 @@ The full procedure is `INSTRUCTION.md`, section 9.9. Do not commit `.env`, token
 | `DOCUMENTATION.md` | Index of current documents and archived audits |
 | `LICENSE` | Proprietary license 1.0, RU/EN |
 | `MOBILE.md` | Android and iOS functions, session, logo and build, RU/EN |
+| `RELEASE_NOTES_V3_0_1.md` | 3.0.1 audit: auto-renew, backups and wallet |
 | `RELEASE_NOTES_V3_0_0.md` | 3.0.0-realise audit and checklist result |
 | `RELEASE_NOTES_V2_13_0.md` | 2.13.0 app downloads |
 | `RELEASE_NOTES_V2_12_0.md` | 2.12.0 broadcast, function reference and the check |

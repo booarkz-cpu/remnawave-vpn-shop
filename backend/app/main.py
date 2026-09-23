@@ -22,11 +22,12 @@ from .models import User, Plan, Payment, Subscription, AuditLog, FinancialLedger
 from .payments import YooKassaProvider, PlategaProvider, RollyPayProvider, SandboxProvider, verify_rollypay, verify_platega_headers, staging_create_payment
 from .remnawave import RemnawaveClient
 from .provisioner import run_ssh, ProvisionError
-from .security import (hash_password, verify_password, encrypt_secret, issue_token, decode_token,
+from .security import (hash_password, verify_password, encrypt_secret, decrypt_secret, issue_token, decode_token,
                        current_admin, require_permission, verify_totp, generate_recovery_codes, set_recovery_codes, consume_recovery_code)
 from .totp import random_base32, provisioning_uri
 
-APP_VERSION = "3.0.0-realise"
+APP_VERSION = "3.0.1"
+# Historical compatibility marker: APP_VERSION = "3.0.0-realise"
 # Historical compatibility marker: APP_VERSION = "2.13.0"
 # Historical compatibility marker: APP_VERSION = "2.12.0"
 # Historical compatibility marker: APP_VERSION = "2.11.0"
@@ -1120,80 +1121,96 @@ async def create_payment(payload:dict, request:Request, db:AsyncSession=Depends(
     idem_fingerprint=f"{user.id}:{plan.id}:{idem}:{promo.code if promo else promotion.id if promotion else ''}{config_tag}"
     canonical_order_id=f"vpn-{user.id}-{plan.id}-{hashlib.sha256(idem_fingerprint.encode()).hexdigest()[:24]}"
 
-    # Idempotency lookup already happened above. The order lock below protects the
-    # first-time intent creation from concurrent callers using the same key.
-    requested_provider=payload.get("provider")
-    provider_order=await _payment_provider_order(db,requested_provider)
-    if not provider_order: raise HTTPException(503,"Нет доступных платёжных провайдеров")
-    provider_name=provider_order[0]
-    provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider(),"sandbox":SandboxProvider()}[provider_name]
-    order_id=canonical_order_id
-    lock_key=f"lock:payment-create:{hashlib.sha256(canonical_order_id.encode()).hexdigest()}"
+    # A fresh Idempotency-Key must not open a second provider session while this
+    # buyer already has an unresolved checkout for the same commercial snapshot.
+    intent_lock_key=f"lock:checkout-intent:{user.id}"
     try:
-        lock_key, lock_token=await _acquire_redis_lock(lock_key,ttl=300,conflict_message="Payment creation is already in progress")
-    except RuntimeError:
-        existing=(await db.execute(select(Payment).where(Payment.order_id==order_id))).scalar_one_or_none()
-        if existing: return {"id":existing.provider_payment_id,"url":existing.checkout_url,"provider":existing.provider,"status":existing.status}
-        raise HTTPException(409,"Payment creation is already in progress")
-    reservation=None; payment_row=None
+        intent_lock_key, intent_token=await _acquire_redis_lock(intent_lock_key,ttl=60,conflict_message="Payment creation is already in progress")
+    except RuntimeError as exc:
+        raise HTTPException(409,"Payment creation is already in progress") from exc
     try:
-        candidate=provider_order[0]
-        candidate_provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider(),"sandbox":SandboxProvider()}[candidate]
-        # Re-check after acquiring the distributed lock so two first-time callers cannot
-        # create two durable intents for the same idempotency key.
-        existing=(await db.execute(select(Payment).where(Payment.order_id==order_id).with_for_update())).scalar_one_or_none()
-        if existing:
-            return {"id":existing.provider_payment_id,"url":existing.checkout_url,"provider":existing.provider,"status":existing.status}
-        if promo:
-            reservation=await reserve_promo(db,promo,user.id,canonical_order_id)
-        # Durable payment intent BEFORE the external provider call. A process crash after
-        # provider acceptance cannot erase the fact that this order already exists.
-        payment_row=Payment(user_id=user.id,plan_id=plan.id,provider=candidate,provider_payment_id=None,order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=snap_days,traffic_limit_gb_snapshot=snap_traffic,device_limit_snapshot=snap_devices,remnawave_profile_id_snapshot=snap_profile,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="creating",fulfillment_status="pending",idempotency_key=idem,purpose="subscription",bonus_days=bonus_days)
-        db.add(payment_row)
-        await db.flush()
-        if reservation: reservation.payment_id=payment_row.id
-        await db.commit()
+        open_recent=(await db.execute(select(Payment).where(Payment.user_id==user.id,Payment.purpose=="subscription",Payment.provider!="wallet",Payment.plan_id==plan.id,Payment.amount==final_amount,Payment.duration_days_snapshot==snap_days,Payment.traffic_limit_gb_snapshot==snap_traffic,Payment.device_limit_snapshot==snap_devices,Payment.status.in_(["creating","pending","creation_unknown"]),Payment.created_at>=datetime.utcnow()-timedelta(seconds=30)).order_by(Payment.id.desc()))).scalars().first()
+        if open_recent:
+            if open_recent.status=="pending" and open_recent.provider_payment_id:
+                return {"id":open_recent.provider_payment_id,"url":open_recent.checkout_url,"provider":open_recent.provider,"status":open_recent.status}
+            raise HTTPException(409,"Платёж создаётся/имеет неопределённый результат; повторное списание заблокировано. Требуется сверка операции.")
+
+        # Idempotency lookup already happened above. The order lock below protects the
+        # first-time intent creation from concurrent callers using the same key.
+        requested_provider=payload.get("provider")
+        provider_order=await _payment_provider_order(db,requested_provider)
+        if not provider_order: raise HTTPException(503,"Нет доступных платёжных провайдеров")
+        provider_name=provider_order[0]
+        provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider(),"sandbox":SandboxProvider()}[provider_name]
+        order_id=canonical_order_id
+        lock_key=f"lock:payment-create:{hashlib.sha256(canonical_order_id.encode()).hexdigest()}"
         try:
-            result=await candidate_provider.create(final_amount,canonical_order_id,f"VPN {plan.name}",settings.cabinet_url or settings.mini_app_url)
-            if not result.get("id"):
-                raise RuntimeError("Payment provider returned no payment ID")
-            provider_name=candidate; provider=candidate_provider
-            health=(await db.execute(select(PaymentProviderHealth).where(PaymentProviderHealth.provider==candidate).with_for_update())).scalar_one_or_none()
-            if health:
-                health.success_count += 1; health.failure_count=0; health.last_error=None; health.circuit_open_until=None; health.updated_at=datetime.utcnow()
-            payment_row=(await db.execute(select(Payment).where(Payment.id==payment_row.id).with_for_update())).scalar_one()
-            payment_row.provider_payment_id=result["id"]; payment_row.checkout_url=result.get("url"); payment_row.fulfillment_terminal=False
-            if candidate=="sandbox" and result.get("status")=="succeeded":
-                payment_row.status="paid"; payment_row.paid_at=datetime.utcnow(); await db.commit()
-                try:
-                    await fulfill(payment_row.id, db)
-                except Exception:
-                    pass
-            else:
-                payment_row.status="pending"; await db.commit()
-        except Exception as exc:
-            last_error=str(exc)[:1000]
-            await db.rollback()
-            health=(await db.execute(select(PaymentProviderHealth).where(PaymentProviderHealth.provider==candidate).with_for_update())).scalar_one_or_none()
-            if health:
-                health.failure_count += 1; health.last_error=last_error; health.updated_at=datetime.utcnow()
-                if health.failure_count >= 3: health.circuit_open_until=datetime.utcnow()+timedelta(minutes=5)
-            payment_row=(await db.execute(select(Payment).where(Payment.id==payment_row.id).with_for_update())).scalar_one()
-            payment_row.status="creation_unknown"; payment_row.fulfillment_terminal=True; payment_row.fulfillment_error=last_error
-            await audit(db,"payment.creation.uncertain",str(user.id),str(payment_row.id),{"provider":candidate,"error":last_error,"fallback_blocked":True})
+            lock_key, lock_token=await _acquire_redis_lock(lock_key,ttl=300,conflict_message="Payment creation is already in progress")
+        except RuntimeError:
+            existing=(await db.execute(select(Payment).where(Payment.order_id==order_id))).scalar_one_or_none()
+            if existing: return {"id":existing.provider_payment_id,"url":existing.checkout_url,"provider":existing.provider,"status":existing.status}
+            raise HTTPException(409,"Payment creation is already in progress")
+        reservation=None; payment_row=None
+        try:
+            candidate=provider_order[0]
+            candidate_provider={"yookassa":YooKassaProvider(),"platega":PlategaProvider(),"rollypay":RollyPayProvider(),"sandbox":SandboxProvider()}[candidate]
+            # Re-check after acquiring the distributed lock so two first-time callers cannot
+            # create two durable intents for the same idempotency key.
+            existing=(await db.execute(select(Payment).where(Payment.order_id==order_id).with_for_update())).scalar_one_or_none()
+            if existing:
+                return {"id":existing.provider_payment_id,"url":existing.checkout_url,"provider":existing.provider,"status":existing.status}
+            if promo:
+                reservation=await reserve_promo(db,promo,user.id,canonical_order_id)
+            # Durable payment intent BEFORE the external provider call. A process crash after
+            # provider acceptance cannot erase the fact that this order already exists.
+            payment_row=Payment(user_id=user.id,plan_id=plan.id,provider=candidate,provider_payment_id=None,order_id=order_id,amount=final_amount,original_amount=base_amount,discount_amount=discount_amount,duration_days_snapshot=snap_days,traffic_limit_gb_snapshot=snap_traffic,device_limit_snapshot=snap_devices,remnawave_profile_id_snapshot=snap_profile,referrer_id_snapshot=user.referred_by_id,promo_code=(promo.code if promo else None),currency=settings.default_currency,status="creating",fulfillment_status="pending",idempotency_key=idem,purpose="subscription",bonus_days=bonus_days)
+            db.add(payment_row)
+            await db.flush()
+            if reservation: reservation.payment_id=payment_row.id
             await db.commit()
-            raise HTTPException(503,"Результат создания платежа не определён. Повторное списание заблокировано; операция будет сверена.")
-        if result.get("recurring_token") and provider_name == "yookassa" and result.get("status") == "succeeded":
-            existing_method=(await db.execute(select(AutoRenewMethod).where(AutoRenewMethod.user_id==user.id).with_for_update())).scalar_one_or_none()
-            token_enc=encrypt_secret(str(result["recurring_token"]))
-            if existing_method:
-                existing_method.provider="yookassa"; existing_method.external_token_encrypted=token_enc; existing_method.enabled=True
-            else:
-                db.add(AutoRenewMethod(user_id=user.id,provider="yookassa",external_token_encrypted=token_enc,enabled=True))
-            await db.commit()
-        return result
+            try:
+                result=await candidate_provider.create(final_amount,canonical_order_id,f"VPN {plan.name}",settings.cabinet_url or settings.mini_app_url)
+                if not result.get("id"):
+                    raise RuntimeError("Payment provider returned no payment ID")
+                provider_name=candidate; provider=candidate_provider
+                health=(await db.execute(select(PaymentProviderHealth).where(PaymentProviderHealth.provider==candidate).with_for_update())).scalar_one_or_none()
+                if health:
+                    health.success_count += 1; health.failure_count=0; health.last_error=None; health.circuit_open_until=None; health.updated_at=datetime.utcnow()
+                payment_row=(await db.execute(select(Payment).where(Payment.id==payment_row.id).with_for_update())).scalar_one()
+                payment_row.provider_payment_id=result["id"]; payment_row.checkout_url=result.get("url"); payment_row.fulfillment_terminal=False
+                if candidate=="sandbox" and result.get("status")=="succeeded":
+                    payment_row.status="paid"; payment_row.paid_at=datetime.utcnow(); await db.commit()
+                    try:
+                        await fulfill(payment_row.id, db)
+                    except Exception:
+                        pass
+                else:
+                    payment_row.status="pending"; await db.commit()
+            except Exception as exc:
+                last_error=str(exc)[:1000]
+                await db.rollback()
+                health=(await db.execute(select(PaymentProviderHealth).where(PaymentProviderHealth.provider==candidate).with_for_update())).scalar_one_or_none()
+                if health:
+                    health.failure_count += 1; health.last_error=last_error; health.updated_at=datetime.utcnow()
+                    if health.failure_count >= 3: health.circuit_open_until=datetime.utcnow()+timedelta(minutes=5)
+                payment_row=(await db.execute(select(Payment).where(Payment.id==payment_row.id).with_for_update())).scalar_one()
+                payment_row.status="creation_unknown"; payment_row.fulfillment_terminal=True; payment_row.fulfillment_error=last_error
+                await audit(db,"payment.creation.uncertain",str(user.id),str(payment_row.id),{"provider":candidate,"error":last_error,"fallback_blocked":True})
+                await db.commit()
+                raise HTTPException(503,"Результат создания платежа не определён. Повторное списание заблокировано; операция будет сверена.")
+            if result.get("recurring_token") and provider_name == "yookassa" and result.get("status") == "succeeded":
+                existing_method=(await db.execute(select(AutoRenewMethod).where(AutoRenewMethod.user_id==user.id).with_for_update())).scalar_one_or_none()
+                token_enc=encrypt_secret(str(result["recurring_token"]))
+                if existing_method:
+                    existing_method.provider="yookassa"; existing_method.external_token_encrypted=token_enc; existing_method.enabled=True
+                else:
+                    db.add(AutoRenewMethod(user_id=user.id,provider="yookassa",external_token_encrypted=token_enc,enabled=True))
+                await db.commit()
+            return result
+        finally:
+            await _release_payment_side_effect_lock(lock_key,lock_token)
     finally:
-        await _release_payment_side_effect_lock(lock_key,lock_token)
+        await _release_payment_side_effect_lock(intent_lock_key, intent_token)
 _LOCK_RENEW_TASKS: dict[str, asyncio.Task] = {}
 
 async def _renew_redis_lock(key: str, token: str, ttl: int):
@@ -1774,7 +1791,7 @@ async def auto_renew_scheduler():
                                 # YooKassa idempotency is keyed by order_id, so retrying the
                                 # same durable intent is safe even if the previous HTTP response
                                 # was lost after the provider accepted the charge.
-                                token=__import__("backend.app.security",fromlist=["decrypt_secret"]).decrypt_secret(method.external_token_encrypted)
+                                token=decrypt_secret(method.external_token_encrypted)
                                 result=await YooKassaProvider().charge_recurring(Decimal(str(existing.amount)),existing.order_id,f"Auto-renew {plan.name}",token)
                                 existing.provider_payment_id=result["id"]; existing.status="pending"; await db.commit()
                             if existing.status=="pending":
@@ -1810,7 +1827,7 @@ async def auto_renew_scheduler():
                                 continue
                             failed_count=sum(1 for item in attempts if item.status in {"failed","canceled","cancelled"})
                             order_id=f"{prefix}-retry-{failed_count+1}"
-                        token=__import__("backend.app.security",fromlist=["decrypt_secret"]).decrypt_secret(method.external_token_encrypted)
+                        token=decrypt_secret(method.external_token_encrypted)
                         # Persist the payment intent BEFORE the external charge. If the
                         # process dies after YooKassa accepts the charge but before the
                         # response/DB commit, the next run can safely retry the SAME
@@ -2087,8 +2104,8 @@ async def wallet_spend(payload:dict, request:Request, db:AsyncSession=Depends(ge
             plan_id=int(payload.get("plan_id"))
         except (TypeError, ValueError):
             raise HTTPException(400,"Invalid plan_id")
-    idem=request.headers.get("Idempotency-Key") or (f"wallet-spend-{user.id}-{plan_id}-{uuid.uuid4().hex}" if plan_id is not None else f"wallet-spend-{user.id}-{uuid.uuid4().hex}")
-    if len(idem)>128: raise HTTPException(400,"Idempotency-Key is required")
+    idem=request.headers.get("Idempotency-Key")
+    if not idem or len(idem)>128: raise HTTPException(400,"Idempotency-Key is required")
     existing=(await db.execute(select(Payment).where(Payment.user_id==user.id,Payment.idempotency_key==idem))).scalar_one_or_none()
     if existing:
         if existing.provider != "wallet":
@@ -2133,6 +2150,15 @@ async def wallet_spend(payload:dict, request:Request, db:AsyncSession=Depends(ge
     lock,token=await _acquire_user_fulfillment_lock(user.id,ttl=900)
     try:
         user=(await db.execute(select(User).where(User.id==user.id).with_for_update())).scalar_one()
+        existing=(await db.execute(select(Payment).where(Payment.user_id==user.id,Payment.idempotency_key==idem).with_for_update())).scalar_one_or_none()
+        if existing:
+            return {"ok":True,"payment_id":existing.id,"status":existing.status,"fulfillment_status":existing.fulfillment_status}
+        cutoff=datetime.utcnow()-timedelta(seconds=30)
+        duplicate_filters=[Payment.user_id==user.id,Payment.provider=="wallet",Payment.purpose=="subscription",Payment.plan_id==plan.id,Payment.amount==final_amount,Payment.duration_days_snapshot==snap_days,Payment.traffic_limit_gb_snapshot==snap_traffic,Payment.device_limit_snapshot==snap_devices,Payment.created_at>=cutoff,Payment.status.notin_(["failed","canceled","cancelled","refunded","refunded_pending_revoke"])]
+        duplicate_filters.append(Payment.promo_code==promo.code if promo is not None else Payment.promo_code.is_(None))
+        duplicate=(await db.execute(select(Payment).where(*duplicate_filters).order_by(Payment.id.desc()))).scalars().first()
+        if duplicate:
+            raise HTTPException(409,"Повторное списание с баланса заблокировано. Подождите полминуты и повторите покупку.")
         balance=_money(user.wallet_balance or 0)
         if balance < final_amount: raise HTTPException(402,"Недостаточно средств на балансе")
         order_id=f"wallet-{user.id}-{plan.id}-{hashlib.sha256(idem.encode()).hexdigest()[:24]}"
@@ -2173,6 +2199,9 @@ async def purchase_gift(payload:dict, request:Request, db:AsyncSession=Depends(g
     lock,token=await _acquire_user_fulfillment_lock(user.id,ttl=300)
     try:
         user=(await db.execute(select(User).where(User.id==user.id).with_for_update())).scalar_one()
+        existing=(await db.execute(select(GiftCode).where(GiftCode.idempotency_key==idem,GiftCode.purchaser_user_id==user.id).with_for_update())).scalar_one_or_none()
+        if existing:
+            return {"ok":True,"code":existing.code,"bot_claim_url":(f"https://t.me/{settings.bot_username}?start={existing.code}" if settings.bot_username else None),"wallet_balance":str(user.wallet_balance)}
         balance=_money(user.wallet_balance or 0)
         if balance < price: raise HTTPException(402,"Недостаточно средств на балансе")
         code="GIFT_"+secrets.token_hex(20)
@@ -3663,7 +3692,7 @@ async def validate_backup_archive(backup_id:int,db:AsyncSession=Depends(get_db),
             if not password_enc: raise HTTPException(500,"Backup password is not configured")
             dec=work/"backup.tar.gz"
             proc=await asyncio.create_subprocess_exec("openssl","enc","-d","-aes-256-cbc","-pbkdf2","-in",str(source),"-out",str(dec),"-pass","stdin",stdin=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
-            _,err=await proc.communicate((__import__("backend.app.security",fromlist=["decrypt_secret"]).decrypt_secret(password_enc)+"\n").encode())
+            _,err=await proc.communicate((decrypt_secret(password_enc)+"\n").encode())
             if proc.returncode!=0: raise HTTPException(400,"Backup decryption failed")
             source=dec
         with tarfile.open(source,"r:gz") as tar:

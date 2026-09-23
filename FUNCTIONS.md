@@ -1,8 +1,14 @@
 # Разбор функций / Function reference
 
-Версия приложения: **3.0.0-realise**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая рассылка — в `INSTRUCTION.md`, раздел 9.10, и в `RELEASE_NOTES_V2_12_0.md`. Исправления аудита — раздел 9.12 и `RELEASE_NOTES_V3_0_0.md`.
+Версия приложения: **3.0.1**. Полное описание модулей и их назначения — в `MODULES.md` (русский и английский). Функции четырёх приложений и установка APK — в `MOBILE.md`. Пошаговая рассылка — в `INSTRUCTION.md`, раздел 9.10, и в `RELEASE_NOTES_V2_12_0.md`. Исправления 3.0.1 — раздел 9.13 и `RELEASE_NOTES_V3_0_1.md`. Исправления 3.0.0-realise — раздел 9.12 и `RELEASE_NOTES_V3_0_0.md`.
 
-Application version: **3.0.0-realise**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The broadcast walkthrough is section 9.10 of `INSTRUCTION.md` and `RELEASE_NOTES_V2_12_0.md`. The audit fixes are section 9.12 and `RELEASE_NOTES_V3_0_0.md`.
+Application version: **3.0.1**. Module purposes are in `MODULES.md`. The four apps and the APK install are in `MOBILE.md`. The broadcast walkthrough is section 9.10 of `INSTRUCTION.md` and `RELEASE_NOTES_V2_12_0.md`. The 3.0.1 fixes are section 9.13 and `RELEASE_NOTES_V3_0_1.md`. The 3.0.0-realise fixes are section 9.12 and `RELEASE_NOTES_V3_0_0.md`.
+
+## Аудит 3.0.1 / 3.0.1 audit
+
+`decrypt_secret` расшифровывает токен автопродления и пароль копии. `wallet_spend` требует `Idempotency-Key` и отклоняет второе списание того же снимка тарифа в течение 30 секунд. Создание платежа под блокировкой `lock:checkout-intent` не открывает второй счёт, пока первый ещё не завершён.
+
+`decrypt_secret` decrypts the auto-renew token and the backup password. `wallet_spend` requires `Idempotency-Key` and rejects a second debit of the same plan snapshot within 30 seconds. Payment creation under `lock:checkout-intent` does not open a second invoice while the first one is still open.
 
 ## Аудит 3.0.0-realise / 3.0.0-realise audit
 

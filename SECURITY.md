@@ -1,4 +1,18 @@
-# Security / Безопасность — Remnawave VPN Shop 3.0.0-realise
+# Security / Безопасность — Remnawave VPN Shop 3.0.1
+
+## Аудит 3.0.1 / 3.0.1 audit
+
+- Автопродление YooKassa и проверка шифрованной резервной копии вызывают `decrypt_secret` из пакета приложения. Импорт `backend.app.security` в контейнере `uvicorn app.main:app` не существует и больше не используется.
+- `POST /api/me/wallet/spend` без заголовка `Idempotency-Key` отвечает 400. Сервер не подставляет случайный ключ. Повтор с тем же ключом, в том числе пока первая операция ещё держит блокировку пользователя, возвращает уже созданный платёж и не списывает баланс второй раз.
+- Другой ключ на тот же тариф, ту же цену и тот же промокод в течение 30 секунд отвечает 409 «Повторное списание с баланса заблокировано. Подождите полминуты и повторите покупку.»
+- `POST /api/me/gifts/purchase` повторно ищет подарок по ключу идемпотентности уже под блокировкой пользователя, поэтому параллельный повтор не создаёт второй код и не отвечает 500.
+- `POST /api/payments/create` с новым ключом не открывает второй сеанс провайдера, пока в последние 30 секунд у того же снимка тарифа есть счёт в состоянии `creating`, `pending` или `creation_unknown`. Готовый счёт `pending` возвращается снова.
+
+- Auto-renew and encrypted backup validation call `decrypt_secret` from the application package. The import `backend.app.security` does not exist in the `uvicorn app.main:app` container and is no longer used.
+- `POST /api/me/wallet/spend` without an `Idempotency-Key` header answers 400. The server does not invent a random key. A retry with the same key, including while the first operation still holds the user lock, returns the payment already created and does not debit the balance again.
+- A different key for the same plan, price and promo code within 30 seconds answers 409 «Повторное списание с баланса заблокировано. Подождите полминуты и повторите покупку.»
+- `POST /api/me/gifts/purchase` looks up the gift by idempotency key again while the user row is locked, so a parallel retry does not create a second code and does not answer 500.
+- `POST /api/payments/create` with a new key does not open a second provider session while the same plan snapshot has an invoice in `creating`, `pending` or `creation_unknown` from the last 30 seconds. An existing `pending` invoice is returned again.
 
 ## Аудит 3.0.0-realise / 3.0.0-realise audit
 
